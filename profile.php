@@ -51,24 +51,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     <title>My Profile</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 500px; margin: 20px auto; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .page-header h2 { margin: 0; color: #1f2937; }
+        .header-actions a { font-weight: bold; text-decoration: none; color: #007bff; padding: 8px 15px; border: 1px solid #007bff; border-radius: 4px; transition: 0.3s; }
+        .header-actions a:hover { background: #007bff; color: white; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 500px; margin: 0 auto; }
         .info-group { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .info-label { font-weight: bold; color: #666; font-size: 13px; }
         .info-value { font-size: 16px; font-weight: bold; margin-top: 5px; color: #111; }
         input { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; }
+        button { background: #007bff; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; }
         button:hover { background: #0056b3; }
-        .btn-back { display: block; text-align: center; margin-top: 15px; color: #6c757d; text-decoration: none; font-size: 14px; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h2>My Profile Settings</h2>
-    <a href="<?php echo htmlspecialchars($back_link); ?>" style="font-weight: bold; text-decoration: none; color: #007bff;">
-        ← Back to Dashboard
-    </a>
+
+<div class="page-header">
+    <h2>👤 My Profile Settings</h2>
+    <div class="header-actions">
+        <a href="<?php echo htmlspecialchars($back_link); ?>">← Back to Dashboard</a>
+    </div>
 </div>
 
 <div class="card">
@@ -86,7 +89,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     <h3 style="margin-top: 30px; border-top: 2px solid #f4f7f6; padding-top: 20px;">Security & Change Password</h3>
     
     <?php if(!empty($msg)): ?>
-        <div style="color: <?php echo $status=='success'?'green':'red'; ?>; font-weight:bold; margin-bottom:15px; font-size:14px; text-align:center;">
+        <div style="color: <?php echo $status=='success'?'#155724':'#721c24'; ?>; background: <?php echo $status=='success'?'#d4edda':'#f8d7da'; ?>; padding: 10px; border-radius: 4px; font-weight:bold; margin-bottom:15px; font-size:14px; text-align:center;">
             <?php echo $msg; ?>
         </div>
     <?php endif; ?>
@@ -100,4 +103,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 </div>
 
 </body>
-</html> 
+</html>

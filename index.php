@@ -30,7 +30,6 @@ $result = $stmt->get_result();
 
 $proj_list_res = $conn->query("SELECT project_id, project_name, customer_name FROM projects ORDER BY project_id ASC");
 
-// Compute summary stats
 $total_records = 0;
 $total_minutes = 0;
 $rows_cache = [];
@@ -64,30 +63,27 @@ function fmtDate($d) {
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
 
-        /* ── Top bar ── */
-        .topbar { background: #1e2330; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-        .topbar h2 { color: white; margin: 0; font-size: 16px; }
-        .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .topbar a { color: #94a3b8; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
-        .topbar a:hover { background: rgba(255,255,255,0.1); color: white; }
-        .topbar a.admin-btn { background: #166534; color: #d1fae5; }
-        .topbar a.logout-btn { color: #f87171; }
+        .page { padding: 20px; max-width: 1400px; margin: 0 auto; }
 
-        /* ── Page ── */
-        .page { padding: 20px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .page-header h2 { margin: 0; color: #1f2937; font-size: 20px; }
+        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .header-actions a { font-weight: bold; text-decoration: none; color: #007bff; padding: 8px 15px; border: 1px solid #007bff; border-radius: 4px; transition: 0.3s; font-size: 14px; }
+        .header-actions a:hover { background: #007bff; color: white; }
+        .header-actions a.btn-admin { color: #166534; border-color: #166534; }
+        .header-actions a.btn-admin:hover { background: #166534; color: white; }
+        .header-actions a.btn-logout { color: #dc3545; border-color: #dc3545; }
+        .header-actions a.btn-logout:hover { background: #dc3545; color: white; }
 
-        /* ── Summary cards ── */
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
         .stat.green { border-top-color: #28a745; }
         .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
         .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
 
-        /* ── Create button ── */
         .btn-create { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 11px 22px; border-radius: 5px; font-weight: bold; font-size: 15px; margin-bottom: 16px; width: 100%; text-align: center; }
         .btn-create:hover { background: #0056b3; }
 
-        /* ── Search bar ── */
         .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
         .search-bar-wrap input { flex: 2; min-width: 120px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
         .search-bar-wrap input[type="date"] { flex: 1.2; min-width: 110px; }
@@ -103,7 +99,6 @@ function fmtDate($d) {
         .sel-opt.active { background: #e6f0ff; color: #007bff; font-weight: bold; }
         .show { display: block !important; }
 
-        /* ── Table ── */
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
         .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; }
         .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -114,25 +109,20 @@ function fmtDate($d) {
 
         .is-hidden { display: none !important; }
 
-        /* Activity cell */
         .act-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; font-size: 12px; color: #555; }
         .act-cell.expanded { display: block; max-height: none; }
 
-        /* Date range cell */
         .date-range { font-size: 12px; line-height: 1.6; }
         .date-range .start { color: #1d4ed8; font-weight: 600; }
         .date-range .end { color: #7c3aed; font-weight: 600; }
         .date-range .time { color: #64748b; font-size: 11px; }
 
-        /* Duration badge */
         .dur-badge { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
         .dur-badge.multiday { background: #dbeafe; color: #1e40af; }
 
-        /* Action buttons */
         .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; margin-right: 4px; }
         .btn-delete { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
 
-        /* Sort dropdown */
         .sort-wrap { display: inline-flex; align-items: center; gap: 5px; }
         .sort-btn { background: none; border: none; width: 14px; height: 14px; cursor: pointer; position: relative; padding: 0; }
         .sort-btn::before { content:""; position:absolute; top:1px; left:2px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:5px solid #888; }
@@ -155,20 +145,18 @@ function fmtDate($d) {
 </head>
 <body>
 
-<div class="topbar">
-    <h2>👷 <?= htmlspecialchars($current_user_name) ?></h2>
-    <div class="nav">
-        <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
-            <a href="admin.php" class="admin-btn">⚙️ Admin</a>
-        <?php endif; ?>
-        <a href="profile.php">👤 Profile</a>
-        <a href="login.php?action=logout" class="logout-btn">Logout</a>
-    </div>
-</div>
-
 <div class="page">
+    <div class="page-header">
+        <h2>👷 <?php echo htmlspecialchars($current_user_name); ?>'s Dashboard</h2>
+        <div class="header-actions">
+            <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
+                <a href="admin.php" class="btn-admin">⚙️ Admin</a>
+            <?php endif; ?>
+            <a href="profile.php">👤 Profile</a>
+            <a href="login.php?action=logout" class="btn-logout">Logout</a>
+        </div>
+    </div>
 
-    <!-- Stats -->
     <div class="stats-bar">
         <div class="stat">
             <div class="stat-label">Total Records</div>
@@ -182,7 +170,6 @@ function fmtDate($d) {
 
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
-    <!-- Search -->
     <div class="search-bar-wrap">
         <input type="text" id="txt-search" placeholder="🔍 Search activity, project, customer..." oninput="doFilter()">
         <div class="proj-select-wrap">
@@ -206,7 +193,6 @@ function fmtDate($d) {
         <button class="btn-clear" onclick="clearFilters()">Clear</button>
     </div>
 
-    <!-- Table -->
     <div class="card">
         <div class="card-hdr">My Timesheet Records</div>
         <?php if (empty($rows_cache)): ?>
@@ -355,14 +341,12 @@ window.addEventListener('click', e => {
     if (!e.target.closest('.proj-select-wrap')) document.getElementById('proj-drop').classList.remove('show');
 });
 
-// Activity expand
 document.querySelectorAll('.act-cell').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('expanded'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('expanded'); });
 });
 
-// Sort
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id !== id) m.classList.remove('show-sort'); });

@@ -6,7 +6,6 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
     exit;
 }
 
-// ── Bulk delete ───────────────────────────────────────────────────────────────
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['bulk_action']) && $_POST['bulk_action'] === 'delete') {
     if (isset($_POST['selected_ts']) && is_array($_POST['selected_ts'])) {
         $ids = array_map('intval', $_POST['selected_ts']);
@@ -20,7 +19,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['bulk_action']) && $_PO
     }
 }
 
-// ── Single delete ─────────────────────────────────────────────────────────────
 if (isset($_GET['delete_ts'])) {
     $del_id = intval($_GET['delete_ts']);
     $stmt = $conn->prepare("DELETE FROM timesheets WHERE id = ?");
@@ -31,7 +29,6 @@ if (isset($_GET['delete_ts'])) {
     exit;
 }
 
-// ── Fetch all timesheets ──────────────────────────────────────────────────────
 $ts_result = $conn->query("
     SELECT t.*, p.project_name, p.customer_name, p.estimate_time
     FROM timesheets t
@@ -42,7 +39,6 @@ if (!$ts_result) die("DB Error: " . $conn->error);
 
 $proj_list_result = $conn->query("SELECT project_id, project_name, customer_name FROM projects ORDER BY project_name ASC");
 
-// Cache rows + compute minutes
 $rows_cache = [];
 while ($row = $ts_result->fetch_assoc()) {
     $start = new DateTime($row['start_date'] . ' ' . $row['start_time']);
@@ -54,7 +50,6 @@ while ($row = $ts_result->fetch_assoc()) {
     $rows_cache[] = $row;
 }
 
-// Per-project aggregates (for summary card)
 $proj_agg = [];
 foreach ($rows_cache as $r) {
     $pid = $r['project_id'];
@@ -90,18 +85,15 @@ function fmtDate($d) {
 <title>Audit Timesheets — Admin</title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; font-size: 13px; }
+body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; font-size: 13px; }
 
-/* ── Top bar ── */
-.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.topbar h2 { color: white; margin: 0; font-size: 16px; }
-.topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
-.topbar a:hover { color: #ffda6a; }
+.page { box-sizing: border-box; }
 
-/* ── Page ── */
-.page { padding: 20px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.page-header h2 { margin: 0; font-size: 18px; }
+.header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.header-actions a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 
-/* ── Stats ── */
 .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .stat { background: white; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 120px; border-top: 3px solid #007bff; }
 .stat.green { border-top-color: #28a745; }
@@ -109,7 +101,6 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
 .stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; }
 
-/* ── Search bar ── */
 .search-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .search-wrap input[type="text"], .search-wrap input[type="date"] { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
 .search-wrap input[type="text"] { flex: 3; min-width: 140px; }
@@ -126,10 +117,8 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 .sel-opt.active { background: #e6f0ff; color: #007bff; font-weight: bold; }
 .show-drop { display: block !important; }
 
-/* Engineer filter */
 .eng-wrap { flex: 2; min-width: 120px; position: relative; }
 
-/* ── Project Summary Card ── */
 .summary-card { display: none; background: white; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); border-left: 5px solid #007bff; margin-bottom: 14px; }
 .summary-card h4 { margin: 0 0 12px 0; color: #007bff; font-size: 15px; }
 .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -137,7 +126,6 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 .sum-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 3px; }
 .sum-value { font-size: 14px; font-weight: 700; color: #1e293b; }
 
-/* ── Bulk Toolbar ── */
 #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 #bulk-toolbar span { font-size: 13px; font-weight: 600; color: #1e40af; flex: 1; }
 .btn-bulk { border: none; padding: 7px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
@@ -145,13 +133,11 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 .btn-bulk-del { background: #dc3545; color: white; }
 .btn-desel { background: #e2e8f0; color: #374151; }
 
-/* ── Card ── */
 .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
 .card-hdr { padding: 12px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .card-hdr h3 { margin: 0; font-size: 15px; }
 .btn-export-all { background: #6c757d; color: white; border: none; padding: 7px 14px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; }
 
-/* ── Table ── */
 .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 th, td { padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
@@ -159,35 +145,28 @@ th { background: #f8fafc; font-weight: 600; color: #475569; white-space: nowrap;
 tbody tr:hover { background: #f8faff; }
 .is-hidden { display: none !important; }
 
-/* Date-range cell */
 .dr { line-height: 1.6; }
 .dr .d-start { color: #1d4ed8; font-weight: 600; font-size: 12px; }
 .dr .d-end   { color: #7c3aed; font-weight: 600; font-size: 12px; }
 .dr .d-time  { color: #94a3b8; font-size: 11px; }
 
-/* Duration badge */
 .dur { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 7px; border-radius: 10px; font-size: 11px; white-space: nowrap; }
 .dur.multi { background: #dbeafe; color: #1e40af; }
 
-/* Mandays badge */
 .md-badge { font-size: 11px; font-weight: bold; }
 .md-target { color: #1e40af; }
 .md-actual { color: #065f46; }
 
-/* Gap badge */
 .gap-over { color: #dc3545; font-weight: bold; font-size: 11px; }
 .gap-under { color: #28a745; font-weight: bold; font-size: 11px; }
 .gap-ok    { color: #6c757d; font-weight: bold; font-size: 11px; }
 
-/* Activity */
 .act { max-width: 200px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; color: #555; font-size: 11px; }
 .act.exp { display: block; max-height: none; }
 
-/* Actions */
 .btn-edit { background: #ffc107; color: #333; padding: 3px 8px; text-decoration: none; border-radius: 3px; font-size: 11px; font-weight: bold; margin-right: 3px; }
 .btn-del  { background: #dc3545; color: white; padding: 3px 8px; text-decoration: none; border-radius: 3px; font-size: 11px; font-weight: bold; }
 
-/* Sort */
 .sort-wrap { display: inline-flex; align-items: center; gap: 4px; position: relative; }
 .sort-btn { background:none; border:none; width:12px; height:12px; cursor:pointer; position:relative; padding:0; }
 .sort-btn::before { content:""; position:absolute; top:1px; left:1px; border-left:4px solid transparent; border-right:4px solid transparent; border-bottom:4px solid #888; }
@@ -200,7 +179,7 @@ tbody tr:hover { background: #f8faff; }
 .show-sort { display:block !important; }
 
 @media (max-width: 600px) {
-    .page { padding: 10px; }
+    body { margin: 15px; }
     .stats-bar { gap: 8px; }
     .stat { min-width: 100px; }
 }
@@ -208,14 +187,14 @@ tbody tr:hover { background: #f8faff; }
 </head>
 <body>
 
-<div class="topbar">
-    <h2>📊 Timesheet Audit — All Engineers</h2>
-    <a href="admin.php">← Back to Admin</a>
-</div>
-
 <div class="page">
+    <div class="page-header">
+        <h2>📊 Timesheet Audit — All Engineers</h2>
+        <div class="header-actions">
+            <a href="admin.php">← Back to Admin</a>
+        </div>
+    </div>
 
-    <!-- Stats -->
     <?php
     $total_recs = count($rows_cache);
     $total_mins_all = array_sum(array_column($rows_cache, '_minutes'));
@@ -243,7 +222,6 @@ tbody tr:hover { background: #f8faff; }
         </div>
     </div>
 
-    <!-- Bulk Toolbar -->
     <div id="bulk-toolbar">
         <span id="bulk-count">0 selected</span>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -253,7 +231,6 @@ tbody tr:hover { background: #f8faff; }
         </div>
     </div>
 
-    <!-- Search -->
     <div class="search-wrap">
         <input type="text" id="txt-search" placeholder="🔍 Search engineer, project, activity..." oninput="doFilter()">
         <div class="proj-wrap">
@@ -274,7 +251,6 @@ tbody tr:hover { background: #f8faff; }
                 </div>
             </div>
         </div>
-        <!-- Engineer filter -->
         <div class="eng-wrap">
             <div class="sel-trigger" id="eng-trigger" onclick="toggleDrop('eng-drop', event)">
                 <span id="eng-label">All Engineers</span>
@@ -299,7 +275,6 @@ tbody tr:hover { background: #f8faff; }
         <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
 
-    <!-- Project Summary Card -->
     <div class="summary-card" id="sum-card">
         <h4>📈 Project Overview</h4>
         <div class="sum-grid">
@@ -314,7 +289,6 @@ tbody tr:hover { background: #f8faff; }
         </div>
     </div>
 
-    <!-- Table -->
     <form id="bulk-form" method="POST" action="admin_timesheets.php">
         <input type="hidden" name="bulk_action" id="bulk-action-field" value="">
 
@@ -453,7 +427,6 @@ let activeProjFilter = '';
 let activeEngFilter  = '';
 let origRows = null;
 
-// ── Filter ────────────────────────────────────────────────────────────────────
 function doFilter() {
     const txt  = document.getElementById('txt-search').value.toLowerCase();
     const date = document.getElementById('date-search').value;
@@ -515,7 +488,6 @@ function clearAllFilters() {
     doFilter();
 }
 
-// ── Dropdown helpers ──────────────────────────────────────────────────────────
 function toggleDrop(id, e) {
     e.stopPropagation();
     ['proj-drop','eng-drop'].forEach(d => { if (d !== id) document.getElementById(d).classList.remove('show-drop'); });
@@ -547,7 +519,6 @@ window.addEventListener('click', () => {
     document.getElementById('eng-drop').classList.remove('show-drop');
 });
 
-// ── Checkbox / bulk ───────────────────────────────────────────────────────────
 function onChkChange() {
     const checked = document.querySelectorAll('.ts-chk:checked').length;
     const toolbar = document.getElementById('bulk-toolbar');
@@ -580,14 +551,12 @@ function submitBulkDelete() {
 }
 function exportAll() { window.location.href = 'export.php'; }
 
-// ── Activity expand ───────────────────────────────────────────────────────────
 document.querySelectorAll('.act').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('exp'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('exp'); });
 });
 
-// ── Sort ──────────────────────────────────────────────────────────────────────
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id!==id) m.classList.remove('show-sort'); });
