@@ -102,8 +102,8 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
 .page { max-width: 900px; margin: 20px auto; padding: 0 20px 60px; }
 
-.section { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
-.section-hdr { background: #343a40; color: white; padding: 10px 20px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.section { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: visible; }
+.section-hdr { background: #343a40; color: white; padding: 10px 20px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
 .section-hdr.green { background: #155724; }
 .section-body { padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
 .section-body.one-col { grid-template-columns: 1fr; }

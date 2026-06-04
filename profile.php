@@ -53,17 +53,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 * { box-sizing: border-box; }
 body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
-.topbar { padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
-.topbar h2 { margin: 0; font-size: 18px; }
-.topbar a { font-weight: bold; text-decoration: none; font-size: 13px; }
-
-.admin-topbar { background: #343a40; }
-.admin-topbar h2 { color: white; }
-.admin-topbar a { color: #ffc107; }
-
-.engineer-topbar { background: #ffffff; }
-.engineer-topbar h2 { color: #1f2937; }
-.engineer-topbar a { color: #007bff; }
+.topbar { background: #ffffff; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
+.topbar h2 { color: #1f2937; margin: 0; font-size: 18px; }
+.topbar a { color: #007bff; font-weight: bold; text-decoration: none; font-size: 13px; }
 
 .page { max-width: 900px; margin: 20px auto; padding: 0 20px 60px; }
 
@@ -99,7 +91,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 </head>
 <body>
 
-<div class="topbar <?php echo $is_admin ? 'admin-topbar' : 'engineer-topbar'; ?>">
+<div class="topbar">
     <h2>👤 My Profile Settings</h2>
     <a href="<?php echo htmlspecialchars($back_link); ?>">← Back to Dashboard</a>
 </div>
