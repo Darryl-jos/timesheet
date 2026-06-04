@@ -10,7 +10,6 @@ $current_user_id = $_SESSION['engineer_id'];
 if (!isset($_GET['edit'])) { header("Location: index.php"); exit; }
 $edit_id = intval($_GET['edit']);
 
-// Admin can edit any row; engineers can only edit their own
 $is_admin = isset($_SESSION['is_admin']) && ($_SESSION['is_admin'] == 1 || $_SESSION['is_admin'] == 2);
 
 if ($is_admin) {
@@ -27,15 +26,46 @@ $stmt->close();
 if (!$edit_data) { header("Location: index.php"); exit; }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $proj_id    = $_POST['project_id'];
-    $start_date = $_POST['start_date'];
-    $s_time     = $_POST['start_time'];
-    $end_date   = $_POST['end_date'];
-    $e_time     = $_POST['end_time'];
-    $work_desc  = trim($_POST['work_description']);
-
+    $proj_id = $_POST['project_id'];
+    $date = $_POST['date'];
+    $s_time = $_POST['start_time']; 
+    $e_time = $_POST['end_time'];   
+    $work_desc = trim($_POST['work_description']); 
+    $meal_breaks = isset($_POST['meal_breaks']) ? (int)$_POST['meal_breaks'] : 0;
+    
+    $start_dt = new DateTime("$date $s_time");
+    $end_dt = new DateTime("$date $e_time");
+    
+    if ($end_dt <= $start_dt) {
+        $end_dt->modify('+1 day');
+    }
+    
+    $diff_hours = ($end_dt->getTimestamp() - $start_dt->getTimestamp()) / 3600;
+    
+    $max_breaks = 0;
+    if ($diff_hours >= 24) {
+        $max_breaks = 3;
+    } elseif ($diff_hours > 16) {
+        $max_breaks = 2;
+    } elseif ($diff_hours > 8) {
+        $max_breaks = 1;
+    }
+    
+    if ($meal_breaks > $max_breaks) {
+        $meal_breaks = $max_breaks;
+    }
+    
+    if ($meal_breaks > 0) {
+        $end_dt->modify("-{$meal_breaks} hours");
+    }
+    
+    $final_start_date = $start_dt->format('Y-m-d');
+    $final_start_time = $start_dt->format('H:i:s');
+    $final_end_date = $end_dt->format('Y-m-d');
+    $final_end_time = $end_dt->format('H:i:s');
+    
     $stmt = $conn->prepare("UPDATE timesheets SET project_id=?, start_date=?, start_time=?, end_date=?, end_time=?, work_description=? WHERE id=?");
-    $stmt->bind_param("ssssssi", $proj_id, $start_date, $s_time, $end_date, $e_time, $work_desc, $edit_id);
+    $stmt->bind_param("ssssssi", $proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $work_desc, $edit_id);
     $stmt->execute();
     $stmt->close();
 
@@ -57,12 +87,10 @@ $current_selected_text = "-- Select Project --";
         .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
         .form-group { margin-bottom: 16px; position: relative; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        input[type="text"], input[type="date"], textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        input[type="checkbox"] { width: auto; margin: 0; display: inline-block; transform: scale(1.2); }
         textarea { resize: vertical; min-height: 80px; font-family: Arial, sans-serif; }
-        .datetime-row { display: flex; gap: 10px; }
-        .datetime-row .dt-group { flex: 1; }
-        .datetime-row .dt-group label { font-size: 12px; color: #555; margin-bottom: 3px; }
-        .custom-select-trigger { padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; min-height: 42px; }
+        .custom-select-trigger { padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; min-height: 42px; box-sizing: border-box; }
         .custom-select-trigger::after { content: ""; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #666; flex-shrink: 0; margin-left: 8px; }
         .custom-select-dropdown { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #ffc107; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 999; margin-top: 2px; padding: 8px; box-sizing: border-box; }
         .search-bar { margin-bottom: 8px; border: 1px solid #ddd; font-size: 13px; }
@@ -74,125 +102,396 @@ $current_selected_text = "-- Select Project --";
         button[type="submit"] { background: #ffc107; color: #333; border: none; padding: 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button[type="submit"]:hover { background: #e0a800; }
         .btn-cancel { display: block; text-align: center; margin-top: 15px; color: #6c757d; text-decoration: none; font-size: 14px; }
-        .duration-preview { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #166534; font-weight: bold; text-align: center; margin-top: 8px; }
+        #start-time-dropdown, #end-time-dropdown { width: 100%; max-height: 220px; overflow-y: auto; padding: 5px 0; border-color: #ffc107; }
+        .time-header { background: #f1f1f1; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #666; position: sticky; top: 0; z-index: 10; }
+        .duration-preview { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #166534; font-weight: bold; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
 <div class="card">
     <h2 style="margin-top:0; margin-bottom:20px; color:#b45309;">✏️ Edit Timesheet Record</h2>
-    <form method="POST">
-
+    <form method="POST" id="record-form">
         <div class="form-group">
             <label>Select Project:</label>
             <div class="custom-select-trigger" id="select-trigger" onclick="toggleDropdown(event)">
-                <span id="trigger-text">-- Select Project --</span>
+                <?php 
+                while($p = $projects_res->fetch_assoc()) {
+                    if ($edit_data['project_id'] == $p['project_id']) {
+                        $current_selected_text = "[".$p['project_id']."] ".$p['project_name']." (Client: ".$p['customer_name'].")";
+                    }
+                }
+                echo htmlspecialchars($current_selected_text);
+                $projects_res->data_seek(0);
+                ?>
             </div>
             <div class="custom-select-dropdown" id="select-dropdown">
-                <input type="text" id="project-search" class="search-bar" onkeyup="filterProjects()" placeholder="🔍 Type ID, Name or Client..." autocomplete="off">
+                <input type="text" id="project-search" class="search-bar" onkeyup="filterProjects()" placeholder="🔍 Type ID, Name or Client to filter..." autocomplete="off">
                 <div class="options-list">
-                    <?php while($p = $projects_res->fetch_assoc()):
-                        $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']);
-                        $sel = ($edit_data['project_id'] == $p['project_id']);
-                        if ($sel) $current_selected_text = "[".$p['project_id']."] ".$p['project_name']." (".$p['customer_name'].")";
-                    ?>
-                        <div class="custom-option <?= $sel ? 'selected' : '' ?>"
-                             data-value="<?= htmlspecialchars($p['project_id']) ?>"
-                             data-keywords="<?= htmlspecialchars($kw) ?>"
-                             onclick="selectOption(this)">
-                            [<?= htmlspecialchars($p['project_id']) ?>] <?= htmlspecialchars($p['project_name']) ?> <span style="color:#888;">(<?= htmlspecialchars($p['customer_name']) ?>)</span>
+                    <?php while($p = $projects_res->fetch_assoc()): ?>
+                        <?php 
+                        $search_haystack = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']); 
+                        $is_selected = ($edit_data['project_id'] == $p['project_id']) ? 'selected' : '';
+                        ?>
+                        <div class="custom-option <?php echo $is_selected; ?>" data-value="<?php echo htmlspecialchars($p['project_id']); ?>" data-keywords="<?php echo htmlspecialchars($search_haystack); ?>" onclick="selectOption(this)">
+                            <?php echo "[".htmlspecialchars($p['project_id'])."] " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; ?>
                         </div>
                     <?php endwhile; ?>
                 </div>
             </div>
-            <input type="hidden" name="project_id" id="hidden-project-id" value="<?= htmlspecialchars($edit_data['project_id']) ?>" required>
+            <input type="hidden" name="project_id" id="hidden-project-id" value="<?php echo htmlspecialchars($edit_data['project_id']); ?>" required>
         </div>
 
-        <!-- Start -->
         <div class="form-group">
-            <label>Start:</label>
-            <div class="datetime-row">
-                <div class="dt-group">
-                    <label>Date</label>
-                    <input type="date" name="start_date" id="start_date" value="<?= htmlspecialchars($edit_data['start_date']) ?>" required onchange="updatePreview()">
+            <label>Date:</label>
+            <input type="date" name="date" id="date" value="<?php echo htmlspecialchars($edit_data['start_date']); ?>" required>
+        </div>
+
+        <div class="form-group">
+            <label>Time Range:</label>
+            <div style="display: flex; gap: 10px; position: relative;">
+                <div style="flex: 1; position: relative;">
+                    <div class="custom-select-trigger" id="start-time-trigger" onclick="toggleTimeDropdown('start', event)"></div>
+                    <div class="custom-select-dropdown" id="start-time-dropdown" style="max-height: 250px; overflow-y: auto;"></div>
+                    <input type="hidden" name="start_time" id="start-time-hidden" value="<?php echo htmlspecialchars(substr($edit_data['start_time'], 0, 5)); ?>" required>
                 </div>
-                <div class="dt-group">
-                    <label>Time</label>
-                    <input type="time" name="start_time" id="start_time" value="<?= htmlspecialchars(substr($edit_data['start_time'],0,5)) ?>" required onchange="updatePreview()">
+
+                <span style="align-self: center;">to</span>
+
+                <div style="flex: 1; position: relative;">
+                    <div class="custom-select-trigger" id="end-time-trigger" onclick="toggleTimeDropdown('end', event)"></div>
+                    <div class="custom-select-dropdown" id="end-time-dropdown" style="max-height: 250px; overflow-y: auto;"></div>
+                    <input type="hidden" name="end_time" id="end-time-hidden" value="<?php echo htmlspecialchars(substr($edit_data['end_time'], 0, 5)); ?>" required>
                 </div>
             </div>
+            <div class="duration-preview" id="dur-preview"></div>
         </div>
 
-        <!-- End -->
-        <div class="form-group">
-            <label>End:</label>
-            <div class="datetime-row">
-                <div class="dt-group">
-                    <label>Date</label>
-                    <input type="date" name="end_date" id="end_date" value="<?= htmlspecialchars($edit_data['end_date']) ?>" required onchange="updatePreview()">
-                </div>
-                <div class="dt-group">
-                    <label>Time</label>
-                    <input type="time" name="end_time" id="end_time" value="<?= htmlspecialchars(substr($edit_data['end_time'],0,5)) ?>" required onchange="updatePreview()">
-                </div>
-            </div>
+        <div class="form-group" id="meal-break-container" style="display: none;">
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="meal_break_checkbox">
+                Meal Break
+            </label>
+            <select id="meal_breaks_select" style="display: none; margin-top: 8px;">
+            </select>
+            <input type="hidden" name="meal_breaks" id="actual_meal_breaks" value="0">
         </div>
-
-        <div class="duration-preview" id="dur-preview"></div>
 
         <div class="form-group">
             <label>Activity (Work Description):</label>
-            <textarea name="work_description" required><?= htmlspecialchars($edit_data['work_description']) ?></textarea>
+            <textarea name="work_description" required placeholder="Detail exactly what steps or technical activities you conducted during this shift..."><?php echo htmlspecialchars($edit_data['work_description']); ?></textarea>
         </div>
 
         <button type="submit">Update Record</button>
-        <a href="<?= $is_admin ? 'admin_timesheets.php' : 'index.php' ?>" class="btn-cancel">Cancel</a>
+        <a href="<?php echo $is_admin ? 'admin_timesheets.php' : 'index.php'; ?>" class="btn-cancel">Cancel</a>
     </form>
 </div>
-<script>
-document.getElementById('trigger-text').textContent = <?= json_encode($current_selected_text) ?>;
 
-function toggleDropdown(e) {
-    e.stopPropagation();
-    document.getElementById('select-dropdown').classList.toggle('show-dropdown');
-    if (document.getElementById('select-dropdown').classList.contains('show-dropdown'))
+<script>
+window.onclick = function(event) {
+    if (!event.target.closest('.form-group')) {
+        document.getElementById('select-dropdown').classList.remove('show-dropdown');
+        document.getElementById('start-time-dropdown').classList.remove('show-dropdown');
+        document.getElementById('end-time-dropdown').classList.remove('show-dropdown');
+    }
+}
+
+function toggleDropdown(event) {
+    event.stopPropagation();
+    document.getElementById('start-time-dropdown').classList.remove('show-dropdown');
+    document.getElementById('end-time-dropdown').classList.remove('show-dropdown');
+    
+    const projDropdown = document.getElementById('select-dropdown');
+    projDropdown.classList.toggle('show-dropdown');
+    if (projDropdown.classList.contains('show-dropdown')) {
         document.getElementById('project-search').focus();
+    }
 }
-function selectOption(el) {
-    document.getElementById('hidden-project-id').value = el.dataset.value;
-    document.getElementById('trigger-text').textContent = el.textContent.trim();
-    document.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
-    el.classList.add('selected');
+
+function selectOption(element) {
+    document.getElementById('hidden-project-id').value = element.getAttribute('data-value');
+    document.getElementById('select-trigger').innerText = element.innerText;
     document.getElementById('select-dropdown').classList.remove('show-dropdown');
+
+    document.querySelectorAll('#select-dropdown .custom-option').forEach(opt => opt.classList.remove('selected'));
+    element.classList.add('selected');
 }
+
 function filterProjects() {
-    const f = document.getElementById('project-search').value.toLowerCase();
-    document.querySelectorAll('.custom-option').forEach(o => {
-        o.style.display = (o.dataset.keywords || '').includes(f) ? '' : 'none';
+    const filterValue = document.getElementById('project-search').value.toLowerCase();
+    document.querySelectorAll('#select-dropdown .custom-option').forEach(option => {
+        const keywords = option.getAttribute('data-keywords') || "";
+        option.style.display = keywords.indexOf(filterValue) > -1 ? "block" : "none";
     });
 }
-window.onclick = e => {
-    if (!e.target.closest('.form-group')) document.getElementById('select-dropdown').classList.remove('show-dropdown');
-};
 
-function updatePreview() {
-    const sd = document.getElementById('start_date').value;
-    const st = document.getElementById('start_time').value;
-    const ed = document.getElementById('end_date').value;
-    const et = document.getElementById('end_time').value;
-    const prev = document.getElementById('dur-preview');
-    if (!sd||!st||!ed||!et) { prev.textContent = ''; return; }
-    const diff = new Date(ed+'T'+et) - new Date(sd+'T'+st);
-    if (diff <= 0) { prev.textContent = '⚠️ End must be after Start'; prev.style.color='#991b1b'; return; }
-    const h = Math.floor(diff/3600000);
-    const m = Math.floor((diff%3600000)/60000);
-    const days = Math.floor(h/24);
-    let t = '⏱ Duration: ';
-    if (days>0) t += days+'d ';
-    t += (h%24)+'h '+m+'m';
-    prev.textContent = t;
-    prev.style.color = '#166534';
+function toggleTimeDropdown(type, event) {
+    event.stopPropagation();
+    document.getElementById('select-dropdown').classList.remove('show-dropdown');
+
+    const startDropdown = document.getElementById('start-time-dropdown');
+    const endDropdown = document.getElementById('end-time-dropdown');
+
+    if (type === 'start') {
+        endDropdown.classList.remove('show-dropdown');
+        startDropdown.classList.toggle('show-dropdown');
+    } else {
+        startDropdown.classList.remove('show-dropdown');
+        endDropdown.classList.toggle('show-dropdown');
+    }
 }
-updatePreview();
+
+function formatAMPM(hours, minutes) {
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    let displayHours = hours % 12;
+    displayHours = displayHours ? displayHours : 12; 
+    const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
+    return displayHours + ':' + displayMinutes + ' ' + ampm;
+}
+
+function updateDurationPreview() {
+    const sd = document.getElementById('date').value;
+    const st = document.getElementById('start-time-hidden').value;
+    const et = document.getElementById('end-time-hidden').value;
+    const prev = document.getElementById('dur-preview');
+    
+    if (!sd || !st || !et) { 
+        prev.textContent = ''; 
+        prev.style.display = 'none';
+        return; 
+    }
+    
+    const start = new Date(sd + 'T' + st + ':00');
+    let end = new Date(sd + 'T' + et + ':00');
+    if (end <= start) {
+        end.setDate(end.getDate() + 1);
+    }
+    
+    let mealBreaks = parseInt(document.getElementById('actual_meal_breaks').value) || 0;
+    
+    let diff = end - start;
+    diff = diff - (mealBreaks * 3600000); 
+    if (diff < 0) diff = 0;
+
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const days = Math.floor(h / 24);
+    
+    let t = '⏱ Duration: ';
+    if (days > 0) t += days + 'd ';
+    t += (h % 24) + 'h ' + m + 'm';
+    
+    prev.textContent = t;
+    prev.style.display = 'block';
+}
+
+let currentMaxBreaks = 0;
+
+function calculateMealBreaks() {
+    const st = document.getElementById('start-time-hidden').value;
+    const et = document.getElementById('end-time-hidden').value;
+    if (!st || !et) return;
+
+    const start = new Date("1970-01-01T" + st + ":00");
+    let end = new Date("1970-01-01T" + et + ":00");
+    if (end <= start) end.setDate(end.getDate() + 1);
+
+    const diffHours = (end - start) / (1000 * 60 * 60);
+    
+    let maxBreaks = 0;
+    if (diffHours >= 24) maxBreaks = 3;
+    else if (diffHours > 16) maxBreaks = 2;
+    else if (diffHours > 8) maxBreaks = 1;
+
+    const container = document.getElementById('meal-break-container');
+    const select = document.getElementById('meal_breaks_select');
+    const checkbox = document.getElementById('meal_break_checkbox');
+    const hiddenInput = document.getElementById('actual_meal_breaks');
+    
+    currentMaxBreaks = maxBreaks;
+
+    if (maxBreaks > 0) {
+        container.style.display = 'block';
+        
+        let oldVal = select.value;
+        select.innerHTML = '';
+        if (maxBreaks > 1) {
+            for (let i = 1; i <= maxBreaks; i++) {
+                select.innerHTML += `<option value="${i}">${i}</option>`;
+            }
+            if (oldVal && oldVal <= maxBreaks && oldVal > 0) {
+                select.value = oldVal;
+            }
+        }
+        
+        if (checkbox.checked) {
+            if (maxBreaks > 1) {
+                select.style.display = 'block';
+                hiddenInput.value = select.value;
+            } else {
+                select.style.display = 'none';
+                hiddenInput.value = "1";
+            }
+        } else {
+            select.style.display = 'none';
+            hiddenInput.value = "0";
+        }
+    } else {
+        container.style.display = 'none';
+        checkbox.checked = false;
+        select.style.display = 'none';
+        hiddenInput.value = "0";
+    }
+    updateDurationPreview();
+}
+
+function generateStartTimes() {
+    const container = document.getElementById('start-time-dropdown');
+    container.innerHTML = '';
+    const currentVal = document.getElementById('start-time-hidden').value;
+
+    for (let minutes = 0; minutes < 24 * 60; minutes += 15) {
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
+        const textStr = formatAMPM(h, m);
+
+        const opt = document.createElement('div');
+        opt.className = 'custom-option' + (currentVal === valStr ? ' selected' : '');
+        opt.innerText = textStr;
+        opt.onclick = function() {
+            document.getElementById('start-time-hidden').value = valStr;
+            document.getElementById('start-time-trigger').innerText = textStr;
+            document.getElementById('start-time-dropdown').classList.remove('show-dropdown');
+            
+            document.getElementById('end-time-hidden').value = "";
+            document.getElementById('end-time-trigger').innerText = "-- Select End Time --";
+            generateEndTimes();
+            calculateMealBreaks();
+        };
+        container.appendChild(opt);
+    }
+}
+
+function generateEndTimes() {
+    const container = document.getElementById('end-time-dropdown');
+    container.innerHTML = '';
+
+    const dateInput = document.getElementById('date');
+    let baseDateText = "Today", nextDateText = "Tomorrow";
+
+    if (dateInput && dateInput.value) {
+        const d = new Date(dateInput.value);
+        if (!isNaN(d.getTime())) {
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            baseDateText = d.getDate() + ' ' + months[d.getMonth()];
+            const nextD = new Date(d);
+            nextD.setDate(d.getDate() + 1);
+            nextDateText = nextD.getDate() + ' ' + months[nextD.getMonth()];
+        }
+    }
+
+    const startTimeStr = document.getElementById('start-time-hidden').value;
+    if (!startTimeStr) return; 
+    
+    const [startH, startM] = startTimeStr.split(':').map(Number);
+    const startMins = startH * 60 + startM;
+
+    let hasAddedNextDayHeader = false;
+
+    const todayHeader = document.createElement('div');
+    todayHeader.className = 'time-header';
+    todayHeader.innerText = baseDateText;
+    container.appendChild(todayHeader);
+
+    for (let loopMins = startMins + 15; loopMins <= startMins + 24 * 60; loopMins += 15) {
+        let currentDayMins = loopMins % (24 * 60);
+        let h = Math.floor(currentDayMins / 60);
+        let m = currentDayMins % 60;
+
+        if (loopMins >= 24 * 60 && !hasAddedNextDayHeader) {
+            const nextHeader = document.createElement('div');
+            nextHeader.className = 'time-header';
+            nextHeader.innerText = nextDateText;
+            container.appendChild(nextHeader);
+            hasAddedNextDayHeader = true;
+        }
+
+        const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
+        const textStr = formatAMPM(h, m);
+
+        const opt = document.createElement('div');
+        opt.className = 'custom-option';
+        opt.innerText = textStr;
+        opt.onclick = function() {
+            document.getElementById('end-time-hidden').value = valStr;
+            document.getElementById('end-time-trigger').innerText = textStr;
+            document.getElementById('end-time-dropdown').classList.remove('show-dropdown');
+            calculateMealBreaks();
+        };
+        container.appendChild(opt);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const stVal = document.getElementById('start-time-hidden').value;
+    if (stVal) {
+        const [sh, sm] = stVal.split(':').map(Number);
+        document.getElementById('start-time-trigger').innerText = formatAMPM(sh, sm);
+    }
+
+    const etVal = document.getElementById('end-time-hidden').value;
+    if (etVal) {
+        const [eh, em] = etVal.split(':').map(Number);
+        document.getElementById('end-time-trigger').innerText = formatAMPM(eh, em);
+    }
+
+    generateStartTimes();
+    generateEndTimes();
+    calculateMealBreaks();
+    updateDurationPreview();
+
+    const dateInput = document.getElementById('date');
+    if(dateInput) {
+        dateInput.addEventListener('change', function() {
+            generateEndTimes();
+            calculateMealBreaks();
+        });
+    }
+
+    document.getElementById('meal_break_checkbox').addEventListener('change', function() {
+        const select = document.getElementById('meal_breaks_select');
+        const hiddenInput = document.getElementById('actual_meal_breaks');
+        
+        if (this.checked) {
+            if (currentMaxBreaks > 1) {
+                select.style.display = 'block';
+                hiddenInput.value = select.value;
+            } else {
+                select.style.display = 'none';
+                hiddenInput.value = "1";
+            }
+        } else {
+            select.style.display = 'none';
+            hiddenInput.value = "0";
+        }
+        updateDurationPreview();
+    });
+
+    document.getElementById('meal_breaks_select').addEventListener('change', function() {
+        document.getElementById('actual_meal_breaks').value = this.value;
+        updateDurationPreview();
+    });
+});
+
+document.getElementById('record-form').addEventListener('submit', function(e) {
+    if (!document.getElementById('hidden-project-id').value) {
+        alert("Please select a Project.");
+        e.preventDefault();
+    } else if (!document.getElementById('end-time-hidden').value) {
+        alert("Please select an End Time.");
+        e.preventDefault();
+    }
+});
 </script>
 </body>
 </html>
