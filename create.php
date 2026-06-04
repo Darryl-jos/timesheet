@@ -64,109 +64,150 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     exit;
 }
 
-$projects_res = $conn->query("
-    SELECT p.* FROM projects p 
-    ORDER BY p.project_id ASC
-");
+$projects_res = $conn->query("SELECT p.* FROM projects p ORDER BY p.project_id ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Create Record</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 30px 15px; box-sizing: border-box; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        .form-group { margin-bottom: 16px; position: relative; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input[type="text"], input[type="date"], textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
-        input[type="checkbox"] { width: auto; margin: 0; display: inline-block; transform: scale(1.2); }
-        textarea { resize: vertical; min-height: 80px; font-family: Arial, sans-serif; }
-        .custom-select-trigger { padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; min-height: 42px; box-sizing: border-box; }
-        .custom-select-trigger::after { content: ""; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #666; flex-shrink: 0; margin-left: 8px; }
-        .custom-select-dropdown { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #28a745; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 999; margin-top: 2px; padding: 8px; box-sizing: border-box; }
-        .search-bar { margin-bottom: 8px; border: 1px solid #ddd; font-size: 13px; }
-        .options-list { max-height: 200px; overflow-y: auto; }
-        .custom-option { padding: 8px 10px; cursor: pointer; font-size: 13px; border-radius: 3px; }
-        .custom-option:hover { background: #e6f0ff; color: #007bff; }
-        .custom-option.selected { background: #e6f0ff; color: #007bff; font-weight: bold; }
-        .show-dropdown { display: block !important; }
-        button[type="submit"] { background: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
-        button[type="submit"]:hover { background: #218838; }
-        .btn-cancel { display: block; text-align: center; margin-top: 15px; color: #6c757d; text-decoration: none; font-size: 14px; }
-        #start-time-dropdown, #end-time-dropdown { width: 100%; max-height: 220px; overflow-y: auto; padding: 5px 0; }
-        .time-header { background: #f1f1f1; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #666; position: sticky; top: 0; z-index: 10; }
-        .duration-preview { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #166534; font-weight: bold; text-align: center; margin-top: 8px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Create Record</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
+
+.topbar { background: #ffffff; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
+.topbar h2 { color: #1f2937; margin: 0; font-size: 18px; }
+.topbar a { color: #007bff; font-weight: bold; text-decoration: none; font-size: 13px; }
+
+.page { max-width: 900px; margin: 20px auto; padding: 0 20px 60px; }
+
+.section { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
+.section-hdr { background: #343a40; color: white; padding: 10px 20px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.section-hdr.green { background: #155724; }
+.section-body { padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+.section-body.one-col { grid-template-columns: 1fr; }
+
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 700; color: #495057; }
+.form-group input:not([type="checkbox"]), .form-group select, .form-group textarea {
+    padding: 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; width: 100%;
+}
+.form-group input:not([type="checkbox"]), .form-group select { height: 36px; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
+.form-group textarea { resize: vertical; min-height: 100px; font-family: Arial, sans-serif; }
+
+.check-group { display: flex; align-items: center; gap: 10px; padding-top: 8px; }
+.check-group input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; margin: 0; }
+.check-group label { font-size: 13px; font-weight: 600; color: #333; margin: 0; }
+
+.actions { display: flex; gap: 12px; margin-top: 24px; }
+.btn-save { background: #28a745; color: white; border: none; padding: 0 28px; height: 40px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; }
+.btn-save:hover { background: #218838; }
+.btn-cancel { display: inline-flex; align-items: center; color: #6c757d; text-decoration: none; font-size: 13px; height: 40px; }
+
+.custom-select-trigger { height: 36px; padding: 0 10px; border: 1px solid #ced4da; border-radius: 4px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; box-sizing: border-box; }
+.custom-select-trigger::after { content: ""; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #666; flex-shrink: 0; margin-left: 8px; }
+.custom-select-dropdown { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 999; margin-top: 2px; padding: 8px; box-sizing: border-box; }
+.search-bar { margin-bottom: 8px; border: 1px solid #ddd; font-size: 13px; height: 32px !important; }
+.options-list { max-height: 200px; overflow-y: auto; }
+.custom-option { padding: 8px 10px; cursor: pointer; font-size: 13px; border-radius: 3px; }
+.custom-option:hover { background: #f0f7ff; color: #007bff; }
+.custom-option.selected { background: #e6f0ff; color: #007bff; font-weight: bold; }
+.show-dropdown { display: block !important; }
+#start-time-dropdown, #end-time-dropdown { width: 100%; max-height: 220px; overflow-y: auto; padding: 5px 0; }
+.time-header { background: #f8f9fa; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #495057; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #e9ecef; }
+.duration-preview { display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #1e40af; font-weight: bold; text-align: center; margin-top: 8px; }
+
+@media (max-width: 600px) {
+    body { margin: 15px; }
+    .section-body { grid-template-columns: 1fr; }
+    .page { padding: 0 0 40px; }
+}
+</style>
 </head>
 <body>
-<div class="card">
-    <h2 style="margin-top:0; margin-bottom:20px; color:#166534;">➕ Create New Record</h2>
+
+<div class="topbar">
+    <h2>➕ Create New Record</h2>
+    <a href="index.php">← Back to Dashboard</a>
+</div>
+
+<div class="page">
     <form method="POST" id="record-form">
-        <div class="form-group">
-            <label>Select Project:</label>
-            <div class="custom-select-trigger" id="select-trigger" onclick="toggleDropdown(event)">
-                -- Select Project --
-            </div>
-            <div class="custom-select-dropdown" id="select-dropdown">
-                <input type="text" id="project-search" class="search-bar" onkeyup="filterProjects()" placeholder="🔍 Type ID, Name or Client to filter..." autocomplete="off">
-                <div class="options-list">
-                    <?php while($p = $projects_res->fetch_assoc()): ?>
-                        <?php $search_haystack = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']); ?>
-                        <div class="custom-option" data-value="<?php echo htmlspecialchars($p['project_id']); ?>" data-keywords="<?php echo htmlspecialchars($search_haystack); ?>" onclick="selectOption(this)">
-                            <?php echo "[".htmlspecialchars($p['project_id'])."] " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; ?>
-                        </div>
-                    <?php endwhile; ?>
-                </div>
-            </div>
-            <input type="hidden" name="project_id" id="hidden-project-id" required>
-        </div>
-
-        <div class="form-group">
-            <label>Date:</label>
-            <input type="date" name="date" id="date" value="<?php echo date('Y-m-d'); ?>" required>
-        </div>
-
-        <div class="form-group">
-            <label>Time Range:</label>
-            <div style="display: flex; gap: 10px; position: relative;">
-                <div style="flex: 1; position: relative;">
-                    <div class="custom-select-trigger" id="start-time-trigger" onclick="toggleTimeDropdown('start', event)"></div>
-                    <div class="custom-select-dropdown" id="start-time-dropdown" style="max-height: 250px; overflow-y: auto;"></div>
-                    <input type="hidden" name="start_time" id="start-time-hidden" required>
-                </div>
-
-                <span style="align-self: center;">to</span>
-
-                <div style="flex: 1; position: relative;">
-                    <div class="custom-select-trigger" id="end-time-trigger" onclick="toggleTimeDropdown('end', event)">
-                        -- Select End Time --
+        
+        <div class="section">
+            <div class="section-hdr">📁 Project Details</div>
+            <div class="section-body one-col">
+                <div class="form-group" style="position: relative;">
+                    <label>Select Project <span style="color:#dc2626;">*</span></label>
+                    <div class="custom-select-trigger" id="select-trigger" onclick="toggleDropdown(event)">
+                        -- Select Project --
                     </div>
-                    <div class="custom-select-dropdown" id="end-time-dropdown" style="max-height: 250px; overflow-y: auto;"></div>
-                    <input type="hidden" name="end_time" id="end-time-hidden" required>
+                    <div class="custom-select-dropdown" id="select-dropdown">
+                        <input type="text" id="project-search" class="search-bar" onkeyup="filterProjects()" placeholder="🔍 Type ID, Name or Client to filter..." autocomplete="off">
+                        <div class="options-list">
+                            <?php while($p = $projects_res->fetch_assoc()): ?>
+                                <?php $search_haystack = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']); ?>
+                                <div class="custom-option" data-value="<?php echo htmlspecialchars($p['project_id']); ?>" data-keywords="<?php echo htmlspecialchars($search_haystack); ?>" onclick="selectOption(this)">
+                                    <?php echo "[".htmlspecialchars($p['project_id'])."] " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; ?>
+                                </div>
+                            <?php endwhile; ?>
+                        </div>
+                    </div>
+                    <input type="hidden" name="project_id" id="hidden-project-id" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Date <span style="color:#dc2626;">*</span></label>
+                    <input type="date" name="date" id="date" value="<?php echo date('Y-m-d'); ?>" required>
                 </div>
             </div>
-            <div class="duration-preview" id="dur-preview"></div>
         </div>
 
-        <div class="form-group" id="meal-break-container" style="display: none;">
-            <label style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="meal_break_checkbox">
-                Meal Break
-            </label>
-            <select id="meal_breaks_select" style="display: none; margin-top: 8px;">
-            </select>
-            <input type="hidden" name="meal_breaks" id="actual_meal_breaks" value="0">
+        <div class="section">
+            <div class="section-hdr green">⏱️ Time & Activity</div>
+            <div class="section-body one-col">
+                <div class="form-group">
+                    <label>Time Range <span style="color:#dc2626;">*</span></label>
+                    <div style="display: flex; gap: 10px; position: relative;">
+                        <div style="flex: 1; position: relative;">
+                            <div class="custom-select-trigger" id="start-time-trigger" onclick="toggleTimeDropdown('start', event)"></div>
+                            <div class="custom-select-dropdown" id="start-time-dropdown"></div>
+                            <input type="hidden" name="start_time" id="start-time-hidden" required>
+                        </div>
+                        <span style="align-self: center; font-size: 13px; color: #495057;">to</span>
+                        <div style="flex: 1; position: relative;">
+                            <div class="custom-select-trigger" id="end-time-trigger" onclick="toggleTimeDropdown('end', event)">
+                                -- Select End Time --
+                            </div>
+                            <div class="custom-select-dropdown" id="end-time-dropdown"></div>
+                            <input type="hidden" name="end_time" id="end-time-hidden" required>
+                        </div>
+                    </div>
+                    <div class="duration-preview" id="dur-preview"></div>
+                </div>
+
+                <div class="form-group" id="meal-break-container" style="display: none;">
+                    <div class="check-group">
+                        <input type="checkbox" id="meal_break_checkbox">
+                        <label for="meal_break_checkbox">Meal Break</label>
+                    </div>
+                    <select id="meal_breaks_select" style="display: none; margin-top: 8px; width: 100px;"></select>
+                    <input type="hidden" name="meal_breaks" id="actual_meal_breaks" value="0">
+                </div>
+
+                <div class="form-group">
+                    <label>Activity (Work Description) <span style="color:#dc2626;">*</span></label>
+                    <textarea name="work_description" required placeholder="Detail exactly what steps or technical activities you conducted during this shift..."></textarea>
+                </div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>Activity (Work Description):</label>
-            <textarea name="work_description" required placeholder="Detail exactly what steps or technical activities you conducted during this shift..."></textarea>
+        <div class="actions">
+            <button type="submit" class="btn-save">Save Record</button>
+            <a href="index.php" class="btn-cancel">Cancel</a>
         </div>
-
-        <button type="submit">Save Record</button>
-        <a href="index.php" class="btn-cancel">Back to Dashboard</a>
     </form>
 </div>
 

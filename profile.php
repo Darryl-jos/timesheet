@@ -46,60 +46,101 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>My Profile</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; }
-        .page-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .page-header h2 { margin: 0; color: #1f2937; }
-        .header-actions a { font-weight: bold; text-decoration: none; color: #007bff; padding: 8px 15px; border: 1px solid #007bff; border-radius: 4px; transition: 0.3s; }
-        .header-actions a:hover { background: #007bff; color: white; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 500px; margin: 0 auto; }
-        .info-group { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .info-label { font-weight: bold; color: #666; font-size: 13px; }
-        .info-value { font-size: 16px; font-weight: bold; margin-top: 5px; color: #111; }
-        input { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; }
-        button:hover { background: #0056b3; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>My Profile</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
+
+.topbar { padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
+.topbar h2 { margin: 0; font-size: 18px; }
+.topbar a { font-weight: bold; text-decoration: none; font-size: 13px; }
+
+.admin-topbar { background: #343a40; }
+.admin-topbar h2 { color: white; }
+.admin-topbar a { color: #ffc107; }
+
+.engineer-topbar { background: #ffffff; }
+.engineer-topbar h2 { color: #1f2937; }
+.engineer-topbar a { color: #007bff; }
+
+.page { max-width: 900px; margin: 20px auto; padding: 0 20px 60px; }
+
+.section { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
+.section-hdr { background: #343a40; color: white; padding: 10px 20px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.section-hdr.green { background: #155724; }
+.section-body { padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+.section-body.one-col { grid-template-columns: 1fr; }
+
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 700; color: #495057; }
+.form-group input { padding: 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; width: 100%; height: 36px; }
+.form-group input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
+
+.info-value { font-size: 14px; font-weight: bold; color: #111; padding: 6px 0; }
+.info-value.highlight { color: #28a745; }
+.info-value code { background: #f8f9fa; padding: 3px 6px; border-radius: 4px; border: 1px solid #e9ecef; font-family: monospace; font-size: 13px; color: #d63384; }
+
+.actions { display: flex; gap: 12px; margin-top: 10px; }
+.btn-save { background: #28a745; color: white; border: none; padding: 0 28px; height: 40px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; }
+.btn-save:hover { background: #218838; }
+
+.alert { padding: 12px; border-radius: 4px; font-weight: bold; margin-bottom: 15px; font-size: 13px; text-align: center; }
+.alert-success { color: #155724; background: #d4edda; border: 1px solid #c3e6cb; }
+.alert-error { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
+
+@media (max-width: 600px) {
+    body { margin: 15px; }
+    .section-body { grid-template-columns: 1fr; }
+    .page { padding: 0 0 40px; }
+}
+</style>
 </head>
 <body>
 
-
-<div class="page-header">
+<div class="topbar <?php echo $is_admin ? 'admin-topbar' : 'engineer-topbar'; ?>">
     <h2>👤 My Profile Settings</h2>
-    <div class="header-actions">
-        <a href="<?php echo htmlspecialchars($back_link); ?>">← Back to Dashboard</a>
-    </div>
+    <a href="<?php echo htmlspecialchars($back_link); ?>">← Back to Dashboard</a>
 </div>
 
-<div class="card">
-    <h3>Account Information</h3>
-    <div class="info-group">
-        <div class="info-label">Username ID:</div>
-        <div class="info-value"><code><?php echo htmlspecialchars($user_info['username_id']); ?></code></div>
-    </div>
-    
-    <div class="info-group">
-        <div class="info-label">Assigned Username (Real Name):</div>
-        <div class="info-value" style="color: #28a745;"><?php echo htmlspecialchars($user_info['engineer_name'] ? $user_info['engineer_name'] : 'Not assigned yet'); ?></div>
-    </div>
-
-    <h3 style="margin-top: 30px; border-top: 2px solid #f4f7f6; padding-top: 20px;">Security & Change Password</h3>
-    
-    <?php if(!empty($msg)): ?>
-        <div style="color: <?php echo $status=='success'?'#155724':'#721c24'; ?>; background: <?php echo $status=='success'?'#d4edda':'#f8d7da'; ?>; padding: 10px; border-radius: 4px; font-weight:bold; margin-bottom:15px; font-size:14px; text-align:center;">
-            <?php echo $msg; ?>
+<div class="page">
+    <div class="section">
+        <div class="section-hdr">👤 Account Information</div>
+        <div class="section-body one-col">
+            <div class="form-group">
+                <label>Username ID</label>
+                <div class="info-value"><code><?php echo htmlspecialchars($user_info['username_id']); ?></code></div>
+            </div>
+            
+            <div class="form-group">
+                <label>Assigned Username (Real Name)</label>
+                <div class="info-value highlight"><?php echo htmlspecialchars($user_info['engineer_name'] ? $user_info['engineer_name'] : 'Not assigned yet'); ?></div>
+            </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <form method="POST">
-        <label style="font-size: 13px; font-weight: bold;">New Password:</label>
-        <input type="password" name="new_password" required placeholder="Min 6 characters">
-        
-        <button type="submit" name="change_password">Update My Password</button>
-    </form>
+    <div class="section">
+        <div class="section-hdr green">🔒 Security & Change Password</div>
+        <div class="section-body one-col">
+            <?php if(!empty($msg)): ?>
+                <div class="alert <?php echo $status == 'success' ? 'alert-success' : 'alert-error'; ?>">
+                    <?php echo $msg; ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label>New Password <span style="color:#dc2626;">*</span></label>
+                    <input type="password" name="new_password" required placeholder="Min 6 characters">
+                </div>
+                
+                <div class="actions">
+                    <button type="submit" name="change_password" class="btn-save">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 </body>

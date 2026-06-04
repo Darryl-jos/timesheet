@@ -65,15 +65,15 @@ function fmtDate($d) {
 
         .page { padding: 20px; max-width: 1400px; margin: 0 auto; }
 
-        .page-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
-        .page-header h2 { margin: 0; color: #1f2937; font-size: 20px; }
-        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .header-actions a { font-weight: bold; text-decoration: none; color: #007bff; padding: 8px 15px; border: 1px solid #007bff; border-radius: 4px; transition: 0.3s; font-size: 14px; }
-        .header-actions a:hover { background: #007bff; color: white; }
-        .header-actions a.btn-admin { color: #166534; border-color: #166534; }
-        .header-actions a.btn-admin:hover { background: #166534; color: white; }
-        .header-actions a.btn-logout { color: #dc3545; border-color: #dc3545; }
-        .header-actions a.btn-logout:hover { background: #dc3545; color: white; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .page-header h2 { margin: 0; color: #1f2937; font-size: 18px; }
+        .header-actions { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .header-actions a { font-weight: bold; text-decoration: none; font-size: 13px; color: #007bff; transition: 0.3s; }
+        .header-actions a:hover { color: #0056b3; text-decoration: underline; }
+        .header-actions a.btn-admin { color: #166534; }
+        .header-actions a.btn-admin:hover { color: #0f4a25; }
+        .header-actions a.btn-logout { color: #dc3545; }
+        .header-actions a.btn-logout:hover { color: #a71d2a; }
 
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
@@ -135,6 +135,10 @@ function fmtDate($d) {
         .show-sort { display:block !important; }
 
         .no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 15px; }
+
+        @media (min-width: 768px) {
+            .page-header h2 { font-size: 20px; }
+        }
 
         @media (max-width: 600px) {
             .page { padding: 12px; }
