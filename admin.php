@@ -63,12 +63,12 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
         <div class="menu-btn">Manage Engineers →</div>
     </a>
 
-    <a href="admin_projects.php" class="menu-card projects">
+    <a href="admin_iips.php" class="menu-card projects">
         <div>
-            <div class="menu-title">📂 Project List</div>
-            <div class="menu-desc">Create and log new corporate projects (Project ID, Name, and Client master data). Edit or remove active contracts.</div>
+            <div class="menu-title">📂 IIPS List</div>
+            <div class="menu-desc">Create and manage IIPS projects — track costing, timeline targets, billing status, and resource allocation linked to timesheet data.</div>
         </div>
-        <div class="menu-btn">Manage Projects →</div>
+        <div class="menu-btn">Manage IIPS List →</div>
     </a>
 
     <a href="admin_timesheets.php" class="menu-card timesheets">
@@ -77,13 +77,6 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
             <div class="menu-desc">Review global working hour logs submitted across all departments. Access administrative data and export raw compliance data directly to Microsoft Excel.</div>
         </div>
         <div class="menu-btn">Audit Timesheets →</div>
-    </a>
-    <a href="admin_iips.php" class="menu-card" style="border-top: 5px solid #8b5cf6;">
-        <div>
-            <div class="menu-title">📋 IIPS Tracking</div>
-            <div class="menu-desc">Track Professional Service projects end-to-end: costing, timeline targets vs actuals, billing status, and resource allocation — all linked to timesheet data.</div>
-        </div>
-        <div class="menu-btn" style="background: #8b5cf6;">Manage IIPS &rarr;</div>
     </a>
 </div>
 

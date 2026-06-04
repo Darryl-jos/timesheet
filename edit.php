@@ -12,6 +12,14 @@ $edit_id = intval($_GET['edit']);
 
 $is_admin = isset($_SESSION['is_admin']) && ($_SESSION['is_admin'] == 1 || $_SESSION['is_admin'] == 2);
 
+$return_url = $is_admin ? 'admin_timesheets.php' : 'index.php';
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_SERVER['HTTP_REFERER'])) {
+    $referer = basename(parse_url($_SERVER['HTTP_REFERER'], PHP_URL_PATH));
+    if ($referer == 'index.php' || strpos($referer, 'admin') !== false) {
+        $return_url = $referer;
+    }
+}
+
 if ($is_admin) {
     $stmt = $conn->prepare("SELECT * FROM timesheets WHERE id = ?");
     $stmt->bind_param("i", $edit_id);
@@ -32,6 +40,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $e_time = $_POST['end_time'];   
     $work_desc = trim($_POST['work_description']); 
     $meal_breaks = isset($_POST['meal_breaks']) ? (int)$_POST['meal_breaks'] : 0;
+    
+    $final_return_url = isset($_POST['return_url']) ? $_POST['return_url'] : ($is_admin ? "admin_timesheets.php" : "index.php");
     
     $start_dt = new DateTime("$date $s_time");
     $end_dt = new DateTime("$date $e_time");
@@ -69,7 +79,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->execute();
     $stmt->close();
 
-    header("Location: " . ($is_admin ? "admin_timesheets.php" : "index.php"));
+    header("Location: " . $final_return_url);
     exit;
 }
 
@@ -111,6 +121,9 @@ $current_selected_text = "-- Select Project --";
 <div class="card">
     <h2 style="margin-top:0; margin-bottom:20px; color:#b45309;">✏️ Edit Timesheet Record</h2>
     <form method="POST" id="record-form">
+        
+        <input type="hidden" name="return_url" value="<?php echo htmlspecialchars($return_url); ?>">
+        
         <div class="form-group">
             <label>Select Project:</label>
             <div class="custom-select-trigger" id="select-trigger" onclick="toggleDropdown(event)">
@@ -182,7 +195,7 @@ $current_selected_text = "-- Select Project --";
         </div>
 
         <button type="submit">Update Record</button>
-        <a href="<?php echo $is_admin ? 'admin_timesheets.php' : 'index.php'; ?>" class="btn-cancel">Cancel</a>
+        <a href="<?php echo htmlspecialchars($return_url); ?>" class="btn-cancel">Cancel</a>
     </form>
 </div>
 

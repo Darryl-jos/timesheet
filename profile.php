@@ -6,6 +6,16 @@ if (!isset($_SESSION['engineer_id'])) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_SERVER['HTTP_REFERER'])) {
+    $referer = basename(parse_url($_SERVER['HTTP_REFERER'], PHP_URL_PATH));
+    if ($referer != 'profile.php' && !empty($referer)) {
+        $_SESSION['profile_return_url'] = $referer;
+    }
+}
+
+$is_admin = isset($_SESSION['is_admin']) && ($_SESSION['is_admin'] == 1 || $_SESSION['is_admin'] == 2);
+$back_link = isset($_SESSION['profile_return_url']) ? $_SESSION['profile_return_url'] : ($is_admin ? 'admin.php' : 'index.php');
+
 $user_id = $_SESSION['engineer_id'];
 $msg = "";
 $status = "";
@@ -16,32 +26,20 @@ $user_info = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
-    $old_pwd = $_POST['old_password'];
     $new_pwd = $_POST['new_password'];
     
     if (strlen($new_pwd) < 6) {
         $msg = "New password must be at least 6 characters!";
         $status = "error";
     } else {
-        $check_stmt = $conn->prepare("SELECT password FROM engineers WHERE id = ?");
-        $check_stmt->bind_param("i", $user_id);
-        $check_stmt->execute();
-        $pwd_row = $check_stmt->get_result()->fetch_assoc();
-        $check_stmt->close();
+        $new_hashed = password_hash($new_pwd, PASSWORD_DEFAULT);
+        $update_stmt = $conn->prepare("UPDATE engineers SET password = ? WHERE id = ?");
+        $update_stmt->bind_param("si", $new_hashed, $user_id);
+        $update_stmt->execute();
+        $update_stmt->close();
         
-        if (password_verify($old_pwd, $pwd_row['password'])) {
-            $new_hashed = password_hash($new_pwd, PASSWORD_DEFAULT);
-            $update_stmt = $conn->prepare("UPDATE engineers SET password = ? WHERE id = ?");
-            $update_stmt->bind_param("si", $new_hashed, $user_id);
-            $update_stmt->execute();
-            $update_stmt->close();
-            
-            $msg = "Password updated successfully!";
-            $status = "success";
-        } else {
-            $msg = "Incorrect current password!";
-            $status = "error";
-        }
+        $msg = "Password updated successfully!";
+        $status = "success";
     }
 }
 ?>
@@ -68,7 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 
 <div class="header">
     <h2>My Profile Settings</h2>
-    <a href="<?php echo (isset($_SESSION['is_admin']) && ($_SESSION['is_admin'] == 1 || $_SESSION['is_admin'] == 2)) ? 'admin.php' : 'index.php'; ?>" style="font-weight: bold; text-decoration: none; color: #007bff;">
+    <a href="<?php echo htmlspecialchars($back_link); ?>" style="font-weight: bold; text-decoration: none; color: #007bff;">
         ← Back to Dashboard
     </a>
 </div>
@@ -94,9 +92,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     <?php endif; ?>
 
     <form method="POST">
-        <label style="font-size: 13px; font-weight: bold;">Current Password:</label>
-        <input type="password" name="old_password" required placeholder="Enter current password">
-        
         <label style="font-size: 13px; font-weight: bold;">New Password:</label>
         <input type="password" name="new_password" required placeholder="Min 6 characters">
         
@@ -105,4 +100,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 </div>
 
 </body>
-</html>
+</html> 
