@@ -76,97 +76,33 @@ $projects_res = $conn->query("
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Create Record</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px 0; box-sizing: border-box; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 450px; }
-        .form-group { margin-bottom: 15px; position: relative; }
+        body { font-family: Arial, sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 30px 15px; box-sizing: border-box; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        .form-group { margin-bottom: 16px; position: relative; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input[type="text"], input[type="date"], textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        input[type="checkbox"] { width: auto; margin: 0; display: inline-block; transform: scale(1.2); }
         textarea { resize: vertical; min-height: 80px; font-family: Arial, sans-serif; }
-        .custom-select-trigger {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background: #fff;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 14px;
-        }
-        .custom-select-trigger::after {
-            content: "";
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-top: 5px solid #666;
-        }
-        .custom-select-dropdown {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            background: #fff;
-            border: 1px solid #007bff;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 999;
-            margin-top: 2px;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-        .search-bar {
-            margin-bottom: 8px;
-            border: 1px solid #ddd;
-            font-size: 13px;
-        }
-        .search-bar:focus {
-            border-color: #007bff;
-            outline: none;
-        }
-        .options-list {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .custom-option {
-            padding: 8px 10px;
-            cursor: pointer;
-            font-size: 13px;
-            border-radius: 3px; 
-        }
-        .custom-option:hover {
-            background-color: #f1f1f1;
-            color: #007bff;
-        }
-        .custom-option.selected {
-            background-color: #e6f0ff;
-            color: #007bff;
-            font-weight: bold;
-        }
+        .custom-select-trigger { padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; min-height: 42px; box-sizing: border-box; }
+        .custom-select-trigger::after { content: ""; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #666; flex-shrink: 0; margin-left: 8px; }
+        .custom-select-dropdown { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #28a745; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 999; margin-top: 2px; padding: 8px; box-sizing: border-box; }
+        .search-bar { margin-bottom: 8px; border: 1px solid #ddd; font-size: 13px; }
+        .options-list { max-height: 200px; overflow-y: auto; }
+        .custom-option { padding: 8px 10px; cursor: pointer; font-size: 13px; border-radius: 3px; }
+        .custom-option:hover { background: #e6f0ff; color: #007bff; }
+        .custom-option.selected { background: #e6f0ff; color: #007bff; font-weight: bold; }
         .show-dropdown { display: block !important; }
-        button[type="submit"] { background: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; font-weight: bold; }
+        button[type="submit"] { background: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button[type="submit"]:hover { background: #218838; }
         .btn-cancel { display: block; text-align: center; margin-top: 15px; color: #6c757d; text-decoration: none; font-size: 14px; }
-        #start-time-dropdown, #end-time-dropdown {
-            width: 100%;
-            max-height: 220px;
-            overflow-y: auto;
-            padding: 5px 0;
-        }
-        .time-header {
-            background: #f1f1f1;
-            padding: 6px 10px;
-            font-size: 11px;
-            font-weight: bold;
-            color: #666;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
+        #start-time-dropdown, #end-time-dropdown { width: 100%; max-height: 220px; overflow-y: auto; padding: 5px 0; }
+        .time-header { background: #f1f1f1; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #666; position: sticky; top: 0; z-index: 10; }
+        .duration-preview { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #166534; font-weight: bold; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
 <div class="card">
-    <h2>Create New Record</h2>
+    <h2 style="margin-top:0; margin-bottom:20px; color:#166534;">➕ Create New Record</h2>
     <form method="POST" id="record-form">
         <div class="form-group">
             <label>Select Project:</label>
@@ -211,13 +147,17 @@ $projects_res = $conn->query("
                     <input type="hidden" name="end_time" id="end-time-hidden" required>
                 </div>
             </div>
+            <div class="duration-preview" id="dur-preview"></div>
         </div>
 
         <div class="form-group" id="meal-break-container" style="display: none;">
-            <label>Meal Break (-1 hour each):</label>
-            <select name="meal_breaks" id="meal_breaks">
-                <option value="0">0</option>
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="meal_break_checkbox">
+                Meal Break
+            </label>
+            <select id="meal_breaks_select" style="display: none; margin-top: 8px;">
             </select>
+            <input type="hidden" name="meal_breaks" id="actual_meal_breaks" value="0">
         </div>
 
         <div class="form-group">
@@ -289,7 +229,7 @@ function formatAMPM(hours, minutes) {
     let displayHours = hours % 12;
     displayHours = displayHours ? displayHours : 12; 
     const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
-    return `${displayHours}:${displayMinutes} ${ampm}`;
+    return displayHours + ':' + displayMinutes + ' ' + ampm;
 }
 
 function getNearest15Min() {
@@ -307,9 +247,47 @@ function getNearest15Min() {
     }
     if (h >= 24) h = 0;
 
-    const valStr = `${h < 10 ? '0'+h : h}:${m < 10 ? '0'+m : m}`;
-    return { valStr, textStr: formatAMPM(h, m) };
+    const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
+    return { valStr: valStr, textStr: formatAMPM(h, m) };
 }
+
+function updateDurationPreview() {
+    const sd = document.getElementById('date').value;
+    const st = document.getElementById('start-time-hidden').value;
+    const et = document.getElementById('end-time-hidden').value;
+    const prev = document.getElementById('dur-preview');
+    
+    if (!sd || !st || !et) { 
+        prev.textContent = ''; 
+        prev.style.display = 'none';
+        return; 
+    }
+    
+    const start = new Date(sd + 'T' + st + ':00');
+    let end = new Date(sd + 'T' + et + ':00');
+    if (end <= start) {
+        end.setDate(end.getDate() + 1);
+    }
+    
+    let mealBreaks = parseInt(document.getElementById('actual_meal_breaks').value) || 0;
+    
+    let diff = end - start;
+    diff = diff - (mealBreaks * 3600000); 
+    if (diff < 0) diff = 0;
+
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const days = Math.floor(h / 24);
+    
+    let t = '⏱ Duration: ';
+    if (days > 0) t += days + 'd ';
+    t += (h % 24) + 'h ' + m + 'm';
+    
+    prev.textContent = t;
+    prev.style.display = 'block';
+}
+
+let currentMaxBreaks = 0;
 
 function calculateMealBreaks() {
     const st = document.getElementById('start-time-hidden').value;
@@ -318,32 +296,55 @@ function calculateMealBreaks() {
 
     const start = new Date("1970-01-01T" + st + ":00");
     let end = new Date("1970-01-01T" + et + ":00");
-    
-    if (end <= start) {
-        end.setDate(end.getDate() + 1);
-    }
+    if (end <= start) end.setDate(end.getDate() + 1);
 
     const diffHours = (end - start) / (1000 * 60 * 60);
-    const mealBreakContainer = document.getElementById('meal-break-container');
-    const mealBreaksSelect = document.getElementById('meal_breaks');
-
-    mealBreaksSelect.innerHTML = '<option value="0">0</option>';
     
-    if (diffHours > 8) {
-        mealBreakContainer.style.display = 'block';
-        mealBreaksSelect.innerHTML += '<option value="1">1</option>';
-        mealBreaksSelect.value = "1";
+    let maxBreaks = 0;
+    if (diffHours >= 24) maxBreaks = 3;
+    else if (diffHours > 16) maxBreaks = 2;
+    else if (diffHours > 8) maxBreaks = 1;
+
+    const container = document.getElementById('meal-break-container');
+    const select = document.getElementById('meal_breaks_select');
+    const checkbox = document.getElementById('meal_break_checkbox');
+    const hiddenInput = document.getElementById('actual_meal_breaks');
+    
+    currentMaxBreaks = maxBreaks;
+
+    if (maxBreaks > 0) {
+        container.style.display = 'block';
         
-        if (diffHours > 16) {
-            mealBreaksSelect.innerHTML += '<option value="2">2</option>';
+        let oldVal = select.value;
+        select.innerHTML = '';
+        if (maxBreaks > 1) {
+            for (let i = 1; i <= maxBreaks; i++) {
+                select.innerHTML += `<option value="${i}">${i}</option>`;
+            }
+            if (oldVal && oldVal <= maxBreaks && oldVal > 0) {
+                select.value = oldVal;
+            }
         }
-        if (diffHours >= 24) {
-            mealBreaksSelect.innerHTML += '<option value="3">3</option>';
+        
+        if (checkbox.checked) {
+            if (maxBreaks > 1) {
+                select.style.display = 'block';
+                hiddenInput.value = select.value;
+            } else {
+                select.style.display = 'none';
+                hiddenInput.value = "1";
+            }
+        } else {
+            select.style.display = 'none';
+            hiddenInput.value = "0";
         }
     } else {
-        mealBreakContainer.style.display = 'none';
-        mealBreaksSelect.value = "0";
+        container.style.display = 'none';
+        checkbox.checked = false;
+        select.style.display = 'none';
+        hiddenInput.value = "0";
     }
+    updateDurationPreview();
 }
 
 function generateStartTimes() {
@@ -354,7 +355,7 @@ function generateStartTimes() {
     for (let minutes = 0; minutes < 24 * 60; minutes += 15) {
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
-        const valStr = `${h < 10 ? '0'+h : h}:${m < 10 ? '0'+m : m}`;
+        const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
         const textStr = formatAMPM(h, m);
 
         const opt = document.createElement('div');
@@ -385,10 +386,10 @@ function generateEndTimes() {
         const d = new Date(dateInput.value);
         if (!isNaN(d.getTime())) {
             const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            baseDateText = `${d.getDate()} ${months[d.getMonth()]}`;
+            baseDateText = d.getDate() + ' ' + months[d.getMonth()];
             const nextD = new Date(d);
             nextD.setDate(d.getDate() + 1);
-            nextDateText = `${nextD.getDate()} ${months[nextD.getMonth()]}`;
+            nextDateText = nextD.getDate() + ' ' + months[nextD.getMonth()];
         }
     }
 
@@ -418,7 +419,7 @@ function generateEndTimes() {
             hasAddedNextDayHeader = true;
         }
 
-        const valStr = `${h < 10 ? '0'+h : h}:${m < 10 ? '0'+m : m}`;
+        const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
         const textStr = formatAMPM(h, m);
 
         const opt = document.createElement('div');
@@ -441,11 +442,39 @@ document.addEventListener("DOMContentLoaded", function() {
 
     generateStartTimes();
     generateEndTimes();
+    calculateMealBreaks();
 
     const dateInput = document.getElementById('date');
     if(dateInput) {
-        dateInput.addEventListener('change', generateEndTimes);
+        dateInput.addEventListener('change', function() {
+            generateEndTimes();
+            calculateMealBreaks();
+        });
     }
+
+    document.getElementById('meal_break_checkbox').addEventListener('change', function() {
+        const select = document.getElementById('meal_breaks_select');
+        const hiddenInput = document.getElementById('actual_meal_breaks');
+        
+        if (this.checked) {
+            if (currentMaxBreaks > 1) {
+                select.style.display = 'block';
+                hiddenInput.value = select.value;
+            } else {
+                select.style.display = 'none';
+                hiddenInput.value = "1";
+            }
+        } else {
+            select.style.display = 'none';
+            hiddenInput.value = "0";
+        }
+        updateDurationPreview();
+    });
+
+    document.getElementById('meal_breaks_select').addEventListener('change', function() {
+        document.getElementById('actual_meal_breaks').value = this.value;
+        updateDurationPreview();
+    });
 });
 
 document.getElementById('record-form').addEventListener('submit', function(e) {
