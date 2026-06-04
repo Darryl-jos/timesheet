@@ -6,6 +6,7 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
     exit;
 }
 
+// ── Bulk delete ───────────────────────────────────────────────────────────────
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['bulk_action']) && $_POST['bulk_action'] === 'delete') {
     if (isset($_POST['selected_ts']) && is_array($_POST['selected_ts'])) {
         $ids = array_map('intval', $_POST['selected_ts']);
@@ -19,6 +20,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['bulk_action']) && $_PO
     }
 }
 
+// ── Single delete ─────────────────────────────────────────────────────────────
 if (isset($_GET['delete_ts'])) {
     $del_id = intval($_GET['delete_ts']);
     $stmt = $conn->prepare("DELETE FROM timesheets WHERE id = ?");
@@ -29,6 +31,7 @@ if (isset($_GET['delete_ts'])) {
     exit;
 }
 
+// ── Fetch all timesheets ──────────────────────────────────────────────────────
 $ts_result = $conn->query("
     SELECT t.*, p.project_name, p.customer_name, p.estimate_time
     FROM timesheets t
@@ -39,6 +42,7 @@ if (!$ts_result) die("DB Error: " . $conn->error);
 
 $proj_list_result = $conn->query("SELECT project_id, project_name, customer_name FROM projects ORDER BY project_name ASC");
 
+// Cache rows + compute minutes
 $rows_cache = [];
 while ($row = $ts_result->fetch_assoc()) {
     $start = new DateTime($row['start_date'] . ' ' . $row['start_time']);
@@ -50,6 +54,7 @@ while ($row = $ts_result->fetch_assoc()) {
     $rows_cache[] = $row;
 }
 
+// Per-project aggregates (for summary card)
 $proj_agg = [];
 foreach ($rows_cache as $r) {
     $pid = $r['project_id'];
@@ -85,14 +90,15 @@ function fmtDate($d) {
 <title>Audit Timesheets — Admin</title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; font-size: 13px; }
-
-.page { box-sizing: border-box; }
+body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; font-size: 13px; }
 
 .page-header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
 .page-header h2 { margin: 0; font-size: 18px; }
 .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .header-actions a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
+.header-actions a:hover { color: #ffda6a; }
+
+.page { padding: 20px; }
 
 .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .stat { background: white; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 120px; border-top: 3px solid #007bff; }
@@ -101,10 +107,26 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color:
 .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
 .stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; }
 
-.search-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.search-wrap input[type="text"], .search-wrap input[type="date"] { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-.search-wrap input[type="text"] { flex: 3; min-width: 140px; }
-.search-wrap input[type="date"] { flex: 1.5; min-width: 120px; }
+.search-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+.search-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+.search-wrap input[type="date"] { flex: 1; min-width: 130px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+
+.sel-wrap { flex: 2; min-width: 180px; position: relative; }
+.sel-box { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; }
+.sel-box:hover { border-color: #007bff; }
+.sel-box span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: #333; }
+.sel-arrow { color: #6c757d; font-size: 11px; flex-shrink: 0; transition: transform .2s; }
+.sel-wrap.open .sel-arrow { transform: rotate(180deg); }
+.sel-wrap.open .sel-box { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,.12); }
+.sel-panel { display: none; position: absolute; top: calc(100% + 3px); left: 0; width: 100%; min-width: 220px; background: white; border: 1px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 200; padding: 6px; }
+.sel-wrap.open .sel-panel { display: block; }
+.sel-panel input { width: 100%; height: 32px; padding: 0 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; margin-bottom: 5px; box-sizing: border-box; }
+.sel-panel input:focus { border-color: #007bff; outline: none; }
+.sel-list { max-height: 200px; overflow-y: auto; }
+.sel-item { padding: 7px 10px; cursor: pointer; font-size: 13px; border-radius: 3px; line-height: 1.3; }
+.sel-item:hover { background: #f0f7ff; }
+.sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
+.sel-item.hidden { display: none; }
 .btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; }
 .proj-wrap { flex: 3; min-width: 140px; position: relative; }
 .sel-trigger { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
@@ -117,7 +139,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color:
 .sel-opt.active { background: #e6f0ff; color: #007bff; font-weight: bold; }
 .show-drop { display: block !important; }
 
-.eng-wrap { flex: 2; min-width: 120px; position: relative; }
+.btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
 
 .summary-card { display: none; background: white; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); border-left: 5px solid #007bff; margin-bottom: 14px; }
 .summary-card h4 { margin: 0 0 12px 0; color: #007bff; font-size: 15px; }
@@ -140,8 +162,8 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color:
 
 .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-th, td { padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
-th { background: #f8fafc; font-weight: 600; color: #475569; white-space: nowrap; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
+th { background: #f8f9fa; font-weight: bold; color: #495057; }
 tbody tr:hover { background: #f8faff; }
 .is-hidden { display: none !important; }
 
@@ -179,7 +201,7 @@ tbody tr:hover { background: #f8faff; }
 .show-sort { display:block !important; }
 
 @media (max-width: 600px) {
-    body { margin: 15px; }
+    .page { padding: 10px; }
     .stats-bar { gap: 8px; }
     .stat { min-width: 100px; }
 }
@@ -222,6 +244,7 @@ tbody tr:hover { background: #f8faff; }
         </div>
     </div>
 
+    <!-- Bulk Toolbar -->
     <div id="bulk-toolbar">
         <span id="bulk-count">0 selected</span>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -231,50 +254,66 @@ tbody tr:hover { background: #f8faff; }
         </div>
     </div>
 
+    <!-- Search -->
     <div class="search-wrap">
-        <input type="text" id="txt-search" placeholder="🔍 Search engineer, project, activity..." oninput="doFilter()">
-        <div class="proj-wrap">
-            <div class="sel-trigger" id="proj-trigger" onclick="toggleDrop('proj-drop', event)">
+        <input type="text" id="txt-search" placeholder="🔍 Search activity / keyword..." oninput="doFilter()">
+
+        <!-- Project searchable select -->
+        <div class="sel-wrap" id="proj-wrap">
+            <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
                 <span id="proj-label">All Projects</span>
+                <span class="sel-arrow">▾</span>
             </div>
-            <div class="sel-drop" id="proj-drop">
-                <input type="text" id="proj-inner" placeholder="🔍 Search..." onkeyup="filterOpts('proj-drop', this.value)">
-                <div class="sel-opts">
-                    <div class="sel-opt active" data-value="" onclick="pickFilter('proj', '', 'All Projects', this)">All Projects</div>
+            <div class="sel-panel" id="proj-panel">
+                <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
+                <div class="sel-list" id="proj-list">
+                    <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
                     <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
-                        $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']); ?>
-                        <div class="sel-opt" data-value="<?= htmlspecialchars($p['project_id']) ?>" data-kw="<?= htmlspecialchars($kw) ?>"
-                             onclick="pickFilter('proj', '<?= htmlspecialchars($p['project_id']) ?>', this.textContent.trim(), this)">
-                            [<?= htmlspecialchars($p['project_id']) ?>] <?= htmlspecialchars($p['project_name']) ?>
-                        </div>
+                        $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
+                    ?>
+                    <div class="sel-item"
+                         data-value="<?= htmlspecialchars($p['project_id']) ?>"
+                         data-kw="<?= strtolower(htmlspecialchars($p['project_id'].' '.$p['project_name'].' '.$p['customer_name'])) ?>"
+                         onclick="pickSel('proj','<?= htmlspecialchars(addslashes($p['project_id'])) ?>','<?= htmlspecialchars(addslashes($label)) ?>',this)">
+                        <?= htmlspecialchars($label) ?>
+                        <span style="color:#9ca3af;font-size:11px;display:block;"><?= htmlspecialchars($p['customer_name']) ?></span>
+                    </div>
                     <?php endwhile; endif; ?>
                 </div>
             </div>
         </div>
-        <div class="eng-wrap">
-            <div class="sel-trigger" id="eng-trigger" onclick="toggleDrop('eng-drop', event)">
+
+        <!-- Engineer searchable select -->
+        <div class="sel-wrap" id="eng-wrap">
+            <div class="sel-box" id="eng-box" onclick="toggleSel('eng')">
                 <span id="eng-label">All Engineers</span>
+                <span class="sel-arrow">▾</span>
             </div>
-            <div class="sel-drop" id="eng-drop">
-                <input type="text" id="eng-inner" placeholder="🔍 Search..." onkeyup="filterOpts('eng-drop', this.value)">
-                <div class="sel-opts">
-                    <div class="sel-opt active" data-value="" onclick="pickFilter('eng', '', 'All Engineers', this)">All Engineers</div>
+            <div class="sel-panel" id="eng-panel">
+                <input type="text" id="eng-inner" placeholder="🔍 Type to filter..." oninput="filterSel('eng')" onclick="event.stopPropagation()">
+                <div class="sel-list" id="eng-list">
+                    <div class="sel-item active" data-value="" onclick="pickSel('eng','','All Engineers',this)">All Engineers</div>
                     <?php
-                    $unique_engs = array_unique(array_column($rows_cache, 'engineer_name'));
-                    sort($unique_engs);
-                    foreach ($unique_engs as $eng): ?>
-                        <div class="sel-opt" data-value="<?= htmlspecialchars($eng) ?>" data-kw="<?= strtolower(htmlspecialchars($eng)) ?>"
-                             onclick="pickFilter('eng', '<?= htmlspecialchars(addslashes($eng)) ?>', '<?= htmlspecialchars(addslashes($eng)) ?>', this)">
-                            <?= htmlspecialchars($eng) ?>
-                        </div>
-                    <?php endforeach; ?>
+                    $all_engs = $conn->query("SELECT engineer_name FROM engineers WHERE engineer_name != '' ORDER BY engineer_name ASC");
+                    while ($eng_row = $all_engs->fetch_assoc()):
+                        $eng = $eng_row['engineer_name'];
+                    ?>
+                    <div class="sel-item"
+                         data-value="<?= htmlspecialchars($eng) ?>"
+                         data-kw="<?= strtolower(htmlspecialchars($eng)) ?>"
+                         onclick="pickSel('eng','<?= htmlspecialchars(addslashes($eng)) ?>','<?= htmlspecialchars(addslashes($eng)) ?>',this)">
+                        <?= htmlspecialchars($eng) ?>
+                    </div>
+                    <?php endwhile; ?>
                 </div>
             </div>
         </div>
+
         <input type="date" id="date-search" onchange="doFilter()">
         <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
 
+    <!-- Project Summary Card -->
     <div class="summary-card" id="sum-card">
         <h4>📈 Project Overview</h4>
         <div class="sum-grid">
@@ -289,6 +328,7 @@ tbody tr:hover { background: #f8faff; }
         </div>
     </div>
 
+    <!-- Table -->
     <form id="bulk-form" method="POST" action="admin_timesheets.php">
         <input type="hidden" name="bulk_action" id="bulk-action-field" value="">
 
@@ -382,7 +422,7 @@ tbody tr:hover { background: #f8faff; }
                     data-mins="<?= $mins ?>">
                     <td><input type="checkbox" class="ts-chk" name="selected_ts[]" value="<?= $row['id'] ?>" onchange="onChkChange()"></td>
                     <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
-                    <td><code style="font-size:11px;"><?= htmlspecialchars($row['project_id']) ?></code></td>
+                    <td><?= (strpos($row['project_id'], 'N/A') === 0) ? '' : '<code style="font-size:11px;">' . htmlspecialchars($row['project_id']) . '</code>' ?></td>
                     <td style="font-size:11px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:11px;"><?= htmlspecialchars($row['project_name']) ?></td>
                     <td>
@@ -427,6 +467,42 @@ let activeProjFilter = '';
 let activeEngFilter  = '';
 let origRows = null;
 
+// ── Searchable select ─────────────────────────────────────────────────────────
+function toggleSel(type) {
+    const wrap = document.getElementById(type+'-wrap');
+    const isOpen = wrap.classList.contains('open');
+    // close all
+    document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
+    if (!isOpen) {
+        wrap.classList.add('open');
+        document.getElementById(type+'-inner').focus();
+    }
+}
+function filterSel(type) {
+    const val = document.getElementById(type+'-inner').value.toLowerCase();
+    document.querySelectorAll('#'+type+'-list .sel-item').forEach(item => {
+        if (!item.dataset.value) { item.classList.remove('hidden'); return; } // always show "All"
+        item.classList.toggle('hidden', !!val && !(item.dataset.kw||'').includes(val));
+    });
+}
+function pickSel(type, value, label, el) {
+    if (type === 'proj') { activeProjFilter = value; document.getElementById('proj-label').textContent = label; }
+    else                 { activeEngFilter  = value; document.getElementById('eng-label').textContent  = label; }
+    document.querySelectorAll('#'+type+'-list .sel-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById(type+'-wrap').classList.remove('open');
+    document.getElementById(type+'-inner').value = '';
+    filterSel(type); // reset filter display
+    doFilter();
+}
+// Close on outside click
+document.addEventListener('click', e => {
+    if (!e.target.closest('.sel-wrap')) {
+        document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
+    }
+});
+
+// ── Filter ────────────────────────────────────────────────────────────────────
 function doFilter() {
     const txt  = document.getElementById('txt-search').value.toLowerCase();
     const date = document.getElementById('date-search').value;
@@ -436,10 +512,10 @@ function doFilter() {
         const rEng = tr.dataset.eng || '';
         const rSd  = tr.dataset.sd  || '';
         const rTxt = tr.textContent.toLowerCase();
-        const ok = (!txt || rTxt.includes(txt))
+        const ok = (!txt              || rTxt.includes(txt))
                 && (!activeProjFilter || rPid === activeProjFilter)
                 && (!activeEngFilter  || rEng === activeEngFilter)
-                && (!date || rSd === date);
+                && (!date             || rSd  === date);
         tr.classList.toggle('is-hidden', !ok);
         if (ok) visRows.push(tr);
     });
@@ -454,7 +530,6 @@ function updateSummary(visRows) {
 
     let filteredMins = 0;
     visRows.forEach(tr => filteredMins += parseInt(tr.dataset.mins)||0);
-
     const h = Math.floor(filteredMins/60), m = filteredMins%60;
     const targetMins = agg.estimate_time * 60;
     const gapM = filteredMins - targetMins;
@@ -463,62 +538,37 @@ function updateSummary(visRows) {
     document.getElementById('sum-pid').textContent    = activeProjFilter;
     document.getElementById('sum-pname').textContent  = agg.project_name;
     document.getElementById('sum-cust').textContent   = agg.customer_name;
-    document.getElementById('sum-target').textContent = agg.estimate_time + 'h (' + Math.round(agg.estimate_time/8,1) + ' days)';
-    document.getElementById('sum-actual').textContent = h + 'h ' + m + 'm';
-    document.getElementById('sum-dates').textContent  = agg.min_start + ' → ' + agg.max_end;
+    document.getElementById('sum-target').textContent = agg.estimate_time+'h ('+Math.round(agg.estimate_time/8)+' days)';
+    document.getElementById('sum-actual').textContent = h+'h '+m+'m';
+    document.getElementById('sum-dates').textContent  = agg.min_start+' → '+agg.max_end;
     document.getElementById('sum-engs').textContent   = Object.keys(agg.engineers).join(', ');
 
     const gapEl = document.getElementById('sum-gap');
-    if (gapM > 0)      gapEl.innerHTML = '<span style="color:#dc3545; font-weight:bold;">▲ +'+gH+'h '+gM+'m Over</span>';
-    else if (gapM < 0) gapEl.innerHTML = '<span style="color:#28a745; font-weight:bold;">▼ -'+gH+'h '+gM+'m Saved</span>';
-    else               gapEl.innerHTML = '<span style="color:#6c757d; font-weight:bold;">✓ On Track</span>';
-
+    if (agg.estimate_time == 0) {
+        gapEl.innerHTML = '<span style="color:#6c757d;font-weight:bold;">No Target</span>';
+    } else if (gapM > 0) {
+        gapEl.innerHTML = '<span style="color:#dc3545;font-weight:bold;">▲ +'+gH+'h '+gM+'m Over</span>';
+    } else if (gapM < 0) {
+        gapEl.innerHTML = '<span style="color:#28a745;font-weight:bold;">▼ -'+gH+'h '+gM+'m Saved</span>';
+    } else {
+        gapEl.innerHTML = '<span style="color:#6c757d;font-weight:bold;">✓ On Track</span>';
+    }
     card.style.display = 'block';
 }
 
 function clearAllFilters() {
-    document.getElementById('txt-search').value = '';
+    document.getElementById('txt-search').value  = '';
     document.getElementById('date-search').value = '';
     activeProjFilter = '';
     activeEngFilter  = '';
     document.getElementById('proj-label').textContent = 'All Projects';
     document.getElementById('eng-label').textContent  = 'All Engineers';
-    document.querySelectorAll('.sel-opt').forEach(o => o.classList.remove('active'));
-    document.querySelectorAll('.sel-opt[data-value=""]').forEach(o => o.classList.add('active'));
+    document.querySelectorAll('.sel-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.sel-item[data-value=""]').forEach(i => i.classList.add('active'));
     doFilter();
 }
 
-function toggleDrop(id, e) {
-    e.stopPropagation();
-    ['proj-drop','eng-drop'].forEach(d => { if (d !== id) document.getElementById(d).classList.remove('show-drop'); });
-    document.getElementById(id).classList.toggle('show-drop');
-}
-function filterOpts(dropId, val) {
-    const f = val.toLowerCase();
-    document.querySelectorAll('#'+dropId+' .sel-opt').forEach(o => {
-        o.style.display = (!o.dataset.value || (o.dataset.kw||'').includes(f)) ? '' : 'none';
-    });
-}
-function pickFilter(type, val, label, el) {
-    if (type === 'proj') {
-        activeProjFilter = val;
-        document.getElementById('proj-label').textContent = label;
-        document.querySelectorAll('#proj-drop .sel-opt').forEach(o => o.classList.remove('active'));
-        document.getElementById('proj-drop').classList.remove('show-drop');
-    } else {
-        activeEngFilter = val;
-        document.getElementById('eng-label').textContent = label;
-        document.querySelectorAll('#eng-drop .sel-opt').forEach(o => o.classList.remove('active'));
-        document.getElementById('eng-drop').classList.remove('show-drop');
-    }
-    el.classList.add('active');
-    doFilter();
-}
-window.addEventListener('click', () => {
-    document.getElementById('proj-drop').classList.remove('show-drop');
-    document.getElementById('eng-drop').classList.remove('show-drop');
-});
-
+// ── Checkbox / bulk ───────────────────────────────────────────────────────────
 function onChkChange() {
     const checked = document.querySelectorAll('.ts-chk:checked').length;
     const toolbar = document.getElementById('bulk-toolbar');
@@ -551,12 +601,14 @@ function submitBulkDelete() {
 }
 function exportAll() { window.location.href = 'export.php'; }
 
+// ── Activity expand ───────────────────────────────────────────────────────────
 document.querySelectorAll('.act').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('exp'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('exp'); });
 });
 
+// ── Sort ──────────────────────────────────────────────────────────────────────
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id!==id) m.classList.remove('show-sort'); });

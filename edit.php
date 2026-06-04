@@ -166,7 +166,8 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         <?php 
                         while($p = $projects_res->fetch_assoc()) {
                             if ($edit_data['project_id'] == $p['project_id']) {
-                                $current_selected_text = "[".$p['project_id']."] ".$p['project_name']." (Client: ".$p['customer_name'].")";
+                                $display_id = (strpos($p['project_id'], 'N/A') === 0) ? "[-]" : "[" . $p['project_id'] . "]";
+                                $current_selected_text = $display_id . " " . $p['project_name'] . " (Client: " . $p['customer_name'] . ")";
                             }
                         }
                         echo htmlspecialchars($current_selected_text);
@@ -182,7 +183,10 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                                 $is_selected = ($edit_data['project_id'] == $p['project_id']) ? 'selected' : '';
                                 ?>
                                 <div class="custom-option <?php echo $is_selected; ?>" data-value="<?php echo htmlspecialchars($p['project_id']); ?>" data-keywords="<?php echo htmlspecialchars($search_haystack); ?>" onclick="selectOption(this)">
-                                    <?php echo "[".htmlspecialchars($p['project_id'])."] " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; ?>
+                                    <?php 
+                                    $display_id = (strpos($p['project_id'], 'N/A') === 0) ? "[-]" : "[" . htmlspecialchars($p['project_id']) . "]";
+                                    echo $display_id . " " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; 
+                                    ?>
                                 </div>
                             <?php endwhile; ?>
                         </div>

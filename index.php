@@ -258,7 +258,7 @@ function fmtDate($d) {
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>">
                     <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
-                    <td><code style="font-size:11px;"><?= htmlspecialchars($row['project_id']) ?></code></td>
+                    <td><?= (strpos($row['project_id'], 'N/A') === 0) ? '' : '<code style="font-size:11px;">' . htmlspecialchars($row['project_id']) . '</code>' ?></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['project_name']) ?></td>
                     <td>

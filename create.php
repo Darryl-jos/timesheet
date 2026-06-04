@@ -150,7 +150,10 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                             <?php while($p = $projects_res->fetch_assoc()): ?>
                                 <?php $search_haystack = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']); ?>
                                 <div class="custom-option" data-value="<?php echo htmlspecialchars($p['project_id']); ?>" data-keywords="<?php echo htmlspecialchars($search_haystack); ?>" onclick="selectOption(this)">
-                                    <?php echo "[".htmlspecialchars($p['project_id'])."] " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; ?>
+                                    <?php 
+                                    $display_id = (strpos($p['project_id'], 'N/A') === 0) ? "[-]" : "[" . htmlspecialchars($p['project_id']) . "]";
+                                    echo $display_id . " " . htmlspecialchars($p['project_name']) . " (Client: " . htmlspecialchars($p['customer_name']) . ")"; 
+                                    ?>
                                 </div>
                             <?php endwhile; ?>
                         </div>
