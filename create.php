@@ -22,9 +22,41 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $s_time = $_POST['start_time']; 
     $e_time = $_POST['end_time'];   
     $work_desc = trim($_POST['work_description']); 
+    $meal_breaks = isset($_POST['meal_breaks']) ? (int)$_POST['meal_breaks'] : 0;
     
-    $stmt = $conn->prepare("INSERT INTO timesheets (engineer_id, engineer_name, project_id, date, start_time, end_time, work_description) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("issssss", $current_user_id, $current_user_name, $proj_id, $date, $s_time, $e_time, $work_desc);
+    $start_dt = new DateTime("$date $s_time");
+    $end_dt = new DateTime("$date $e_time");
+    
+    if ($end_dt <= $start_dt) {
+        $end_dt->modify('+1 day');
+    }
+    
+    $diff_hours = ($end_dt->getTimestamp() - $start_dt->getTimestamp()) / 3600;
+    
+    $max_breaks = 0;
+    if ($diff_hours >= 24) {
+        $max_breaks = 3;
+    } elseif ($diff_hours > 16) {
+        $max_breaks = 2;
+    } elseif ($diff_hours > 8) {
+        $max_breaks = 1;
+    }
+    
+    if ($meal_breaks > $max_breaks) {
+        $meal_breaks = $max_breaks;
+    }
+    
+    if ($meal_breaks > 0) {
+        $end_dt->modify("-{$meal_breaks} hours");
+    }
+    
+    $final_start_date = $start_dt->format('Y-m-d');
+    $final_start_time = $start_dt->format('H:i:s');
+    $final_end_date = $end_dt->format('Y-m-d');
+    $final_end_time = $end_dt->format('H:i:s');
+    
+    $stmt = $conn->prepare("INSERT INTO timesheets (engineer_id, engineer_name, project_id, start_date, start_time, end_date, end_time, work_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("isssssss", $current_user_id, $current_user_name, $proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $work_desc);
     $stmt->execute();
     $stmt->close();
 
@@ -48,7 +80,7 @@ $projects_res = $conn->query("
         .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 450px; }
         .form-group { margin-bottom: 15px; position: relative; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         textarea { resize: vertical; min-height: 80px; font-family: Arial, sans-serif; }
         .custom-select-trigger {
             padding: 10px;
@@ -114,7 +146,6 @@ $projects_res = $conn->query("
         button[type="submit"] { background: #28a745; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; font-weight: bold; }
         button[type="submit"]:hover { background: #218838; }
         .btn-cancel { display: block; text-align: center; margin-top: 15px; color: #6c757d; text-decoration: none; font-size: 14px; }
-    
         #start-time-dropdown, #end-time-dropdown {
             width: 100%;
             max-height: 220px;
@@ -180,6 +211,13 @@ $projects_res = $conn->query("
                     <input type="hidden" name="end_time" id="end-time-hidden" required>
                 </div>
             </div>
+        </div>
+
+        <div class="form-group" id="meal-break-container" style="display: none;">
+            <label>Meal Break (-1 hour each):</label>
+            <select name="meal_breaks" id="meal_breaks">
+                <option value="0">0</option>
+            </select>
         </div>
 
         <div class="form-group">
@@ -273,6 +311,41 @@ function getNearest15Min() {
     return { valStr, textStr: formatAMPM(h, m) };
 }
 
+function calculateMealBreaks() {
+    const st = document.getElementById('start-time-hidden').value;
+    const et = document.getElementById('end-time-hidden').value;
+    if (!st || !et) return;
+
+    const start = new Date("1970-01-01T" + st + ":00");
+    let end = new Date("1970-01-01T" + et + ":00");
+    
+    if (end <= start) {
+        end.setDate(end.getDate() + 1);
+    }
+
+    const diffHours = (end - start) / (1000 * 60 * 60);
+    const mealBreakContainer = document.getElementById('meal-break-container');
+    const mealBreaksSelect = document.getElementById('meal_breaks');
+
+    mealBreaksSelect.innerHTML = '<option value="0">0</option>';
+    
+    if (diffHours > 8) {
+        mealBreakContainer.style.display = 'block';
+        mealBreaksSelect.innerHTML += '<option value="1">1</option>';
+        mealBreaksSelect.value = "1";
+        
+        if (diffHours > 16) {
+            mealBreaksSelect.innerHTML += '<option value="2">2</option>';
+        }
+        if (diffHours >= 24) {
+            mealBreaksSelect.innerHTML += '<option value="3">3</option>';
+        }
+    } else {
+        mealBreakContainer.style.display = 'none';
+        mealBreaksSelect.value = "0";
+    }
+}
+
 function generateStartTimes() {
     const container = document.getElementById('start-time-dropdown');
     container.innerHTML = '';
@@ -295,6 +368,7 @@ function generateStartTimes() {
             document.getElementById('end-time-hidden').value = "";
             document.getElementById('end-time-trigger').innerText = "-- Select End Time --";
             generateEndTimes();
+            calculateMealBreaks();
         };
         container.appendChild(opt);
     }
@@ -354,6 +428,7 @@ function generateEndTimes() {
             document.getElementById('end-time-hidden').value = valStr;
             document.getElementById('end-time-trigger').innerText = textStr;
             document.getElementById('end-time-dropdown').classList.remove('show-dropdown');
+            calculateMealBreaks();
         };
         container.appendChild(opt);
     }
