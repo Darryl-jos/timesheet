@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($exists) {
                     $upd = $conn->prepare("UPDATE iips_tracking SET selling_price=?,partner_cost=?,gross_profit=?,has_project_mgmt=?,target_mandays=?,target_start_date=?,target_end_date=?,target_billing_date=?,iips_status=?,billing_status=?,account_manager=?,account_leader=?,presales_sdm=?,project_manager=? WHERE project_id=?");
-                    $upd->bind_param("dddidsssssssss", $selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
+                    $upd->bind_param("dddidssssssssss", $selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
                     $upd->execute(); $upd->close();
                 } else {
                     $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
