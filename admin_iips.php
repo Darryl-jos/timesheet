@@ -10,18 +10,15 @@ $error = "";
 // ── Delete IIPS row ───────────────────────────────────────────────────────────
 if (isset($_GET['delete_proj'])) {
     $del_id = $_GET['delete_proj'];
-    $chk = $conn->prepare("SELECT COUNT(*) as total FROM timesheets WHERE project_id=?");
-    $chk->bind_param("s", $del_id); $chk->execute();
-    $cnt = $chk->get_result()->fetch_assoc(); $chk->close();
-    if ($cnt['total'] > 0) {
-        $error = "Cannot delete <code>".htmlspecialchars($del_id)."</code> — it has ".$cnt['total']." linked timesheet logs.";
-    } else {
-        $d1 = $conn->prepare("DELETE FROM iips_tracking WHERE project_id=?");
-        $d1->bind_param("s", $del_id); $d1->execute(); $d1->close();
-        $d2 = $conn->prepare("DELETE FROM projects WHERE project_id=?");
-        $d2->bind_param("s", $del_id); $d2->execute(); $d2->close();
-        header("Location: admin_iips.php"); exit;
-    }
+    $conn->query("SET FOREIGN_KEY_CHECKS=0");
+    $d0 = $conn->prepare("DELETE FROM timesheets WHERE project_id=?");
+    $d0->bind_param("s", $del_id); $d0->execute(); $d0->close();
+    $d1 = $conn->prepare("DELETE FROM iips_tracking WHERE project_id=?");
+    $d1->bind_param("s", $del_id); $d1->execute(); $d1->close();
+    $d2 = $conn->prepare("DELETE FROM projects WHERE project_id=?");
+    $d2->bind_param("s", $del_id); $d2->execute(); $d2->close();
+    $conn->query("SET FOREIGN_KEY_CHECKS=1");
+    header("Location: admin_iips.php"); exit;
 }
 
 // ── Save project (from create_iips.php redirect) ──────────────────────────────
@@ -356,7 +353,7 @@ function fmtMins($m) {
             <td class="s-act-col">
                 <a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a>
                 <a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del"
-                   onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a>
+                   onclick="return confirm('Delete <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis will also delete ALL linked timesheet logs.\nThis cannot be undone.')">Delete</a>
             </td>
         </tr>
         <?php endforeach; endif; ?>

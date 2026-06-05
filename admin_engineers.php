@@ -95,11 +95,11 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
 <style>
     .is-hidden { display: none !important; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
+    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
 
     /* ── Header ── */
-    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 14px 20px; color: white; flex-wrap: wrap; gap: 10px; }
-    .header h2 { margin: 0; font-size: 17px; }
+    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
+    .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 
     /* ── Page ── */

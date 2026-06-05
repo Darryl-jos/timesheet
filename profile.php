@@ -53,7 +53,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     <title>My Profile</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
+        .header h2 { color: #333; margin: 0; font-size: 18px; }
+        .header a { color: #0056b3; font-weight: bold; text-decoration: none; font-size: 13px; }
         .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 500px; margin: 20px auto; }
         .info-group { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .info-label { font-weight: bold; color: #666; font-size: 13px; }
@@ -67,10 +69,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 <body>
 
 <div class="header">
-    <h2>My Profile Settings</h2>
-    <a href="<?php echo (isset($_SESSION['is_admin']) && ($_SESSION['is_admin'] == 1 || $_SESSION['is_admin'] == 2)) ? 'admin.php' : 'index.php'; ?>" style="font-weight: bold; text-decoration: none; color: #007bff;">
-        ← Back to Dashboard
-    </a>
+    <h2>👷 My Profile</h2>
+    <a href="index.php">← Back to Dashboard</a>
 </div>
 
 <div class="card">

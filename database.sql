@@ -66,6 +66,7 @@ CREATE TABLE iips_tracking (
     account_leader      VARCHAR(150) NULL DEFAULT NULL,
     presales_sdm        VARCHAR(150) NULL DEFAULT NULL,
     project_manager     VARCHAR(150) NULL DEFAULT NULL,
+    partner             VARCHAR(150) NULL DEFAULT NULL,
 
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

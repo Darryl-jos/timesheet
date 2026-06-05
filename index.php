@@ -84,9 +84,9 @@ function fmtDate($d) {
     <title>My Timesheet Dashboard</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
+        body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
 
-        .topbar { background: #1e2330; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .topbar { background: #1e2330; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
         .topbar h2 { color: white; margin: 0; font-size: 16px; }
         .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .topbar a { color: #94a3b8; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
@@ -107,6 +107,13 @@ function fmtDate($d) {
 
         .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
         .search-bar-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        /* Filter dashboard */
+        .summary-card { display: none; background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; }
+        .summary-card h4 { margin: 0 0 10px; font-size: 13px; color: #1e40af; font-weight: 700; }
+        .sum-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+        .sum-item { background: white; border-radius: 6px; padding: 8px 14px; min-width: 110px; flex: 1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .sum-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; }
+        .sum-value { font-size: 16px; font-weight: 700; color: #1e293b; }
         .btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
         
         .sel-wrap { flex: 2; min-width: 180px; position: relative; }
@@ -186,46 +193,32 @@ function fmtDate($d) {
 </div>
 
 <div class="page">
-    <div class="stats-bar" style="align-items: flex-end;">
-        
-        <div class="stat">
-            <div class="stat-label">Total Logs</div>
-            <div class="stat-value"><?= $total_records ?></div>
-        </div>
-
-        <div style="flex: 1; min-width: 130px; display: flex; flex-direction: column; gap: 12px;">
-    
-            <form id="month-form" method="GET" style="margin: 0 1px 0 0; align-self: flex-end; width: 180px; height: 38px;">
-                <div style="position: relative; width: 100%; height: 100%; display: flex;">
-                    <input type="text" id="month-display" placeholder="ALL MONTHS" autocomplete="off" style="flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background-color: #fff; color: #333; box-sizing: border-box; z-index: 1;">
-                    <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; z-index: 5;">
-                        <span style="position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none;">📅</span>
-                        <input type="month" name="month" id="month-filter" value="<?= htmlspecialchars($filter_month) ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;" onchange="syncMonth()">
-                    </div>
+    <!-- Month filter -->
+    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+        <form id="month-form" method="GET" style="margin:0; width:180px; height:38px;">
+            <div style="position:relative; width:100%; height:100%; display:flex;">
+                <input type="text" id="month-display" placeholder="ALL MONTHS" autocomplete="off" style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;background:#fff;color:#333;box-sizing:border-box;z-index:1;">
+                <div style="position:absolute;right:0;top:0;width:36px;height:100%;z-index:5;">
+                    <span style="position:absolute;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;">📅</span>
+                    <input type="month" name="month" id="month-filter" value="<?= htmlspecialchars($filter_month) ?>" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;" onchange="syncMonth()">
                 </div>
-            </form>
-
-            <div class="stat green" style="width: 100%; margin: 0;">
-                <div class="stat-label">Total Hours</div>
-                <div class="stat-value"><?= $total_h ?>h <?= $total_m ?>m</div>
             </div>
-            
-        </div>
+        </form>
     </div>
 
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
     <div class="search-bar-wrap">
-        <input type="text" id="txt-search" placeholder="🔍 Search activity, project, customer..." oninput="doFilter()">
+        <input type="text" id="txt-search" placeholder="🔍 Search activity, iips, customer..." oninput="doFilter()">
         <div class="sel-wrap" id="proj-wrap">
             <div class="sel-box" id="proj-box" onclick="toggleSel()">
-                <span id="proj-label">All Projects</span>
+                <span id="proj-label">All IIPS</span>
                 <span class="sel-arrow">▾</span>
             </div>
             <div class="sel-panel" id="proj-panel">
                 <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel()" onclick="event.stopPropagation()">
                 <div class="sel-list" id="proj-list">
-                    <div class="sel-item active" data-value="" onclick="pickProj(this, '', 'All Projects')">All Projects</div>
+                    <div class="sel-item active" data-value="" onclick="pickProj(this, '', 'All IIPS')">All IIPS</div>
                     <?php if ($proj_list_res): while($p = $proj_list_res->fetch_assoc()):
                         $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']);
                         $pid_show = preg_match('/^N\/A/i', $p['project_id']) ? '' : '['.$p['project_id'].'] ';
@@ -256,6 +249,15 @@ function fmtDate($d) {
     </div>
 
     <div class="card">
+    <!-- Filter Dashboard -->
+    <div class="summary-card" id="sum-card">
+        <h4>📊 Filter Results Dashboard</h4>
+        <div class="sum-grid">
+            <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
+            <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
+        </div>
+    </div>
+
         <div class="card-hdr">Timesheet Records</div>
         <?php if (empty($rows_cache)): ?>
             <div class="no-data">No records found. Click "Create New Record" to add an entry.</div>
@@ -266,7 +268,7 @@ function fmtDate($d) {
                 <tr>
                     <th style="width: 13%;">
                         <div class="sort-wrap" style="position:relative;">
-                            <span>Project</span>
+                            <span>IIPS</span>
                             <button class="sort-btn" onclick="toggleSort(event,'drop-proj')"></button>
                             <div id="drop-proj" class="sort-menu">
                                 <a href="#" onclick="sortTable(0,'alpha',0);return false;">Default</a>
@@ -276,7 +278,7 @@ function fmtDate($d) {
                         </div>
                     </th>
                     <th style="width: 14%;">Customer</th>
-                    <th style="width: 15%;">Project Name</th>
+                    <th style="width: 15%;">IIPS Name</th>
                     <th style="width: auto;">Activity</th>
                     <th style="width: 12%;">
                         <div class="sort-wrap" style="position:relative;">
@@ -302,7 +304,9 @@ function fmtDate($d) {
                     $days = floor($h / 24);
                     $dur_text = ($days > 0 ? $days.'d ' : '') . ($h%24) . 'h ' . $m . 'm';
                 ?>
-                <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>">
+                <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
+                    data-sd="<?= htmlspecialchars($row['start_date']) ?>"
+                    data-mins="<?= intval($row['_minutes'] ?? 0) ?>">
                     <td><code style="font-size:11px;"><?= preg_match('/^N\/A/i', $row['project_id']) ? '-' : htmlspecialchars($row['project_id']) ?></code></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['project_name']) ?></td>
@@ -376,23 +380,45 @@ document.addEventListener('click', e => {
     }
 });
 
+const MONTHS_D = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtD(ymd) {
+    if (!ymd) return '-';
+    const p = ymd.split('-');
+    return parseInt(p[2])+'-'+MONTHS_D[parseInt(p[1])-1]+'-'+p[0];
+}
+
 function doFilter() {
-    const txt  = document.getElementById('txt-search').value.toLowerCase();
+    const txt = document.getElementById('txt-search').value.toLowerCase();
+    let visRows = [];
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
         const rowPid  = tr.dataset.pid  || '';
         const rowText = tr.textContent.toLowerCase();
-        const ok = (!txt  || rowText.includes(txt)) && (!activeProjFilter || rowPid === activeProjFilter);
+        const ok = (!txt || rowText.includes(txt)) && (!activeProjFilter || rowPid === activeProjFilter);
         tr.classList.toggle('is-hidden', !ok);
+        if (ok) visRows.push(tr);
     });
+    updateSummary(visRows, txt);
+}
+
+function updateSummary(visRows, txt) {
+    const card = document.getElementById('sum-card');
+    const hasFilter = txt || activeProjFilter;
+    if (!hasFilter || visRows.length === 0) { card.style.display = 'none'; return; }
+    let totalMins = 0;
+    visRows.forEach(tr => { totalMins += parseInt(tr.dataset.mins) || 0; });
+    const h = Math.floor(totalMins/60), m = totalMins%60;
+    document.getElementById('sum-logs').textContent  = visRows.length;
+    document.getElementById('sum-hours').textContent = h+'h '+m+'m';
+    card.style.display = 'block';
 }
 
 function clearFilters() {
     document.getElementById('txt-search').value  = '';
     activeProjFilter = '';
-    document.getElementById('proj-label').textContent = 'All Projects';
+    document.getElementById('proj-label').textContent = 'All IIPS';
     document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
     document.querySelector('#proj-list .sel-item[data-value=""]').classList.add('active');
-    
+    document.getElementById('sum-card').style.display = 'none';
     if (document.getElementById('date-filter').value !== '' || document.getElementById('month-filter').value !== '') {
         window.location.href = 'index.php';
     } else {

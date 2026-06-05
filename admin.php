@@ -13,7 +13,7 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin Home</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .header h2 { margin: 0; font-size: 18px; width: 100%; }
         .header div { display: flex; width: 100%; justify-content: space-between; gap: 10px; }
@@ -46,10 +46,10 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
     <h2>Admin Home</h2>
     <div style="display: flex; gap: 15px; align-items: center;">
         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
-            <a href="index.php" style="color: #28a745; font-weight: bold; text-decoration: none; background: #ffffff; padding: 6px 12px; border-radius: 4px; font-size: 14px;">📋 Timesheet Home</a>
+            <a href="index.php" style="color: #28a745; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">📋 Timesheet Home</a>
         <?php endif; ?>
         
-        <a href="profile.php" style="color: #007bff; font-weight: bold; text-decoration: none; background: #ffffff; padding: 6px 12px; border-radius: 4px; font-size: 14px;">👤 My Profile</a>
+        <a href="profile.php" style="color: #007bff; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">👤 My Profile</a>
         <a href="login.php?action=logout" style="color: #ffc107; font-weight: bold; text-decoration: none;">Logout</a>
     </div>
 </div>

@@ -90,10 +90,10 @@ function fmtDate($d) {
 <title>Audit Timesheets — Admin</title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; font-size: 13px; }
+body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; font-size: 13px; padding-bottom: 20px; }
 
 /* ── Top bar ── */
-.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;  border-radius: 8px;}
 .topbar h2 { color: white; margin: 0; font-size: 16px; }
 .topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 .topbar a:hover { color: #ffda6a; }

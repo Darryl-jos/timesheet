@@ -28,6 +28,8 @@ $stmt->close();
 if (!$edit_data) { header("Location: index.php"); exit; }
 
 $conflict_error = '';
+$db_iips_mgr = '';
+$db_iips_ptr = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     $sel_proj_id = $edit_data['project_id'];
@@ -48,6 +50,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     else $expected_hours = $diff_hours_raw;
 
     $sel_meal_breaks = '0';
+
+    $chk_iips = $conn->prepare("SELECT project_manager, partner FROM iips_tracking WHERE project_id=?");
+    $chk_iips->bind_param("s", $sel_proj_id);
+    $chk_iips->execute();
+    $res_iips = $chk_iips->get_result()->fetch_assoc();
+    $chk_iips->close();
+    if ($res_iips) {
+        $db_iips_mgr = $res_iips['project_manager'] ?? '';
+        $db_iips_ptr = $res_iips['partner'] ?? '';
+    }
+
 } else {
     $sel_proj_id = $_POST['project_id'];
     $sel_date = $_POST['date'];
@@ -56,6 +69,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     $sel_work_desc = trim($_POST['work_description']);
     $sel_meal_breaks = isset($_POST['meal_breaks']) ? (int)$_POST['meal_breaks'] : 0;
     $return_url = isset($_POST['return_url']) ? $_POST['return_url'] : $return_url;
+
+    $has_iips_mgr = (($_POST['has_iips_manager_radio'] ?? 'no') === 'yes') ? 1 : 0;
+    $iips_mgr_name = trim($_POST['iips_manager_name'] ?? '');
+    $has_partner = (($_POST['has_partner_radio'] ?? 'no') === 'yes') ? 1 : 0;
+    $partner_name = trim($_POST['partner_name'] ?? '');
+
+    $db_iips_mgr = $iips_mgr_name;
+    $db_iips_ptr = $partner_name;
 
     if (!empty($sel_date) && !empty($sel_start_time) && !empty($sel_end_time)) {
         $start_dt = new DateTime("$sel_date $sel_start_time");
@@ -96,13 +117,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
             $stmt->bind_param("ssssssi", $sel_proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $sel_work_desc, $edit_id);
             $stmt->execute();
             $stmt->close();
+
+            if (($has_iips_mgr && !empty($iips_mgr_name)) || ($has_partner && !empty($partner_name))) {
+                $chk = $conn->prepare("SELECT id FROM iips_tracking WHERE project_id=?");
+                $chk->bind_param("s", $sel_proj_id); $chk->execute();
+                $iips_exists = $chk->get_result()->num_rows > 0; $chk->close();
+
+                if (!$iips_exists) {
+                    $ins2 = $conn->prepare("INSERT INTO iips_tracking (project_id) VALUES (?)");
+                    $ins2->bind_param("s", $sel_proj_id); $ins2->execute(); $ins2->close();
+                }
+                if ($has_iips_mgr && !empty($iips_mgr_name)) {
+                    $upd = $conn->prepare("UPDATE iips_tracking SET project_manager=? WHERE project_id=? AND (project_manager IS NULL OR project_manager='')");
+                    $upd->bind_param("ss", $iips_mgr_name, $sel_proj_id); $upd->execute(); $upd->close();
+                }
+                if ($has_partner && !empty($partner_name)) {
+                    $upd2 = $conn->prepare("UPDATE iips_tracking SET partner=? WHERE project_id=? AND (partner IS NULL OR partner='')");
+                    $upd2->bind_param("ss", $partner_name, $sel_proj_id); $upd2->execute(); $upd2->close();
+                }
+            }
+
             header("Location: " . $return_url);
             exit;
         }
     }
 }
 
-$projects_res = $conn->query("SELECT p.* FROM projects p ORDER BY p.project_id ASC");
+$projects_res = $conn->query("SELECT p.*, i.project_manager AS iips_mgr, i.partner AS iips_partner FROM projects p LEFT JOIN iips_tracking i ON p.project_id = i.project_id ORDER BY p.project_id ASC");
 $current_selected_label = "-- Select Project --";
 while($p = $projects_res->fetch_assoc()) {
     if ($sel_proj_id == $p['project_id']) {
@@ -188,10 +229,10 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
     <form method="POST" id="record-form">
         <input type="hidden" name="return_url" value="<?php echo htmlspecialchars($return_url); ?>">
         <div class="section">
-            <div class="section-hdr">📁 Project Details</div>
+            <div class="section-hdr">📁 IIPS Details</div>
             <div class="section-body one-col">
                 <div class="form-group" style="position: relative;">
-                    <label>Select Project <span style="color:#dc2626;">*</span></label>
+                    <label>Select IIPS <span style="color:#dc2626;">*</span></label>
                     <div class="sel-wrap" id="proj-wrap">
                         <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
                             <span id="proj-label"><?php echo htmlspecialchars($current_selected_label); ?></span>
@@ -208,6 +249,8 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                                 <div class="sel-item <?php echo $is_selected; ?>"
                                      data-value="<?php echo htmlspecialchars($p['project_id']); ?>"
                                      data-kw="<?php echo htmlspecialchars($kw); ?>"
+                                     data-iips-mgr="<?php echo htmlspecialchars($p['iips_mgr'] ?? ''); ?>"
+                                     data-iips-ptr="<?php echo htmlspecialchars($p['iips_partner'] ?? ''); ?>"
                                      onclick="pickSel('proj', '<?php echo htmlspecialchars(addslashes($p['project_id'])); ?>', '<?php echo htmlspecialchars(addslashes($label)); ?>', this)">
                                     <?php echo htmlspecialchars($label); ?>
                                     <span style="color:#9ca3af;font-size:11px;display:block;"><?php echo htmlspecialchars($p['customer_name']); ?></span>
@@ -217,7 +260,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         </div>
                     </div>
                     <input type="hidden" name="project_id" id="hidden-project-id" value="<?php echo htmlspecialchars($sel_proj_id); ?>">
-                    <div class="error-text" id="err-proj">Please select a Project.</div>
+                    <div class="error-text" id="err-proj">Please select a IIPS.</div>
                 </div>
                 <div class="form-group">
                     <label>Date <span style="color:#dc2626;">*</span></label>
@@ -282,6 +325,41 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 </div>
             </div>
         </div>
+
+        <div class="section">
+            <div class="section-hdr" style="background:#4a235a;">👥 IIPS Management</div>
+            <div class="section-body">
+                <div class="form-group">
+                    <label>Do you have an IIPS Manager?</label>
+                    <div style="display:flex;gap:20px;margin-top:6px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
+                            <input type="radio" name="has_iips_manager_radio" value="yes" <?php echo !empty($db_iips_mgr) ? 'checked' : ''; ?> onclick="document.getElementById('iips-mgr-field').style.display='block'"> Yes
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
+                            <input type="radio" name="has_iips_manager_radio" value="no" <?php echo empty($db_iips_mgr) ? 'checked' : ''; ?> onclick="document.getElementById('iips-mgr-field').style.display='none'"> No
+                        </label>
+                    </div>
+                    <div id="iips-mgr-field" style="display:<?php echo !empty($db_iips_mgr) ? 'block' : 'none'; ?>;margin-top:10px;">
+                        <input type="text" name="iips_manager_name" placeholder="Enter IIPS Manager name" value="<?php echo htmlspecialchars($db_iips_mgr); ?>" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Do you have a Partner?</label>
+                    <div style="display:flex;gap:20px;margin-top:6px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
+                            <input type="radio" name="has_partner_radio" value="yes" <?php echo !empty($db_iips_ptr) ? 'checked' : ''; ?> onclick="document.getElementById('partner-field').style.display='block'"> Yes
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
+                            <input type="radio" name="has_partner_radio" value="no" <?php echo empty($db_iips_ptr) ? 'checked' : ''; ?> onclick="document.getElementById('partner-field').style.display='none'"> No
+                        </label>
+                    </div>
+                    <div id="partner-field" style="display:<?php echo !empty($db_iips_ptr) ? 'block' : 'none'; ?>;margin-top:10px;">
+                        <input type="text" name="partner_name" placeholder="Enter partner name" value="<?php echo htmlspecialchars($db_iips_ptr); ?>" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="actions">
             <button type="submit" class="btn-save">Update Record</button>
             <a href="<?php echo htmlspecialchars($return_url); ?>" class="btn-cancel">Cancel</a>
@@ -481,6 +559,41 @@ function pickSel(type, value, label, el) {
     document.getElementById(type+'-inner').value = '';
     filterSel(type);
     clearError('proj-box', 'err-proj');
+
+    if (type === 'proj') {
+        const mgr = el.getAttribute('data-iips-mgr') || '';
+        const ptr = el.getAttribute('data-iips-ptr') || '';
+        
+        const mgrRadioYes = document.querySelector('input[name="has_iips_manager_radio"][value="yes"]');
+        const mgrRadioNo = document.querySelector('input[name="has_iips_manager_radio"][value="no"]');
+        const mgrInput = document.querySelector('input[name="iips_manager_name"]');
+        const mgrField = document.getElementById('iips-mgr-field');
+        
+        if (mgr !== '') {
+            if(mgrRadioYes) mgrRadioYes.checked = true;
+            if(mgrField) mgrField.style.display = 'block';
+            if(mgrInput) mgrInput.value = mgr;
+        } else {
+            if(mgrRadioNo) mgrRadioNo.checked = true;
+            if(mgrField) mgrField.style.display = 'none';
+            if(mgrInput) mgrInput.value = '';
+        }
+
+        const ptrRadioYes = document.querySelector('input[name="has_partner_radio"][value="yes"]');
+        const ptrRadioNo = document.querySelector('input[name="has_partner_radio"][value="no"]');
+        const ptrInput = document.querySelector('input[name="partner_name"]');
+        const ptrField = document.getElementById('partner-field');
+
+        if (ptr !== '') {
+            if(ptrRadioYes) ptrRadioYes.checked = true;
+            if(ptrField) ptrField.style.display = 'block';
+            if(ptrInput) ptrInput.value = ptr;
+        } else {
+            if(ptrRadioNo) ptrRadioNo.checked = true;
+            if(ptrField) ptrField.style.display = 'none';
+            if(ptrInput) ptrInput.value = '';
+        }
+    }
 }
 
 function toggleTimeDropdown(type, event) {
@@ -853,6 +966,39 @@ document.getElementById('record-form').addEventListener('submit', function(e) {
     check('start-time-hidden', 'start-time-input', 'err-start', 'Please select a Start Time.');
     check('end-time-hidden', 'end-time-input', 'err-end', 'Please select an End Time.');
     check('desc-input', 'desc-input', 'err-desc');
+
+    const iipsMgrPicked = document.querySelector('input[name="has_iips_manager_radio"]:checked');
+    const partnerPicked = document.querySelector('input[name="has_partner_radio"]:checked');
+    if (!iipsMgrPicked) {
+        let el = document.querySelector('input[name="has_iips_manager_radio"]');
+        if (!document.getElementById('err-iips-mgr')) {
+            const err = document.createElement('div');
+            err.id = 'err-iips-mgr';
+            err.style.cssText = 'color:#dc2626;font-size:11px;font-weight:bold;margin-top:4px;';
+            err.textContent = 'Please select Yes or No.';
+            el.closest('.form-group').appendChild(err);
+        }
+        if (!firstErr) firstErr = el;
+        isValid = false;
+    } else {
+        const e = document.getElementById('err-iips-mgr');
+        if (e) e.remove();
+    }
+    if (!partnerPicked) {
+        let el = document.querySelector('input[name="has_partner_radio"]');
+        if (!document.getElementById('err-partner')) {
+            const err = document.createElement('div');
+            err.id = 'err-partner';
+            err.style.cssText = 'color:#dc2626;font-size:11px;font-weight:bold;margin-top:4px;';
+            err.textContent = 'Please select Yes or No.';
+            el.closest('.form-group').appendChild(err);
+        }
+        if (!firstErr) firstErr = el;
+        isValid = false;
+    } else {
+        const e = document.getElementById('err-partner');
+        if (e) e.remove();
+    }
     
     if (!isValid) {
         e.preventDefault();

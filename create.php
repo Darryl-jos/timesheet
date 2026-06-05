@@ -74,14 +74,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->execute();
             $stmt->close();
 
-            // Update iips_tracking with manager/partner if provided
             if (($has_iips_mgr && !empty($iips_mgr_name)) || ($has_partner && !empty($partner_name))) {
                 $chk = $conn->prepare("SELECT id FROM iips_tracking WHERE project_id=?");
                 $chk->bind_param("s", $sel_proj_id); $chk->execute();
                 $iips_exists = $chk->get_result()->num_rows > 0; $chk->close();
 
                 if (!$iips_exists) {
-                    // Create a basic iips_tracking row so we can store the data
                     $ins2 = $conn->prepare("INSERT INTO iips_tracking (project_id) VALUES (?)");
                     $ins2->bind_param("s", $sel_proj_id); $ins2->execute(); $ins2->close();
                 }
@@ -100,7 +98,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-$projects_res = $conn->query("SELECT p.* FROM projects p ORDER BY p.project_id ASC");
+$projects_res = $conn->query("SELECT p.*, i.project_manager AS iips_mgr, i.partner AS iips_partner FROM projects p LEFT JOIN iips_tracking i ON p.project_id = i.project_id ORDER BY p.project_id ASC");
 $current_selected_label = "-- Select Project --";
 while($p = $projects_res->fetch_assoc()) {
     if ($sel_proj_id == $p['project_id']) {
@@ -185,10 +183,10 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 <div class="page">
     <form method="POST" id="record-form">
         <div class="section">
-            <div class="section-hdr">📁 Project Details</div>
+            <div class="section-hdr">📁 IIPS Details</div>
             <div class="section-body one-col">
                 <div class="form-group" style="position: relative;">
-                    <label>Select Project <span style="color:#dc2626;">*</span></label>
+                    <label>Select IIPS <span style="color:#dc2626;">*</span></label>
                     <div class="sel-wrap" id="proj-wrap">
                         <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
                             <span id="proj-label"><?php echo htmlspecialchars($current_selected_label); ?></span>
@@ -205,6 +203,8 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                                 <div class="sel-item <?php echo $is_selected; ?>"
                                      data-value="<?php echo htmlspecialchars($p['project_id']); ?>"
                                      data-kw="<?php echo htmlspecialchars($kw); ?>"
+                                     data-iips-mgr="<?php echo htmlspecialchars($p['iips_mgr'] ?? ''); ?>"
+                                     data-iips-ptr="<?php echo htmlspecialchars($p['iips_partner'] ?? ''); ?>"
                                      onclick="pickSel('proj', '<?php echo htmlspecialchars(addslashes($p['project_id'])); ?>', '<?php echo htmlspecialchars(addslashes($label)); ?>', this)">
                                     <?php echo htmlspecialchars($label); ?>
                                     <span style="color:#9ca3af;font-size:11px;display:block;"><?php echo htmlspecialchars($p['customer_name']); ?></span>
@@ -214,7 +214,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         </div>
                     </div>
                     <input type="hidden" name="project_id" id="hidden-project-id" value="<?php echo htmlspecialchars($sel_proj_id); ?>">
-                    <div class="error-text" id="err-proj">Please select a Project.</div>
+                    <div class="error-text" id="err-proj">Please select a IIPS.</div>
                 </div>
                 <div class="form-group">
                     <label>Date <span style="color:#dc2626;">*</span></label>
@@ -279,7 +279,6 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 </div>
             </div>
         </div>
-        <!-- IIPS Management -->
         <div class="section">
             <div class="section-hdr" style="background:#4a235a;">👥 IIPS Management</div>
             <div class="section-body">
@@ -581,6 +580,41 @@ function pickSel(type, value, label, el) {
     document.getElementById(type+'-inner').value = '';
     filterSel(type);
     clearError('proj-box', 'err-proj');
+
+    if (type === 'proj') {
+        const mgr = el.getAttribute('data-iips-mgr') || '';
+        const ptr = el.getAttribute('data-iips-ptr') || '';
+        
+        const mgrRadioYes = document.querySelector('input[name="has_iips_manager_radio"][value="yes"]');
+        const mgrRadioNo = document.querySelector('input[name="has_iips_manager_radio"][value="no"]');
+        const mgrInput = document.querySelector('input[name="iips_manager_name"]');
+        const mgrField = document.getElementById('iips-mgr-field');
+        
+        if (mgr !== '') {
+            mgrRadioYes.checked = true;
+            mgrField.style.display = 'block';
+            mgrInput.value = mgr;
+        } else {
+            if(mgrRadioNo) mgrRadioNo.checked = true;
+            mgrField.style.display = 'none';
+            mgrInput.value = '';
+        }
+
+        const ptrRadioYes = document.querySelector('input[name="has_partner_radio"][value="yes"]');
+        const ptrRadioNo = document.querySelector('input[name="has_partner_radio"][value="no"]');
+        const ptrInput = document.querySelector('input[name="partner_name"]');
+        const ptrField = document.getElementById('partner-field');
+
+        if (ptr !== '') {
+            ptrRadioYes.checked = true;
+            ptrField.style.display = 'block';
+            ptrInput.value = ptr;
+        } else {
+            if(ptrRadioNo) ptrRadioNo.checked = true;
+            ptrField.style.display = 'none';
+            ptrInput.value = '';
+        }
+    }
 }
 
 function toggleTimeDropdown(type, event) {
@@ -875,7 +909,6 @@ document.getElementById('record-form').addEventListener('submit', function(e) {
     check('end-time-hidden', 'end-time-input', 'err-end', 'Please select an End Time.');
     check('desc-input', 'desc-input', 'err-desc');
 
-    // Validate IIPS Management radios
     const iipsMgrPicked = document.querySelector('input[name="has_iips_manager_radio"]:checked');
     const partnerPicked = document.querySelector('input[name="has_partner_radio"]:checked');
     if (!iipsMgrPicked) {
