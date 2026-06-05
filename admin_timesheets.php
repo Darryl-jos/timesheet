@@ -90,10 +90,10 @@ function fmtDate($d) {
 <title>Audit Timesheets — Admin</title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; font-size: 13px; padding-bottom: 20px; }
+body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; font-size: 13px; }
 
 /* ── Top bar ── */
-.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;  border-radius: 8px;}
+.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .topbar h2 { color: white; margin: 0; font-size: 16px; }
 .topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 .topbar a:hover { color: #ffda6a; }
@@ -254,13 +254,13 @@ tbody tr:hover { background: #f8faff; }
         <!-- Project searchable select -->
         <div class="sel-wrap" id="proj-wrap">
             <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
-                <span id="proj-label">All IIPS</span>
+                <span id="proj-label">All Projects</span>
                 <span class="sel-arrow">▾</span>
             </div>
             <div class="sel-panel" id="proj-panel">
                 <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
                 <div class="sel-list" id="proj-list">
-                    <div class="sel-item active" data-value="" onclick="pickSel('proj','','All IIPS',this)">All IIPS</div>
+                    <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
                     <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
                         $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
                     ?>
@@ -302,11 +302,18 @@ tbody tr:hover { background: #f8faff; }
             </div>
         </div>
 
-        <div style="position: relative; flex: 1; min-width: 150px; height: 38px; display: flex;">
-            <input type="text" id="date-display" placeholder="DD MMM YYYY" style="width: 100%; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase;" autocomplete="off">
-            <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;" onclick="document.getElementById('date-search').showPicker()">📅
-                <input type="date" id="date-search" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" onchange="syncDateFromPicker()">
-            </div>
+        <div style="position:relative; flex:1; min-width:130px; height:38px; display:flex;">
+            <input type="text" id="date-display" placeholder="DD-MM-YYYY"
+                style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;"
+                autocomplete="off"
+                oninput="liveDateSearch(this)"
+                onblur="parseDateSearch()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+            <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;"
+                onclick="document.getElementById('date-search').showPicker()">📅</div>
+            <input type="date" id="date-search"
+                style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:10;"
+                onchange="syncDateSearch()">
         </div>
         <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
@@ -318,9 +325,7 @@ tbody tr:hover { background: #f8faff; }
             <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
             <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
             <div class="sum-item"><span class="sum-label">Engineers</span><span class="sum-value" id="sum-engs">-</span></div>
-            <div class="sum-item"><span class="sum-label">IIPS</span><span class="sum-value" id="sum-projs">-</span></div>
             <div class="sum-item"><span class="sum-label">Date Range</span><span class="sum-value" id="sum-dates">-</span></div>
-            <div class="sum-item"><span class="sum-label">Avg Hours / Log</span><span class="sum-value" id="sum-avg">-</span></div>
         </div>
     </div>
 
@@ -349,7 +354,7 @@ tbody tr:hover { background: #f8faff; }
                             </div>
                         </th>
                         <th>
-                            <div class="sort-wrap">IIPS ID
+                            <div class="sort-wrap">Project ID
                                 <button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button>
                                 <div id="s-pid" class="sort-menu">
                                     <a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a>
@@ -359,7 +364,7 @@ tbody tr:hover { background: #f8faff; }
                             </div>
                         </th>
                         <th>Customer</th>
-                        <th>IIPS Name</th>
+                        <th>Project Name</th>
                         <th>Activity</th>
                         <th>
                             <div class="sort-wrap">Start Date
@@ -463,98 +468,50 @@ let activeProjFilter = '';
 let activeEngFilter  = '';
 let origRows = null;
 
-function parseDateInput(str) {
-    str = str.trim();
-    if (!str) return '';
-    let d, m, y;
-    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
-    if (textMatch) {
-        d = parseInt(textMatch[1], 10);
-        let mStr = textMatch[2].toUpperCase().substring(0, 3);
-        m = months.indexOf(mStr) + 1;
-        if (m === 0) return '';
-        y = parseInt(textMatch[3], 10);
-    } else {
-        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
-        if (numMatch) {
-            d = parseInt(numMatch[1], 10);
-            m = parseInt(numMatch[2], 10);
-            y = parseInt(numMatch[3], 10);
-        } else {
-            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
-            if (digitMatch) {
-                d = parseInt(digitMatch[1], 10);
-                m = parseInt(digitMatch[2], 10);
-                y = parseInt(digitMatch[3], 10);
-            } else {
-                return '';
-            }
-        }
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function liveDateSearch(inp) {
+    let digits = inp.value.replace(/\D/g,'');
+    let result = '';
+    if (digits.length > 0) {
+        let d = digits.substring(0,2);
+        if (digits.length >= 2) { let n=parseInt(d); if(n<1)d='01'; if(n>31)d='31'; }
+        result += d;
     }
-    if (y < 100) y += 2000;
-    if (m < 1 || m > 12) return '';
-    let daysInMonth = new Date(y, m, 0).getDate();
-    if (d < 1 || d > daysInMonth) return '';
-    let mmStr = m < 10 ? '0' + m : m;
-    let ddStr = d < 10 ? '0' + d : d;
-    return y + '-' + mmStr + '-' + ddStr;
+    if (digits.length >= 3) {
+        let m = digits.substring(2,4);
+        if (digits.length >= 4) { let n=parseInt(m); if(n<1)m='01'; if(n>12)m='12'; }
+        result += '-' + m;
+    }
+    if (digits.length >= 5) result += '-' + digits.substring(4,8);
+    inp.value = result;
 }
 
-function updateDateDisplay() {
+function parseDateSearch() {
+    const disp = document.getElementById('date-display');
+    const hidden = document.getElementById('date-search');
+    const str = disp.value.trim();
+    if (!str) { hidden.value = ''; doFilter(); return; }
+    const parts = str.split('-');
+    if (parts.length === 3 && parts[2].length === 4) {
+        const d = parts[0].padStart(2,'0');
+        const m = parts[1].padStart(2,'0');
+        const y = parts[2];
+        hidden.value = y+'-'+m+'-'+d;
+        disp.value = parseInt(d)+'-'+MON[parseInt(m)-1]+'-'+y;
+    }
+    doFilter();
+}
+
+function syncDateSearch() {
     const val = document.getElementById('date-search').value;
-    const display = document.getElementById('date-display');
+    const disp = document.getElementById('date-display');
     if (val) {
-        const parts = val.split('-');
-        if (parts.length === 3) {
-            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-            let d = parseInt(parts[2], 10);
-            let m = parseInt(parts[1], 10);
-            display.value = d + ' ' + months[m - 1] + ' ' + parts[0];
-            display.style.borderColor = '#ccc';
-        }
+        const p = val.split('-');
+        disp.value = parseInt(p[2])+'-'+MON[parseInt(p[1])-1]+'-'+p[0];
     } else {
-        display.value = "";
+        disp.value = '';
     }
-}
-
-document.getElementById('date-display').addEventListener('blur', function() {
-    if (!this.value.trim()) {
-        document.getElementById('date-search').value = "";
-        updateDateDisplay();
-        doFilter();
-        return;
-    }
-    const parsed = parseDateInput(this.value);
-    if (parsed) {
-        document.getElementById('date-search').value = parsed;
-        updateDateDisplay();
-        doFilter();
-    } else {
-        this.style.borderColor = '#dc2626';
-    }
-});
-
-document.getElementById('date-display').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        this.blur();
-    }
-});
-
-document.getElementById('date-display').addEventListener('input', function(e) {
-    if (e.inputType === 'deleteContentBackward') return;
-    this.style.borderColor = '#ccc';
-    let v = this.value;
-    if (/^\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{8}$/.test(v)) {
-        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
-    }
-});
-
-function syncDateFromPicker() {
-    updateDateDisplay();
     doFilter();
 }
 
@@ -653,22 +610,19 @@ function updateSummary(visRows, txt, date) {
     document.getElementById('sum-logs').textContent  = visRows.length;
     document.getElementById('sum-hours').textContent = h + 'h ' + m + 'm';
     document.getElementById('sum-engs').textContent  = engSet.size;
-    document.getElementById('sum-projs').textContent = projSet.size;
     document.getElementById('sum-dates').textContent = minDate && maxDate
         ? (minDate === maxDate ? fmtDateJS(minDate) : fmtDateJS(minDate) + ' → ' + fmtDateJS(maxDate)) : '-';
-    document.getElementById('sum-avg').textContent   = avgH + 'h ' + avgM + 'm';
 
     card.style.display = 'block';
 }
 
 function clearAllFilters() {
-    document.getElementById('txt-search').value  = '';
-    document.getElementById('date-search').value = '';
-    document.getElementById('date-display').value = ''; 
-    document.getElementById('date-display').style.borderColor = '#ccc'; 
+    document.getElementById('txt-search').value   = '';
+    document.getElementById('date-search').value  = '';
+    document.getElementById('date-display').value = '';
     activeProjFilter = '';
     activeEngFilter  = '';
-    document.getElementById('proj-label').textContent = 'All IIPS';
+    document.getElementById('proj-label').textContent = 'All Projects';
     document.getElementById('eng-label').textContent  = 'All Engineers';
     document.querySelectorAll('.sel-item').forEach(i => i.classList.remove('active'));
     document.querySelectorAll('.sel-item[data-value=""]').forEach(i => i.classList.add('active'));
