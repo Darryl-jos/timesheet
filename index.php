@@ -18,19 +18,31 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-$sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
-        FROM timesheets t
-        JOIN projects p ON t.project_id = p.project_id
-        WHERE t.engineer_id = ?
-        ORDER BY t.id DESC";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $current_user_id);
+$filter_date = isset($_GET['date']) ? $_GET['date'] : '';
+
+if (!empty($filter_date)) {
+    $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
+            FROM timesheets t
+            JOIN projects p ON t.project_id = p.project_id
+            WHERE t.engineer_id = ? AND t.start_date = ?
+            ORDER BY t.id DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("is", $current_user_id, $filter_date);
+} else {
+    $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
+            FROM timesheets t
+            JOIN projects p ON t.project_id = p.project_id
+            WHERE t.engineer_id = ?
+            ORDER BY t.id DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $current_user_id);
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
 
 $proj_list_res = $conn->query("SELECT project_id, project_name, customer_name FROM projects ORDER BY project_id ASC");
 
-// Compute summary stats
 $total_records = 0;
 $total_minutes = 0;
 $rows_cache = [];
@@ -64,7 +76,6 @@ function fmtDate($d) {
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
 
-        /* ── Top bar ── */
         .topbar { background: #1e2330; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
         .topbar h2 { color: white; margin: 0; font-size: 16px; }
         .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -73,26 +84,21 @@ function fmtDate($d) {
         .topbar a.admin-btn { background: #166534; color: #d1fae5; }
         .topbar a.logout-btn { color: #f87171; }
 
-        /* ── Page ── */
         .page { padding: 20px; }
 
-        /* ── Summary cards ── */
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
         .stat.green { border-top-color: #28a745; }
         .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
         .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
 
-        /* ── Create button ── */
         .btn-create { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 11px 22px; border-radius: 5px; font-weight: bold; font-size: 15px; margin-bottom: 16px; width: 100%; text-align: center; }
         .btn-create:hover { background: #0056b3; }
 
-        /* ── Search bar ── */
         .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
         .search-bar-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-        .search-bar-wrap input[type="date"] { flex: 1; min-width: 120px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
         .btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
-        /* Searchable select — same as audit page */
+        
         .sel-wrap { flex: 2; min-width: 180px; position: relative; }
         .sel-box { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; }
         .sel-box:hover { border-color: #007bff; }
@@ -110,7 +116,6 @@ function fmtDate($d) {
         .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
         .sel-item.hidden { display: none; }
 
-        /* ── Table ── */
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
         .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; }
         .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -121,25 +126,20 @@ function fmtDate($d) {
 
         .is-hidden { display: none !important; }
 
-        /* Activity cell */
-        .act-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; font-size: 12px; color: #555; }
+        .act-cell { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; font-size: 12px; color: #555; }
         .act-cell.expanded { display: block; max-height: none; }
 
-        /* Date range cell */
         .date-range { font-size: 12px; line-height: 1.6; }
         .date-range .start { color: #1d4ed8; font-weight: 600; }
         .date-range .end { color: #7c3aed; font-weight: 600; }
         .date-range .time { color: #64748b; font-size: 11px; }
 
-        /* Duration badge */
         .dur-badge { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
         .dur-badge.multiday { background: #dbeafe; color: #1e40af; }
 
-        /* Action buttons */
         .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; margin-right: 4px; }
         .btn-delete { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
 
-        /* Sort dropdown */
         .sort-wrap { display: inline-flex; align-items: center; gap: 5px; }
         .sort-btn { background: none; border: none; width: 14px; height: 14px; cursor: pointer; position: relative; padding: 0; }
         .sort-btn::before { content:""; position:absolute; top:1px; left:2px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:5px solid #888; }
@@ -174,12 +174,6 @@ function fmtDate($d) {
 </div>
 
 <div class="page">
-
-    <!-- Stats -->
-    <?php
-    $completed_res = $conn->query("SELECT COUNT(*) as cnt FROM iips_tracking WHERE iips_status='Completed'");
-    $completed_count = $completed_res ? $completed_res->fetch_assoc()['cnt'] : 0;
-    ?>
     <div class="stats-bar">
         <div class="stat">
             <div class="stat-label">Total Logs</div>
@@ -189,15 +183,10 @@ function fmtDate($d) {
             <div class="stat-label">Total Hours</div>
             <div class="stat-value"><?= $total_h ?>h <?= $total_m ?>m</div>
         </div>
-        <div class="stat" style="border-top-color:#166534;">
-            <div class="stat-label">Completed Projects</div>
-            <div class="stat-value"><?= $completed_count ?></div>
-        </div>
     </div>
 
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
-    <!-- Search -->
     <div class="search-bar-wrap">
         <input type="text" id="txt-search" placeholder="🔍 Search activity, project, customer..." oninput="doFilter()">
         <div class="sel-wrap" id="proj-wrap">
@@ -224,59 +213,57 @@ function fmtDate($d) {
                 </div>
             </div>
         </div>
-        <input type="date" id="date-search" onchange="doFilter()">
+
+        <form id="date-form" method="GET" style="margin: 0; display: flex; flex: 1; min-width: 140px; height: 38px;">
+            <div style="position: relative; width: 100%; height: 100%; display: flex;">
+                <input type="text" id="date-display" placeholder="ALL TIME" readonly style="flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background-color: #fff; cursor: pointer; color: #333; box-sizing: border-box;">
+                <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;" onclick="document.getElementById('date-filter').showPicker()">
+                    📅
+                </div>
+                <input type="date" name="date" id="date-filter" value="<?= htmlspecialchars($filter_date) ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" onchange="document.getElementById('date-form').submit();">
+            </div>
+        </form>
+
         <button class="btn-clear" onclick="clearFilters()">Clear</button>
     </div>
 
-    <!-- Table -->
     <div class="card">
         <div class="card-hdr">Timesheet Records</div>
         <?php if (empty($rows_cache)): ?>
-            <div class="no-data">No records yet. Click "Create New Record" to add your first entry.</div>
+            <div class="no-data">No records found. Click "Create New Record" to add an entry.</div>
         <?php else: ?>
         <div class="tbl-wrap">
         <table id="main-table">
             <thead>
                 <tr>
-                    <th>
+                    <th style="width: 13%;">
                         <div class="sort-wrap" style="position:relative;">
-                            <span>Engineer</span>
-                            <button class="sort-btn" onclick="toggleSort(event,'drop-eng')"></button>
-                            <div id="drop-eng" class="sort-menu">
+                            <span>Project</span>
+                            <button class="sort-btn" onclick="toggleSort(event,'drop-proj')"></button>
+                            <div id="drop-proj" class="sort-menu">
                                 <a href="#" onclick="sortTable(0,'alpha',0);return false;">Default</a>
                                 <a href="#" onclick="sortTable(0,'alpha',1);return false;">A → Z</a>
                                 <a href="#" onclick="sortTable(0,'alpha',2);return false;">Z → A</a>
                             </div>
                         </div>
                     </th>
-                    <th>
-                        <div class="sort-wrap" style="position:relative;">
-                            <span>Project</span>
-                            <button class="sort-btn" onclick="toggleSort(event,'drop-proj')"></button>
-                            <div id="drop-proj" class="sort-menu">
-                                <a href="#" onclick="sortTable(1,'alpha',0);return false;">Default</a>
-                                <a href="#" onclick="sortTable(1,'alpha',1);return false;">A → Z</a>
-                                <a href="#" onclick="sortTable(1,'alpha',2);return false;">Z → A</a>
-                            </div>
-                        </div>
-                    </th>
-                    <th>Customer</th>
-                    <th>Project Name</th>
-                    <th>Activity</th>
-                    <th>
+                    <th style="width: 14%;">Customer</th>
+                    <th style="width: 15%;">Project Name</th>
+                    <th style="width: auto;">Activity</th>
+                    <th style="width: 12%;">
                         <div class="sort-wrap" style="position:relative;">
                             <span>Start Date</span>
                             <button class="sort-btn" onclick="toggleSort(event,'drop-sd')"></button>
                             <div id="drop-sd" class="sort-menu">
-                                <a href="#" onclick="sortTable(5,'date',0);return false;">Default</a>
-                                <a href="#" onclick="sortTable(5,'date',1);return false;">Oldest First</a>
-                                <a href="#" onclick="sortTable(5,'date',2);return false;">Newest First</a>
+                                <a href="#" onclick="sortTable(4,'date',0);return false;">Default</a>
+                                <a href="#" onclick="sortTable(4,'date',1);return false;">Oldest First</a>
+                                <a href="#" onclick="sortTable(4,'date',2);return false;">Newest First</a>
                             </div>
                         </div>
                     </th>
-                    <th>End Date</th>
-                    <th>Duration</th>
-                    <th>Actions</th>
+                    <th style="width: 12%;">End Date</th>
+                    <th style="width: 10%;">Duration</th>
+                    <th style="width: 110px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -287,9 +274,7 @@ function fmtDate($d) {
                     $days = floor($h / 24);
                     $dur_text = ($days > 0 ? $days.'d ' : '') . ($h%24) . 'h ' . $m . 'm';
                 ?>
-                <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
-                    data-sd="<?= htmlspecialchars($row['start_date']) ?>">
-                    <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
+                <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>">
                     <td><code style="font-size:11px;"><?= preg_match('/^N\/A/i', $row['project_id']) ? '-' : htmlspecialchars($row['project_id']) ?></code></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['project_name']) ?></td>
@@ -325,10 +310,24 @@ function fmtDate($d) {
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", function() {
+    const val = document.getElementById('date-filter').value;
+    const display = document.getElementById('date-display');
+    if (val) {
+        const parts = val.split('-');
+        if (parts.length === 3) {
+            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+            display.value = parts[2] + '-' + months[parseInt(parts[1], 10) - 1] + '-' + parts[0];
+        }
+    } else {
+        display.value = "";
+        display.placeholder = "ALL TIME";
+    }
+});
+
 let origRows = null;
 let activeProjFilter = '';
 
-// ── Searchable select ─────────────────────────────────────────────────────────
 function toggleSel() {
     const wrap = document.getElementById('proj-wrap');
     const isOpen = wrap.classList.contains('open');
@@ -356,39 +355,37 @@ document.addEventListener('click', e => {
     if (!e.target.closest('#proj-wrap')) document.getElementById('proj-wrap').classList.remove('open');
 });
 
-// ── Filter ────────────────────────────────────────────────────────────────────
 function doFilter() {
     const txt  = document.getElementById('txt-search').value.toLowerCase();
-    const date = document.getElementById('date-search').value;
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
         const rowPid  = tr.dataset.pid  || '';
-        const rowDate = tr.dataset.sd   || '';
         const rowText = tr.textContent.toLowerCase();
         const ok = (!txt  || rowText.includes(txt))
-                && (!activeProjFilter || rowPid === activeProjFilter)
-                && (!date || rowDate === date);
+                && (!activeProjFilter || rowPid === activeProjFilter);
         tr.classList.toggle('is-hidden', !ok);
     });
 }
 
 function clearFilters() {
     document.getElementById('txt-search').value  = '';
-    document.getElementById('date-search').value = '';
     activeProjFilter = '';
     document.getElementById('proj-label').textContent = 'All Projects';
     document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
     document.querySelector('#proj-list .sel-item[data-value=""]').classList.add('active');
-    doFilter();
+    
+    if (document.getElementById('date-filter').value !== '') {
+        window.location.href = 'index.php';
+    } else {
+        doFilter();
+    }
 }
 
-// Activity expand
 document.querySelectorAll('.act-cell').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('expanded'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('expanded'); });
 });
 
-// Sort
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id !== id) m.classList.remove('show-sort'); });
@@ -417,4 +414,3 @@ function sortTable(col, type, dir) {
 </script>
 </body>
 </html>
-<?php $conn->close(); ?>
