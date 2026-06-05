@@ -30,6 +30,7 @@ $result = $stmt->get_result();
 
 $proj_list_res = $conn->query("SELECT project_id, project_name, customer_name FROM projects ORDER BY project_id ASC");
 
+// Compute summary stats
 $total_records = 0;
 $total_minutes = 0;
 $rows_cache = [];
@@ -63,42 +64,53 @@ function fmtDate($d) {
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
 
-        .page { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        /* ── Top bar ── */
+        .topbar { background: #1e2330; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .topbar h2 { color: white; margin: 0; font-size: 16px; }
+        .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .topbar a { color: #94a3b8; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
+        .topbar a:hover { background: rgba(255,255,255,0.1); color: white; }
+        .topbar a.admin-btn { background: #166534; color: #d1fae5; }
+        .topbar a.logout-btn { color: #f87171; }
 
-        .page-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .page-header h2 { margin: 0; color: #1f2937; font-size: 18px; }
-        .header-actions { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
-        .header-actions a { font-weight: bold; text-decoration: none; font-size: 13px; color: #007bff; transition: 0.3s; }
-        .header-actions a:hover { color: #0056b3; text-decoration: underline; }
-        .header-actions a.btn-admin { color: #166534; }
-        .header-actions a.btn-admin:hover { color: #0f4a25; }
-        .header-actions a.btn-logout { color: #dc3545; }
-        .header-actions a.btn-logout:hover { color: #a71d2a; }
+        /* ── Page ── */
+        .page { padding: 20px; }
 
+        /* ── Summary cards ── */
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
         .stat.green { border-top-color: #28a745; }
         .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
         .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
 
+        /* ── Create button ── */
         .btn-create { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 11px 22px; border-radius: 5px; font-weight: bold; font-size: 15px; margin-bottom: 16px; width: 100%; text-align: center; }
         .btn-create:hover { background: #0056b3; }
 
-        .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-        .search-bar-wrap input { flex: 2; min-width: 120px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-        .search-bar-wrap input[type="date"] { flex: 1.2; min-width: 110px; }
+        /* ── Search bar ── */
+        .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+        .search-bar-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        .search-bar-wrap input[type="date"] { flex: 1; min-width: 120px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
         .btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
-        .proj-select-wrap { flex: 2; min-width: 140px; position: relative; }
-        .sel-trigger { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
-        .sel-trigger::after { content: ""; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 4px solid #666; }
-        .sel-dropdown { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 999; margin-top: 2px; padding: 6px; }
-        .sel-dropdown input { height: 30px; margin-bottom: 5px; font-size: 12px; }
-        .sel-opts { max-height: 150px; overflow-y: auto; }
-        .sel-opt { padding: 6px 8px; cursor: pointer; font-size: 12px; border-radius: 3px; }
-        .sel-opt:hover { background: #f0f7ff; color: #007bff; }
-        .sel-opt.active { background: #e6f0ff; color: #007bff; font-weight: bold; }
-        .show { display: block !important; }
+        /* Searchable select — same as audit page */
+        .sel-wrap { flex: 2; min-width: 180px; position: relative; }
+        .sel-box { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; }
+        .sel-box:hover { border-color: #007bff; }
+        .sel-box span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: #333; }
+        .sel-arrow { color: #6c757d; font-size: 11px; flex-shrink: 0; transition: transform .2s; }
+        .sel-wrap.open .sel-arrow { transform: rotate(180deg); }
+        .sel-wrap.open .sel-box { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,.12); }
+        .sel-panel { display: none; position: absolute; top: calc(100% + 3px); left: 0; width: 100%; min-width: 240px; background: white; border: 1px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 200; padding: 6px; }
+        .sel-wrap.open .sel-panel { display: block; }
+        .sel-panel input { width: 100%; height: 32px; padding: 0 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; margin-bottom: 5px; box-sizing: border-box; }
+        .sel-panel input:focus { border-color: #007bff; outline: none; }
+        .sel-list { max-height: 220px; overflow-y: auto; }
+        .sel-item { padding: 7px 10px; cursor: pointer; font-size: 13px; border-radius: 3px; line-height: 1.3; }
+        .sel-item:hover { background: #f0f7ff; }
+        .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
+        .sel-item.hidden { display: none; }
 
+        /* ── Table ── */
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
         .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; }
         .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -109,20 +121,25 @@ function fmtDate($d) {
 
         .is-hidden { display: none !important; }
 
+        /* Activity cell */
         .act-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; font-size: 12px; color: #555; }
         .act-cell.expanded { display: block; max-height: none; }
 
+        /* Date range cell */
         .date-range { font-size: 12px; line-height: 1.6; }
         .date-range .start { color: #1d4ed8; font-weight: 600; }
         .date-range .end { color: #7c3aed; font-weight: 600; }
         .date-range .time { color: #64748b; font-size: 11px; }
 
+        /* Duration badge */
         .dur-badge { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
         .dur-badge.multiday { background: #dbeafe; color: #1e40af; }
 
+        /* Action buttons */
         .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; margin-right: 4px; }
         .btn-delete { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
 
+        /* Sort dropdown */
         .sort-wrap { display: inline-flex; align-items: center; gap: 5px; }
         .sort-btn { background: none; border: none; width: 14px; height: 14px; cursor: pointer; position: relative; padding: 0; }
         .sort-btn::before { content:""; position:absolute; top:1px; left:2px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:5px solid #888; }
@@ -136,10 +153,6 @@ function fmtDate($d) {
 
         .no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 15px; }
 
-        @media (min-width: 768px) {
-            .page-header h2 { font-size: 20px; }
-        }
-
         @media (max-width: 600px) {
             .page { padding: 12px; }
             .stats-bar { gap: 8px; }
@@ -149,45 +162,63 @@ function fmtDate($d) {
 </head>
 <body>
 
-<div class="page">
-    <div class="page-header">
-        <h2>👷 <?php echo htmlspecialchars($current_user_name); ?>'s Dashboard</h2>
-        <div class="header-actions">
-            <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
-                <a href="admin.php" class="btn-admin">⚙️ Admin</a>
-            <?php endif; ?>
-            <a href="profile.php">👤 Profile</a>
-            <a href="login.php?action=logout" class="btn-logout">Logout</a>
-        </div>
+<div class="topbar">
+    <h2>👷 <?= htmlspecialchars($current_user_name) ?></h2>
+    <div class="nav">
+        <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
+            <a href="admin.php" class="admin-btn">⚙️ Admin</a>
+        <?php endif; ?>
+        <a href="profile.php">👤 Profile</a>
+        <a href="login.php?action=logout" class="logout-btn">Logout</a>
     </div>
+</div>
 
+<div class="page">
+
+    <!-- Stats -->
+    <?php
+    $completed_res = $conn->query("SELECT COUNT(*) as cnt FROM iips_tracking WHERE iips_status='Completed'");
+    $completed_count = $completed_res ? $completed_res->fetch_assoc()['cnt'] : 0;
+    ?>
     <div class="stats-bar">
         <div class="stat">
-            <div class="stat-label">Total Records</div>
+            <div class="stat-label">Total Logs</div>
             <div class="stat-value"><?= $total_records ?></div>
         </div>
         <div class="stat green">
-            <div class="stat-label">Total Hours Logged</div>
+            <div class="stat-label">Total Hours</div>
             <div class="stat-value"><?= $total_h ?>h <?= $total_m ?>m</div>
+        </div>
+        <div class="stat" style="border-top-color:#166534;">
+            <div class="stat-label">Completed Projects</div>
+            <div class="stat-value"><?= $completed_count ?></div>
         </div>
     </div>
 
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
+    <!-- Search -->
     <div class="search-bar-wrap">
         <input type="text" id="txt-search" placeholder="🔍 Search activity, project, customer..." oninput="doFilter()">
-        <div class="proj-select-wrap">
-            <div class="sel-trigger" id="proj-trigger" onclick="toggleProjDrop(event)">
+        <div class="sel-wrap" id="proj-wrap">
+            <div class="sel-box" id="proj-box" onclick="toggleSel()">
                 <span id="proj-label">All Projects</span>
+                <span class="sel-arrow">▾</span>
             </div>
-            <div class="sel-dropdown" id="proj-drop">
-                <input type="text" id="proj-inner-search" placeholder="🔍 Search..." onkeyup="filterProjOpts()">
-                <div class="sel-opts">
-                    <div class="sel-opt active" data-value="" onclick="pickProj(this)">All Projects</div>
+            <div class="sel-panel" id="proj-panel">
+                <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel()" onclick="event.stopPropagation()">
+                <div class="sel-list" id="proj-list">
+                    <div class="sel-item active" data-value="" onclick="pickProj(this, '', 'All Projects')">All Projects</div>
                     <?php if ($proj_list_res): while($p = $proj_list_res->fetch_assoc()):
-                        $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']); ?>
-                        <div class="sel-opt" data-value="<?= htmlspecialchars($p['project_id']) ?>" data-kw="<?= htmlspecialchars($kw) ?>" onclick="pickProj(this)">
-                            [<?= htmlspecialchars($p['project_id']) ?>] <?= htmlspecialchars($p['project_name']) ?>
+                        $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']);
+                        $pid_show = preg_match('/^N\/A/i', $p['project_id']) ? '' : '['.$p['project_id'].'] ';
+                    ?>
+                        <div class="sel-item"
+                             data-value="<?= htmlspecialchars($p['project_id']) ?>"
+                             data-kw="<?= htmlspecialchars($kw) ?>"
+                             onclick="pickProj(this, '<?= htmlspecialchars(addslashes($p['project_id'])) ?>', '<?= htmlspecialchars(addslashes($pid_show.$p['project_name'])) ?>')">
+                            <?= htmlspecialchars($pid_show.$p['project_name']) ?>
+                            <span style="color:#9ca3af;font-size:11px;display:block;"><?= htmlspecialchars($p['customer_name']) ?></span>
                         </div>
                     <?php endwhile; endif; ?>
                 </div>
@@ -197,8 +228,9 @@ function fmtDate($d) {
         <button class="btn-clear" onclick="clearFilters()">Clear</button>
     </div>
 
+    <!-- Table -->
     <div class="card">
-        <div class="card-hdr">My Timesheet Records</div>
+        <div class="card-hdr">Timesheet Records</div>
         <?php if (empty($rows_cache)): ?>
             <div class="no-data">No records yet. Click "Create New Record" to add your first entry.</div>
         <?php else: ?>
@@ -258,7 +290,7 @@ function fmtDate($d) {
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>">
                     <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
-                    <td><?= (strpos($row['project_id'], 'N/A') === 0) ? '' : '<code style="font-size:11px;">' . htmlspecialchars($row['project_id']) . '</code>' ?></td>
+                    <td><code style="font-size:11px;"><?= preg_match('/^N\/A/i', $row['project_id']) ? '-' : htmlspecialchars($row['project_id']) ?></code></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['project_name']) ?></td>
                     <td>
@@ -296,61 +328,67 @@ function fmtDate($d) {
 let origRows = null;
 let activeProjFilter = '';
 
+// ── Searchable select ─────────────────────────────────────────────────────────
+function toggleSel() {
+    const wrap = document.getElementById('proj-wrap');
+    const isOpen = wrap.classList.contains('open');
+    wrap.classList.toggle('open', !isOpen);
+    if (!isOpen) document.getElementById('proj-inner').focus();
+}
+function filterSel() {
+    const val = document.getElementById('proj-inner').value.toLowerCase();
+    document.querySelectorAll('#proj-list .sel-item').forEach(item => {
+        if (!item.dataset.value) { item.classList.remove('hidden'); return; }
+        item.classList.toggle('hidden', !!val && !(item.dataset.kw||'').includes(val));
+    });
+}
+function pickProj(el, value, label) {
+    activeProjFilter = value;
+    document.getElementById('proj-label').textContent = label;
+    document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('proj-wrap').classList.remove('open');
+    document.getElementById('proj-inner').value = '';
+    filterSel();
+    doFilter();
+}
+document.addEventListener('click', e => {
+    if (!e.target.closest('#proj-wrap')) document.getElementById('proj-wrap').classList.remove('open');
+});
+
+// ── Filter ────────────────────────────────────────────────────────────────────
 function doFilter() {
-    const txt = document.getElementById('txt-search').value.toLowerCase();
-    const pid = activeProjFilter;
+    const txt  = document.getElementById('txt-search').value.toLowerCase();
     const date = document.getElementById('date-search').value;
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
         const rowPid  = tr.dataset.pid  || '';
         const rowDate = tr.dataset.sd   || '';
         const rowText = tr.textContent.toLowerCase();
-        const ok = (!txt || rowText.includes(txt))
-                && (!pid  || rowPid  === pid)
+        const ok = (!txt  || rowText.includes(txt))
+                && (!activeProjFilter || rowPid === activeProjFilter)
                 && (!date || rowDate === date);
         tr.classList.toggle('is-hidden', !ok);
     });
 }
 
 function clearFilters() {
-    document.getElementById('txt-search').value = '';
+    document.getElementById('txt-search').value  = '';
     document.getElementById('date-search').value = '';
     activeProjFilter = '';
     document.getElementById('proj-label').textContent = 'All Projects';
-    document.querySelectorAll('.sel-opt').forEach(o => o.classList.remove('active'));
-    document.querySelector('.sel-opt[data-value=""]').classList.add('active');
+    document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
+    document.querySelector('#proj-list .sel-item[data-value=""]').classList.add('active');
     doFilter();
 }
 
-function toggleProjDrop(e) {
-    e.stopPropagation();
-    document.getElementById('proj-drop').classList.toggle('show');
-    if (document.getElementById('proj-drop').classList.contains('show'))
-        document.getElementById('proj-inner-search').focus();
-}
-function filterProjOpts() {
-    const f = document.getElementById('proj-inner-search').value.toLowerCase();
-    document.querySelectorAll('.sel-opt').forEach(o => {
-        o.style.display = (!o.dataset.value || (o.dataset.kw||'').includes(f)) ? '' : 'none';
-    });
-}
-function pickProj(el) {
-    activeProjFilter = el.dataset.value || '';
-    document.getElementById('proj-label').textContent = el.textContent.trim();
-    document.querySelectorAll('.sel-opt').forEach(o => o.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('proj-drop').classList.remove('show');
-    doFilter();
-}
-window.addEventListener('click', e => {
-    if (!e.target.closest('.proj-select-wrap')) document.getElementById('proj-drop').classList.remove('show');
-});
-
+// Activity expand
 document.querySelectorAll('.act-cell').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('expanded'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('expanded'); });
 });
 
+// Sort
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id !== id) m.classList.remove('show-sort'); });

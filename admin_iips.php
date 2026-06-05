@@ -97,7 +97,7 @@ function fmtMins($m) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Project List — IIPS Tracking</title>
+<title>IIPS List</title>
 <style>
     .is-hidden { display: none !important; }
 
@@ -107,7 +107,10 @@ function fmtMins($m) {
     .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 
-    .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; }
+    .tbl-scroll-top { overflow-x: auto; overflow-y: hidden; height: 14px; margin-bottom: 2px; }
+    .tbl-scroll-top-inner { height: 1px; }
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; flex-wrap: wrap; }
     .search-input { height: 36px; padding: 0 12px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; min-width: 240px; flex: 1; }
@@ -205,7 +208,7 @@ function fmtMins($m) {
 <body>
 
 <div class="header">
-    <h2>📋 Project List — IIPS Tracking</h2>
+    <h2>📋 IIPS List</h2>
     <a href="admin.php">← Back to Admin</a>
 </div>
 
@@ -216,15 +219,21 @@ function fmtMins($m) {
 
     <!-- Toolbar: Search + Create only -->
     <div class="toolbar">
-        <input type="text" class="search-input" id="search-input" placeholder="🔍 Search project ID, name, customer...">
-        <a href="create_iips.php" class="btn-create">+ Create Project</a>
+        <input type="text" class="search-input" id="search-input" placeholder="🔍 Search IIPS ID, name, customer...">
+        <a href="create_iips.php" class="btn-create">+ Create IIPS</a>
     </div>
 
+    <!-- Top scroll mirror -->
+    <div class="tbl-scroll-top" id="tbl-scroll-top">
+        <div class="tbl-scroll-top-inner" id="tbl-scroll-inner"></div>
+    </div>
+
+    <div class="tbl-wrap" id="tbl-wrap">
     <table id="main-table">
         <thead>
             <!-- Section header row -->
             <tr class="sec-row">
-                <th class="s-base"  colspan="3">Project Details</th>
+                <th class="s-base"  colspan="3">IIPS Details</th>
                 <th class="s-costing" colspan="4">IIPS Costing</th>
                 <th class="s-timeline" colspan="3">Timeline — Target</th>
                 <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
@@ -235,7 +244,7 @@ function fmtMins($m) {
             <!-- Column header row -->
             <tr>
                 <th>
-                    <div class="sort-wrap">Project ID
+                    <div class="sort-wrap">IIPS ID
                         <button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button>
                         <div id="s-pid" class="sort-menu">
                             <a href="#" onclick="sortT(0,'alpha',0);return false;">Default</a>
@@ -244,7 +253,7 @@ function fmtMins($m) {
                         </div>
                     </div>
                 </th>
-                <th>Project Name</th>
+                <th>IIPS Name</th>
                 <th>Customer Name</th>
                 <!-- Costing -->
                 <th>Selling Price (RM)</th>
@@ -272,7 +281,7 @@ function fmtMins($m) {
         </thead>
         <tbody>
         <?php if (empty($rows)): ?>
-            <tr><td colspan="21" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "Create Project" to add one.</td></tr>
+            <tr><td colspan="21" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "Create IIPS" to add one.</td></tr>
         <?php else: foreach ($rows as $r):
             $pid_display = fmtPid($r['project_id']);
             $gp  = floatval($r['gross_profit'] ?? 0);
@@ -301,14 +310,13 @@ function fmtMins($m) {
                 <?= ($r['selling_price'] !== null && $r['partner_cost'] !== null) ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?>
             </td>
             <td class="bg-manual">
-                <?php if ($r['iips_id']): ?>
+                <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
                 <div class="tog">
-                    <div class="tog-track <?= $r['has_project_mgmt'] ? 'on' : '' ?>">
+                    <div class="tog-track <?= $pm_val ? 'on' : '' ?>">
                         <div class="tog-thumb"></div>
                     </div>
-                    <span class="tog-lbl <?= $r['has_project_mgmt'] ? 'yes' : '' ?>"><?= $r['has_project_mgmt'] ? 'Yes' : 'No' ?></span>
+                    <span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span>
                 </div>
-                <?php else: ?><span class="dash">—</span><?php endif; ?>
             </td>
             <!-- Target -->
             <td class="bg-manual"><?= $r['target_mandays'] ? htmlspecialchars($r['target_mandays']).' hrs' : '<span class="dash">—</span>' ?></td>
@@ -337,9 +345,23 @@ function fmtMins($m) {
         <?php endforeach; endif; ?>
         </tbody>
     </table>
+    </div><!-- end tbl-wrap -->
 </div>
 
 <script>
+// ── Top scroll mirror ─────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function() {
+    const top = document.getElementById('tbl-scroll-top');
+    const wrap = document.getElementById('tbl-wrap');
+    const inner = document.getElementById('tbl-scroll-inner');
+    if (top && wrap && inner) {
+        const tbl = wrap.querySelector('table');
+        if (tbl) inner.style.width = tbl.offsetWidth + 'px';
+        top.addEventListener('scroll', function() { wrap.scrollLeft = top.scrollLeft; });
+        wrap.addEventListener('scroll', function() { top.scrollLeft = wrap.scrollLeft; });
+    }
+});
+
 // ── Search ────────────────────────────────────────────────────────────────────
 document.getElementById('search-input').addEventListener('input', function() {
     const f = this.value.toLowerCase();
