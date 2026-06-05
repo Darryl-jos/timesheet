@@ -222,7 +222,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 <div class="form-group">
                     <label>Date <span style="color:#dc2626;">*</span></label>
                     <div style="position: relative; height: 36px; width: 100%; display: flex;">
-                        <input type="text" id="date-display" placeholder="DD/MM/YYYY" style="flex: 1; height: 100%; padding: 8px 36px 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; text-transform: uppercase;" autocomplete="off">
+                        <input type="text" id="date-display" placeholder="DD MMM YYYY" style="flex: 1; height: 100%; padding: 8px 36px 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; text-transform: uppercase;" autocomplete="off">
                         <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;" onclick="document.getElementById('date').showPicker()">📅
                             <input type="date" name="date" id="date" value="<?php echo htmlspecialchars($sel_date); ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" onchange="syncDateFromPicker()">
                         </div>
@@ -300,26 +300,41 @@ function clearError(visId, errId) {
 }
 
 function parseDateInput(str) {
-    str = str.trim().toUpperCase();
+    str = str.trim();
     if (!str) return '';
-    const parts = str.split(/[\/\- \.]+/);
-    if (parts.length === 3) {
-        let d = parts[0], m = parts[1], y = parts[2];
-        if (d.length === 1) d = '0' + d;
-        if (y.length === 2) y = '20' + y;
-        const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-        let mIndex = -1;
-        if (isNaN(m)) {
-            mIndex = months.findIndex(x => m.startsWith(x));
-            if(mIndex !== -1) m = String(mIndex + 1).padStart(2, '0');
+    let d, m, y;
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
+    if (textMatch) {
+        d = parseInt(textMatch[1], 10);
+        let mStr = textMatch[2].toUpperCase().substring(0, 3);
+        m = months.indexOf(mStr) + 1;
+        if (m === 0) return '';
+        y = parseInt(textMatch[3], 10);
+    } else {
+        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
+        if (numMatch) {
+            d = parseInt(numMatch[1], 10);
+            m = parseInt(numMatch[2], 10);
+            y = parseInt(numMatch[3], 10);
         } else {
-            m = String(m).padStart(2, '0');
-        }
-        if (d.length === 2 && m.length === 2 && y.length === 4) {
-            return y + '-' + m + '-' + d;
+            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
+            if (digitMatch) {
+                d = parseInt(digitMatch[1], 10);
+                m = parseInt(digitMatch[2], 10);
+                y = parseInt(digitMatch[3], 10);
+            } else {
+                return '';
+            }
         }
     }
-    return '';
+    if (y < 100) y += 2000;
+    if (m < 1 || m > 12) return '';
+    let daysInMonth = new Date(y, m, 0).getDate();
+    if (d < 1 || d > daysInMonth) return '';
+    let mmStr = m < 10 ? '0' + m : m;
+    let ddStr = d < 10 ? '0' + d : d;
+    return y + '-' + mmStr + '-' + ddStr;
 }
 
 function convertTo24Hour(time12h) {
@@ -678,7 +693,9 @@ function updateDateDisplay() {
         const parts = val.split('-');
         if (parts.length === 3) {
             const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-            display.value = parts[2] + '-' + months[parseInt(parts[1], 10) - 1] + '-' + parts[0];
+            let d = parseInt(parts[2], 10);
+            let m = parseInt(parts[1], 10);
+            display.value = d + ' ' + months[m - 1] + ' ' + parts[0];
             clearError('date-display', 'err-date');
         }
     } else {
@@ -693,6 +710,11 @@ function syncDateFromPicker() {
 }
 
 document.getElementById('date-display').addEventListener('blur', function() {
+    if (!this.value.trim()) {
+        document.getElementById('date').value = "";
+        updateDateDisplay();
+        return;
+    }
     const parsed = parseDateInput(this.value);
     if (parsed) {
         document.getElementById('date').value = parsed;
@@ -700,7 +722,10 @@ document.getElementById('date-display').addEventListener('blur', function() {
         generateEndTimes();
         calculateMealBreaks();
     } else {
-        updateDateDisplay();
+        this.classList.add('error-border');
+        const err = document.getElementById('err-date');
+        err.innerText = "The date format is incorrect. You can enter formats such as DD-MM-YYYY, DD/MM/YYYY, or DD MONTH YYYY.";
+        err.style.display = 'block';
     }
 });
 
@@ -708,6 +733,16 @@ document.getElementById('date-display').addEventListener('keydown', function(e) 
     if (e.key === 'Enter') {
         e.preventDefault();
         this.blur();
+    }
+});
+
+document.getElementById('date-display').addEventListener('input', function(e) {
+    if (e.inputType === 'deleteContentBackward') return;
+    let v = this.value;
+    if (/^\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{8}$/.test(v)) {
+        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
     }
 });
 

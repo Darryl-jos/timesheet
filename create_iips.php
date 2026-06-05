@@ -1,6 +1,12 @@
 <?php
 require_once 'config.php';
 
+function fmtDateDisplay($d) {
+    if (!$d) return '';
+    $dt = DateTime::createFromFormat('Y-m-d', $d);
+    return $dt ? $dt->format('d-M-Y') : '';
+}
+
 if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESSION['is_admin'] != 1 && $_SESSION['is_admin'] != 2)) {
     header("Location: login.php"); exit;
 }
@@ -51,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $proj_mgr  = trim($_POST['project_manager']  ?? '');
 
     // ── Validation ────────────────────────────────────────────────────────────
-    if (empty($p_name))    $errors[] = "Project Name is required.";
+    if (empty($p_name))    $errors[] = "IIPS Name is required.";
     if (empty($c_name))    $errors[] = "Customer Name is required.";
     if ($selling === null) $errors[] = "Selling Price is required.";
     if ($partner === null) $errors[] = "Partner Cost is required.";
@@ -59,10 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$tgt_sd)          $errors[] = "Target Start Date is required.";
     if (!$tgt_ed)          $errors[] = "Target End Date is required.";
     if (!$tgt_bd)          $errors[] = "Target Billing Date is required.";
-    if (empty($acc_mgr))   $errors[] = "Account Manager is required.";
-    if (empty($acc_ldr))   $errors[] = "Account Leader is required.";
-    if (empty($presales))  $errors[] = "Pre-Sales / SDM is required.";
-    if (empty($proj_mgr))  $errors[] = "Project Manager is required.";
+    // Resources are optional EXCEPT Project Manager is required if Project Management is checked
+    if ($has_pm && empty($proj_mgr)) $errors[] = "Project Manager is required when Project Management is included.";
 
     if (empty($errors)) {
         if ($edit_mode && !empty($old_pid)) {
@@ -90,11 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($exists) {
                     $upd = $conn->prepare("UPDATE iips_tracking SET selling_price=?,partner_cost=?,gross_profit=?,has_project_mgmt=?,target_mandays=?,target_start_date=?,target_end_date=?,target_billing_date=?,iips_status=?,billing_status=?,account_manager=?,account_leader=?,presales_sdm=?,project_manager=? WHERE project_id=?");
-                    $upd->bind_param("dddidssssssssss", $selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
+                    $upd->bind_param("dddidsssssssss", $selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
                     $upd->execute(); $upd->close();
                 } else {
                     $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-                    $ins->bind_param("sdddidssssssssss", $p_id,$selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
+                    $ins->bind_param("sdddidsssssssss", $p_id,$selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
                     $ins->execute(); $ins->close();
                 }
                 $conn->commit();
@@ -105,10 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             // Insert new
+            $est_time = 0;
+            $pricing = null;
             $s = $conn->prepare("INSERT INTO projects (project_id,project_name,customer_name,estimate_time,pricing) VALUES (?,?,?,?,?)");
-            $s->bind_param("sssid", $p_id,$p_name,$c_name,0,null); $s->execute(); $s->close();
+            $s->bind_param("sssid", $p_id,$p_name,$c_name,$est_time,$pricing); $s->execute(); $s->close();
             $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $ins->bind_param("sdddidssssssssss", $p_id,$selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
+            $ins->bind_param("sdddidsssssssss", $p_id,$selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
             $ins->execute(); $ins->close();
             header("Location: admin_iips.php"); exit;
         }
@@ -192,6 +198,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
     .section-body, .section-body.three-col { grid-template-columns: 1fr; }
 }
 </style>
+<style>.fp-date { cursor:pointer; }</style>
 </head>
 <body>
 
@@ -237,18 +244,14 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             <div class="section-body three-col">
                 <div class="form-group">
                     <label>Selling Price (RM) <span class="req">*</span></label>
-                    <input type="number" name="selling_price" id="sp" step="0.01" min="0" value="<?= htmlspecialchars($v['selling_price']) ?>" placeholder="e.g. 10000.00" oninput="calcGP()" class="<?= in_array('Selling Price is required.',$errors)?'err':'' ?>">
+                    <input type="number" name="selling_price" id="sp" step="0.01" min="0" value="<?= htmlspecialchars($v['selling_price']) ?>" oninput="calcGP()" class="<?= in_array('Selling Price is required.',$errors)?'err':'' ?>">
                 </div>
                 <div class="form-group">
                     <label>Partner Cost (RM) <span class="req">*</span></label>
-                    <input type="number" name="partner_cost" id="pc" step="0.01" min="0" value="<?= htmlspecialchars($v['partner_cost']) ?>" placeholder="e.g. 3000.00" oninput="calcGP()" class="<?= in_array('Partner Cost is required.',$errors)?'err':'' ?>">
+                    <input type="number" name="partner_cost" id="pc" step="0.01" min="0" value="<?= htmlspecialchars($v['partner_cost']) ?>" oninput="calcGP()" class="<?= in_array('Partner Cost is required.',$errors)?'err':'' ?>">
                 </div>
-                <div class="form-group">
-                    <label>Gross Profit (RM)</label>
-                    <div class="gp-preview" id="gp-preview">—</div>
-                </div>
-                <div class="check-group">
-                    <input type="checkbox" name="has_project_mgmt" id="has_pm" <?= $v['has_project_mgmt'] ? 'checked' : '' ?>>
+                <div class="check-group" style="align-self:center; padding-top:20px;">
+                    <input type="checkbox" name="has_project_mgmt" id="has_pm" <?= $v['has_project_mgmt'] ? 'checked' : '' ?> onchange="togglePMRequired()">
                     <label for="has_pm">Project Management Included</label>
                 </div>
             </div>
@@ -259,20 +262,32 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             <div class="section-hdr blue">📅 IIPS Timeline — Target</div>
             <div class="section-body">
                 <div class="form-group">
-                    <label>Target Man-Days (hr) <span class="req">*</span></label>
+                    <label>Target Man-Days (hrs) <span class="req">*</span></label>
                     <input type="number" name="target_mandays" step="0.5" min="0" value="<?= htmlspecialchars($v['target_mandays']) ?>" class="<?= in_array('Target Man-Days is required.',$errors)?'err':'' ?>">
                 </div>
                 <div class="form-group">
                     <label>Target Billing Date <span class="req">*</span></label>
-                    <input type="date" name="target_billing_date" value="<?= htmlspecialchars($v['target_billing_date']) ?>" class="<?= in_array('Target Billing Date is required.',$errors)?'err':'' ?>">
+                    <div style="position:relative; height:38px; width:100%; display:flex;">
+                        <input type="text" id="tbd_display" placeholder="DD-MM-YYYY" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_billing_date'])) ?>" class="<?= in_array('Target Billing Date is required.',$errors)?'err':'' ?>">
+                        <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('tbd_val').showPicker()">📅</div>
+                        <input type="date" name="target_billing_date" id="tbd_val" value="<?= htmlspecialchars($v['target_billing_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('tbd')">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Target Start Date <span class="req">*</span></label>
-                    <input type="date" name="target_start_date" value="<?= htmlspecialchars($v['target_start_date']) ?>" class="<?= in_array('Target Start Date is required.',$errors)?'err':'' ?>">
+                    <div style="position:relative; height:38px; width:100%; display:flex;">
+                        <input type="text" id="tsd_display" placeholder="DD-MM-YYYY" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_start_date'])) ?>" class="<?= in_array('Target Start Date is required.',$errors)?'err':'' ?>">
+                        <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('tsd_val').showPicker()">📅</div>
+                        <input type="date" name="target_start_date" id="tsd_val" value="<?= htmlspecialchars($v['target_start_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('tsd')">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Target End Date <span class="req">*</span></label>
-                    <input type="date" name="target_end_date" value="<?= htmlspecialchars($v['target_end_date']) ?>" class="<?= in_array('Target End Date is required.',$errors)?'err':'' ?>">
+                    <div style="position:relative; height:38px; width:100%; display:flex;">
+                        <input type="text" id="ted_display" placeholder="DD-MM-YYYY" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_end_date'])) ?>" class="<?= in_array('Target End Date is required.',$errors)?'err':'' ?>">
+                        <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('ted_val').showPicker()">📅</div>
+                        <input type="date" name="target_end_date" id="ted_val" value="<?= htmlspecialchars($v['target_end_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('ted')">
+                    </div>
                 </div>
             </div>
         </div>
@@ -304,23 +319,23 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
         <!-- Resources -->
         <div class="section">
-            <div class="section-hdr purple">👥 IIPS Resources</div>
+            <div class="section-hdr purple">👥 IIPS Management <span style="font-weight:400; font-size:11px; opacity:.7;">(optional)</span></div>
             <div class="section-body">
                 <div class="form-group">
-                    <label>Account Manager <span class="req">*</span></label>
-                    <input type="text" name="account_manager" value="<?= htmlspecialchars($v['account_manager']) ?>" class="<?= in_array('Account Manager is required.',$errors)?'err':'' ?>">
+                    <label>Account Manager</label>
+                    <input type="text" name="account_manager" value="<?= htmlspecialchars($v['account_manager']) ?>">
                 </div>
                 <div class="form-group">
-                    <label>Account Leader <span class="req">*</span></label>
-                    <input type="text" name="account_leader" value="<?= htmlspecialchars($v['account_leader']) ?>" class="<?= in_array('Account Leader is required.',$errors)?'err':'' ?>">
+                    <label>Account Leader</label>
+                    <input type="text" name="account_leader" value="<?= htmlspecialchars($v['account_leader']) ?>">
                 </div>
                 <div class="form-group">
-                    <label>Pre-Sales / SDM <span class="req">*</span></label>
-                    <input type="text" name="presales_sdm" value="<?= htmlspecialchars($v['presales_sdm']) ?>" class="<?= in_array('Pre-Sales / SDM is required.',$errors)?'err':'' ?>">
+                    <label>Pre-Sales / SDM</label>
+                    <input type="text" name="presales_sdm" value="<?= htmlspecialchars($v['presales_sdm']) ?>">
                 </div>
                 <div class="form-group">
-                    <label>Project Manager <span class="req">*</span></label>
-                    <input type="text" name="project_manager" value="<?= htmlspecialchars($v['project_manager']) ?>" class="<?= in_array('Project Manager is required.',$errors)?'err':'' ?>">
+                    <label>IIPS Manager <span class="req" id="pm-req" style="display:<?= $v['has_project_mgmt'] ? 'inline' : 'none' ?>;">*</span></label>
+                    <input type="text" name="project_manager" id="proj_mgr_input" value="<?= htmlspecialchars($v['project_manager']) ?>" class="<?= in_array('Project Manager is required when Project Management is included.',$errors)?'err':'' ?>">
                 </div>
             </div>
         </div>
@@ -334,15 +349,121 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
 <script>
 function calcGP() {
-    const sp = parseFloat(document.getElementById('sp').value);
-    const pc = parseFloat(document.getElementById('pc').value);
-    const el = document.getElementById('gp-preview');
-    if (isNaN(sp) && isNaN(pc)) { el.textContent = '—'; el.style.color = '#6b7280'; return; }
-    const gp = (isNaN(sp) ? 0 : sp) - (isNaN(pc) ? 0 : pc);
-    el.textContent = 'RM ' + gp.toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
-    el.style.color = gp > 0 ? '#166534' : gp < 0 ? '#dc2626' : '#6b7280';
+    // kept for compatibility but gross profit not shown in form
 }
-calcGP();
+
+function togglePMRequired() {
+    const checked = document.getElementById('has_pm').checked;
+    const req = document.getElementById('pm-req');
+    const inp = document.getElementById('proj_mgr_input');
+    if (req) req.style.display = checked ? 'inline' : 'none';
+    if (inp) inp.required = checked;
+}
+
+// Init on load
+document.addEventListener('DOMContentLoaded', function() {
+    togglePMRequired();
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/imask@7/dist/imask.min.js"></script>
+<script>
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function syncDate(prefix) {
+    const val = document.getElementById(prefix+'_val').value;
+    const display = document.getElementById(prefix+'_display');
+    if (val) {
+        const parts = val.split('-');
+        if (parts.length === 3) {
+            display.value = parts[2] + '-' + MONTHS[parseInt(parts[1],10)-1] + '-' + parts[0];
+        }
+    } else {
+        display.value = '';
+    }
+}
+
+function parseDateInput(str) {
+    str = str.trim().toUpperCase();
+    if (!str) return '';
+    const parts = str.split(/[\/\-\. ]+/);
+    if (parts.length === 3) {
+        let d = parts[0], m = parts[1], y = parts[2];
+        if (d.length === 1) d = '0'+d;
+        if (y.length === 2) y = '20'+y;
+        if (isNaN(m)) {
+            const mIdx = MONTHS.findIndex(x => m.startsWith(x.substring(0,3)));
+            if (mIdx !== -1) m = String(mIdx+1).padStart(2,'0');
+        } else {
+            m = String(m).padStart(2,'0');
+        }
+        if (d.length===2 && m.length===2 && y.length===4) return y+'-'+m+'-'+d;
+    }
+    return '';
+}
+
+function bindDateField(prefix) {
+    const display = document.getElementById(prefix+'_display');
+    const hidden  = document.getElementById(prefix+'_val');
+
+    display.addEventListener('input', function() {
+        // Only allow digits, auto-insert dashes
+        let digits = this.value.replace(/\D/g,'');
+        let result = '';
+
+        // Clamp day 01-31
+        if (digits.length >= 1) {
+            let d = digits.substring(0,2);
+            if (digits.length >= 2) {
+                let dNum = parseInt(d);
+                if (dNum < 1) d = '01';
+                if (dNum > 31) d = '31';
+            }
+            result += d;
+        }
+        // Clamp month 01-12
+        if (digits.length >= 3) {
+            result += '-';
+            let m = digits.substring(2,4);
+            if (digits.length >= 4) {
+                let mNum = parseInt(m);
+                if (mNum < 1) m = '01';
+                if (mNum > 12) m = '12';
+            }
+            result += m;
+        }
+        // Year
+        if (digits.length >= 5) {
+            result += '-';
+            result += digits.substring(4,8);
+        }
+
+        this.value = result;
+    });
+
+    display.addEventListener('blur', function() {
+        const parsed = parseDateInput(this.value);
+        if (parsed) {
+            hidden.value = parsed;
+            syncDate(prefix);
+        } else if (!hidden.value) {
+            this.value = '';
+        } else {
+            syncDate(prefix);
+        }
+    });
+    display.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    ['tbd','tsd','ted'].forEach(function(p) {
+        syncDate(p);
+        bindDateField(p);
+    });
+});
 </script>
 </body>
 </html>

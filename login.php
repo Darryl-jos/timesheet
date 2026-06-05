@@ -74,18 +74,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <form method="POST">
         <label>Username:</label>
-        <input type="text" name="username_id" placeholder="e.g. john.doe" required
+        <input type="text" name="username_id" required
                value="<?php echo isset($_POST['username_id']) ? htmlspecialchars($_POST['username_id']) : ''; ?>">
 
         <label>Password:</label>
-        <input type="password" name="password" placeholder="Password" required>
+        <input type="password" name="password" required>
 
         <button type="submit" class="btn-login">Login</button>
     </form>
-
-    <div class="link-text">
-        Don't have an account? <a href="signup.php">Sign up now</a>
-    </div>
 </div>
 </body>
 </html>

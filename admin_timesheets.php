@@ -79,7 +79,7 @@ $proj_agg_json = json_encode($proj_agg);
 function fmtDate($d) {
     if (!$d) return '-';
     $dt = DateTime::createFromFormat('Y-m-d', $d);
-    return $dt ? $dt->format('d M Y') : $d;
+    return $dt ? $dt->format('d-M-Y') : $d;
 }
 ?>
 <!DOCTYPE html>
@@ -235,25 +235,7 @@ tbody tr:hover { background: #f8faff; }
     <?php
     $total_recs = count($rows_cache);
     $total_mins_all = array_sum(array_column($rows_cache, '_minutes'));
-    $total_h_all = floor($total_mins_all / 60);
-    $total_m_all = $total_mins_all % 60;
-    $completed_res = $conn->query("SELECT COUNT(*) as cnt FROM iips_tracking WHERE iips_status='Completed'");
-    $completed_count = $completed_res ? $completed_res->fetch_assoc()['cnt'] : 0;
     ?>
-    <div class="stats-bar">
-        <div class="stat">
-            <div class="stat-label">Total Logs</div>
-            <div class="stat-value"><?= $total_recs ?></div>
-        </div>
-        <div class="stat green">
-            <div class="stat-label">Total Hours</div>
-            <div class="stat-value"><?= $total_h_all ?>h <?= $total_m_all ?>m</div>
-        </div>
-        <div class="stat" style="border-top-color:#166534;">
-            <div class="stat-label">Completed Projects</div>
-            <div class="stat-value"><?= $completed_count ?></div>
-        </div>
-    </div>
 
     <!-- Bulk Toolbar -->
     <div id="bulk-toolbar">
@@ -272,13 +254,13 @@ tbody tr:hover { background: #f8faff; }
         <!-- Project searchable select -->
         <div class="sel-wrap" id="proj-wrap">
             <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
-                <span id="proj-label">All Projects</span>
+                <span id="proj-label">All IIPS</span>
                 <span class="sel-arrow">▾</span>
             </div>
             <div class="sel-panel" id="proj-panel">
                 <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
                 <div class="sel-list" id="proj-list">
-                    <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
+                    <div class="sel-item active" data-value="" onclick="pickSel('proj','','All IIPS',this)">All IIPS</div>
                     <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
                         $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
                     ?>
@@ -320,22 +302,25 @@ tbody tr:hover { background: #f8faff; }
             </div>
         </div>
 
-        <input type="date" id="date-search" onchange="doFilter()">
+        <div style="position: relative; flex: 1; min-width: 150px; height: 38px; display: flex;">
+            <input type="text" id="date-display" placeholder="DD MMM YYYY" style="width: 100%; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase;" autocomplete="off">
+            <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;" onclick="document.getElementById('date-search').showPicker()">📅
+                <input type="date" id="date-search" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" onchange="syncDateFromPicker()">
+            </div>
+        </div>
         <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
 
-    <!-- Project Summary Card -->
+    <!-- Live Filter Dashboard — only shows when filtering -->
     <div class="summary-card" id="sum-card">
-        <h4>📈 Project Overview</h4>
+        <h4>📊 Filter Results Dashboard</h4>
         <div class="sum-grid">
-            <div class="sum-item"><span class="sum-label">Project ID</span><span class="sum-value" id="sum-pid">-</span></div>
-            <div class="sum-item"><span class="sum-label">Project Name</span><span class="sum-value" id="sum-pname">-</span></div>
-            <div class="sum-item"><span class="sum-label">Customer</span><span class="sum-value" id="sum-cust">-</span></div>
-            <div class="sum-item"><span class="sum-label">Target Man-days</span><span class="sum-value" id="sum-target">-</span></div>
-            <div class="sum-item"><span class="sum-label">Actual Hours</span><span class="sum-value" id="sum-actual">-</span></div>
-            <div class="sum-item"><span class="sum-label">Gap</span><span class="sum-value" id="sum-gap">-</span></div>
+            <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
+            <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
+            <div class="sum-item"><span class="sum-label">Engineers</span><span class="sum-value" id="sum-engs">-</span></div>
+            <div class="sum-item"><span class="sum-label">IIPS</span><span class="sum-value" id="sum-projs">-</span></div>
             <div class="sum-item"><span class="sum-label">Date Range</span><span class="sum-value" id="sum-dates">-</span></div>
-            <div class="sum-item"><span class="sum-label">Engineers Involved</span><span class="sum-value" id="sum-engs">-</span></div>
+            <div class="sum-item"><span class="sum-label">Avg Hours / Log</span><span class="sum-value" id="sum-avg">-</span></div>
         </div>
     </div>
 
@@ -364,7 +349,7 @@ tbody tr:hover { background: #f8faff; }
                             </div>
                         </th>
                         <th>
-                            <div class="sort-wrap">Project ID
+                            <div class="sort-wrap">IIPS ID
                                 <button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button>
                                 <div id="s-pid" class="sort-menu">
                                     <a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a>
@@ -374,7 +359,7 @@ tbody tr:hover { background: #f8faff; }
                             </div>
                         </th>
                         <th>Customer</th>
-                        <th>Project Name</th>
+                        <th>IIPS Name</th>
                         <th>Activity</th>
                         <th>
                             <div class="sort-wrap">Start Date
@@ -478,6 +463,101 @@ let activeProjFilter = '';
 let activeEngFilter  = '';
 let origRows = null;
 
+function parseDateInput(str) {
+    str = str.trim();
+    if (!str) return '';
+    let d, m, y;
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
+    if (textMatch) {
+        d = parseInt(textMatch[1], 10);
+        let mStr = textMatch[2].toUpperCase().substring(0, 3);
+        m = months.indexOf(mStr) + 1;
+        if (m === 0) return '';
+        y = parseInt(textMatch[3], 10);
+    } else {
+        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
+        if (numMatch) {
+            d = parseInt(numMatch[1], 10);
+            m = parseInt(numMatch[2], 10);
+            y = parseInt(numMatch[3], 10);
+        } else {
+            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
+            if (digitMatch) {
+                d = parseInt(digitMatch[1], 10);
+                m = parseInt(digitMatch[2], 10);
+                y = parseInt(digitMatch[3], 10);
+            } else {
+                return '';
+            }
+        }
+    }
+    if (y < 100) y += 2000;
+    if (m < 1 || m > 12) return '';
+    let daysInMonth = new Date(y, m, 0).getDate();
+    if (d < 1 || d > daysInMonth) return '';
+    let mmStr = m < 10 ? '0' + m : m;
+    let ddStr = d < 10 ? '0' + d : d;
+    return y + '-' + mmStr + '-' + ddStr;
+}
+
+function updateDateDisplay() {
+    const val = document.getElementById('date-search').value;
+    const display = document.getElementById('date-display');
+    if (val) {
+        const parts = val.split('-');
+        if (parts.length === 3) {
+            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+            let d = parseInt(parts[2], 10);
+            let m = parseInt(parts[1], 10);
+            display.value = d + ' ' + months[m - 1] + ' ' + parts[0];
+            display.style.borderColor = '#ccc';
+        }
+    } else {
+        display.value = "";
+    }
+}
+
+document.getElementById('date-display').addEventListener('blur', function() {
+    if (!this.value.trim()) {
+        document.getElementById('date-search').value = "";
+        updateDateDisplay();
+        doFilter();
+        return;
+    }
+    const parsed = parseDateInput(this.value);
+    if (parsed) {
+        document.getElementById('date-search').value = parsed;
+        updateDateDisplay();
+        doFilter();
+    } else {
+        this.style.borderColor = '#dc2626';
+    }
+});
+
+document.getElementById('date-display').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        this.blur();
+    }
+});
+
+document.getElementById('date-display').addEventListener('input', function(e) {
+    if (e.inputType === 'deleteContentBackward') return;
+    this.style.borderColor = '#ccc';
+    let v = this.value;
+    if (/^\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{8}$/.test(v)) {
+        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
+    }
+});
+
+function syncDateFromPicker() {
+    updateDateDisplay();
+    doFilter();
+}
+
 // ── Searchable select ─────────────────────────────────────────────────────────
 function toggleSel(type) {
     const wrap = document.getElementById(type+'-wrap');
@@ -530,43 +610,65 @@ function doFilter() {
         tr.classList.toggle('is-hidden', !ok);
         if (ok) visRows.push(tr);
     });
-    updateSummary(visRows);
+    updateSummary(visRows, txt, date);
 }
 
-function updateSummary(visRows) {
+function updateSummary(visRows, txt, date) {
     const card = document.getElementById('sum-card');
-    if (!activeProjFilter || visRows.length === 0) { card.style.display = 'none'; return; }
-    const agg = projAgg[activeProjFilter];
-    if (!agg) { card.style.display = 'none'; return; }
+    const hasFilter = txt || activeProjFilter || activeEngFilter || date;
 
-    let filteredMins = 0;
-    visRows.forEach(tr => filteredMins += parseInt(tr.dataset.mins)||0);
-    const h = Math.floor(filteredMins/60), m = filteredMins%60;
-    const targetMins = agg.estimate_time * 60;
-    const gapM = filteredMins - targetMins;
-    const gH = Math.floor(Math.abs(gapM)/60), gM = Math.abs(gapM)%60;
+    // Hide when no filter active
+    if (!hasFilter || visRows.length === 0) { card.style.display = 'none'; return; }
 
-    document.getElementById('sum-pid').textContent    = activeProjFilter;
-    document.getElementById('sum-pname').textContent  = agg.project_name;
-    document.getElementById('sum-cust').textContent   = agg.customer_name;
-    document.getElementById('sum-target').textContent = agg.estimate_time+'h ('+Math.round(agg.estimate_time/8)+' days)';
-    document.getElementById('sum-actual').textContent = h+'h '+m+'m';
-    document.getElementById('sum-dates').textContent  = agg.min_start+' → '+agg.max_end;
-    document.getElementById('sum-engs').textContent   = Object.keys(agg.engineers).join(', ');
+    // Calculate stats from visible rows only
+    let totalMins = 0;
+    const engSet  = new Set();
+    const projSet = new Set();
+    let minDate = '', maxDate = '';
 
-    const gapEl = document.getElementById('sum-gap');
-    if (gapM > 0)      gapEl.innerHTML = '<span style="color:#dc3545;font-weight:bold;">▲ +'+gH+'h '+gM+'m Over</span>';
-    else if (gapM < 0) gapEl.innerHTML = '<span style="color:#28a745;font-weight:bold;">▼ -'+gH+'h '+gM+'m Saved</span>';
-    else               gapEl.innerHTML = '<span style="color:#6c757d;font-weight:bold;">✓ On Track</span>';
+    visRows.forEach(tr => {
+        totalMins += parseInt(tr.dataset.mins) || 0;
+        if (tr.dataset.eng)  engSet.add(tr.dataset.eng);
+        if (tr.dataset.pid)  projSet.add(tr.dataset.pid);
+        const sd = tr.dataset.sd || '';
+        if (sd) {
+            if (!minDate || sd < minDate) minDate = sd;
+            if (!maxDate || sd > maxDate) maxDate = sd;
+        }
+    });
+
+    const h   = Math.floor(totalMins / 60);
+    const m   = totalMins % 60;
+    const avg = visRows.length > 0 ? Math.round(totalMins / visRows.length) : 0;
+    const avgH = Math.floor(avg/60), avgM = avg%60;
+
+    const MONTHS_JS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtDateJS(ymd) {
+        if (!ymd) return '-';
+        const p = ymd.split('-');
+        if (p.length !== 3) return ymd;
+        return parseInt(p[2]) + '-' + MONTHS_JS[parseInt(p[1])-1] + '-' + p[0];
+    }
+
+    document.getElementById('sum-logs').textContent  = visRows.length;
+    document.getElementById('sum-hours').textContent = h + 'h ' + m + 'm';
+    document.getElementById('sum-engs').textContent  = engSet.size;
+    document.getElementById('sum-projs').textContent = projSet.size;
+    document.getElementById('sum-dates').textContent = minDate && maxDate
+        ? (minDate === maxDate ? fmtDateJS(minDate) : fmtDateJS(minDate) + ' → ' + fmtDateJS(maxDate)) : '-';
+    document.getElementById('sum-avg').textContent   = avgH + 'h ' + avgM + 'm';
+
     card.style.display = 'block';
 }
 
 function clearAllFilters() {
     document.getElementById('txt-search').value  = '';
     document.getElementById('date-search').value = '';
+    document.getElementById('date-display').value = ''; 
+    document.getElementById('date-display').style.borderColor = '#ccc'; 
     activeProjFilter = '';
     activeEngFilter  = '';
-    document.getElementById('proj-label').textContent = 'All Projects';
+    document.getElementById('proj-label').textContent = 'All IIPS';
     document.getElementById('eng-label').textContent  = 'All Engineers';
     document.querySelectorAll('.sel-item').forEach(i => i.classList.remove('active'));
     document.querySelectorAll('.sel-item[data-value=""]').forEach(i => i.classList.add('active'));

@@ -193,7 +193,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 <div class="form-group">
                     <label>Date <span style="color:#dc2626;">*</span></label>
                     <div style="position: relative; height: 36px; width: 100%; display: flex;">
-                        <input type="text" id="date-display" placeholder="DD/MM/YYYY" style="flex: 1; height: 100%; padding: 8px 36px 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; text-transform: uppercase;" autocomplete="off">
+                        <input type="text" id="date-display" placeholder="DD MMM YYYY" style="flex: 1; height: 100%; padding: 8px 36px 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; text-transform: uppercase;" autocomplete="off">
                         <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;" onclick="document.getElementById('date').showPicker()">📅
                             <input type="date" name="date" id="date" value="<?php echo htmlspecialchars($sel_date); ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" onchange="syncDateFromPicker()">
                         </div>
@@ -271,26 +271,101 @@ function clearError(visId, errId) {
 }
 
 function parseDateInput(str) {
-    str = str.trim().toUpperCase();
+    str = str.trim();
     if (!str) return '';
-    const parts = str.split(/[\/\- \.]+/);
-    if (parts.length === 3) {
-        let d = parts[0], m = parts[1], y = parts[2];
-        if (d.length === 1) d = '0' + d;
-        if (y.length === 2) y = '20' + y;
-        const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-        let mIndex = -1;
-        if (isNaN(m)) {
-            mIndex = months.findIndex(x => m.startsWith(x));
-            if(mIndex !== -1) m = String(mIndex + 1).padStart(2, '0');
+    let d, m, y;
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
+    if (textMatch) {
+        d = parseInt(textMatch[1], 10);
+        let mStr = textMatch[2].toUpperCase().substring(0, 3);
+        m = months.indexOf(mStr) + 1;
+        if (m === 0) return '';
+        y = parseInt(textMatch[3], 10);
+    } else {
+        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
+        if (numMatch) {
+            d = parseInt(numMatch[1], 10);
+            m = parseInt(numMatch[2], 10);
+            y = parseInt(numMatch[3], 10);
         } else {
-            m = String(m).padStart(2, '0');
-        }
-        if (d.length === 2 && m.length === 2 && y.length === 4) {
-            return y + '-' + m + '-' + d;
+            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
+            if (digitMatch) {
+                d = parseInt(digitMatch[1], 10);
+                m = parseInt(digitMatch[2], 10);
+                y = parseInt(digitMatch[3], 10);
+            } else {
+                return '';
+            }
         }
     }
-    return '';
+    if (y < 100) y += 2000;
+    if (m < 1 || m > 12) return '';
+    let daysInMonth = new Date(y, m, 0).getDate();
+    if (d < 1 || d > daysInMonth) return '';
+    let mmStr = m < 10 ? '0' + m : m;
+    let ddStr = d < 10 ? '0' + d : d;
+    return y + '-' + mmStr + '-' + ddStr;
+}
+
+function updateDateDisplay() {
+    const val = document.getElementById('date').value;
+    const display = document.getElementById('date-display');
+    if (val) {
+        const parts = val.split('-');
+        if (parts.length === 3) {
+            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+            let d = parseInt(parts[2], 10);
+            let m = parseInt(parts[1], 10);
+            display.value = d + ' ' + months[m - 1] + ' ' + parts[0];
+            clearError('date-display', 'err-date');
+        }
+    } else {
+        display.value = "";
+    }
+}
+
+document.getElementById('date-display').addEventListener('blur', function() {
+    if (!this.value.trim()) {
+        document.getElementById('date').value = "";
+        updateDateDisplay();
+        return;
+    }
+    const parsed = parseDateInput(this.value);
+    if (parsed) {
+        document.getElementById('date').value = parsed;
+        updateDateDisplay();
+        generateEndTimes();
+        calculateMealBreaks();
+    } else {
+        this.classList.add('error-border');
+        const err = document.getElementById('err-date');
+        err.innerText = "The date format is incorrect. You can enter formats such as DD-MM-YYYY, DD/MM/YYYY, or DD MONTH YYYY.";
+        err.style.display = 'block';
+    }
+});
+
+document.getElementById('date-display').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        this.blur();
+    }
+});
+
+document.getElementById('date-display').addEventListener('input', function(e) {
+    if (e.inputType === 'deleteContentBackward') return;
+    let v = this.value;
+    if (/^\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{8}$/.test(v)) {
+        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
+    }
+});
+
+function syncDateFromPicker() {
+    updateDateDisplay();
+    generateEndTimes();
+    calculateMealBreaks();
 }
 
 function convertTo24Hour(time12h) {
@@ -316,7 +391,6 @@ function parseAndRoundTime(inputStr, inputEl, errId, type) {
         amPmErrorFlag[type] = false;
         return null;
     }
-
     if (!str.includes('am') && !str.includes('pm')) {
         inputEl.classList.add('error-border');
         const errObj = document.getElementById(errId);
@@ -325,25 +399,20 @@ function parseAndRoundTime(inputStr, inputEl, errId, type) {
         amPmErrorFlag[type] = true;
         return false; 
     }
-
     amPmErrorFlag[type] = false;
     clearError(inputEl.id, errId);
-
     let timePart = str.replace(/[^\d:]/g, '');
     let isPM = str.includes('pm');
     let parts = timePart.split(':');
     let h = parseInt(parts[0], 10);
     let m = parts[1] ? parseInt(parts[1], 10) : 0;
-
     if (isNaN(h) || isNaN(m)) return null;
-
     let rem = m % 15;
     if (rem <= 7) {
         m -= rem;
     } else {
         m += (15 - rem);
     }
-
     if (m >= 60) {
         m = 0;
         h += 1;
@@ -353,11 +422,9 @@ function parseAndRoundTime(inputStr, inputEl, errId, type) {
             h = 1;
         }
     }
-
     let ampm = isPM ? 'PM' : 'AM';
     let formattedH = h % 12;
     formattedH = formattedH ? formattedH : 12;
-    
     return (formattedH < 10 ? '0' + formattedH : formattedH) + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
 }
 
@@ -365,9 +432,7 @@ function handleTimeInputBlur(type) {
     let inputEl = document.getElementById(type + '-time-input');
     let hiddenEl = document.getElementById(type + '-time-hidden');
     let errId = 'err-' + type;
-    
     let res = parseAndRoundTime(inputEl.value, inputEl, errId, type);
-    
     if (res === false) {
         hiddenEl.value = "";
     } else if (res) {
@@ -398,20 +463,17 @@ function getRoundedCurrentTime() {
     let now = new Date();
     let h = now.getHours();
     let m = now.getMinutes();
-
     let rem = m % 15;
     if (rem <= 7) {
         m -= rem;
     } else {
         m += (15 - rem);
     }
-
     if (m >= 60) {
         m = 0;
         h += 1;
     }
     if (h >= 24) h = 0;
-
     return { text: formatAMPM(h, m), val: (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m) };
 }
 
@@ -463,14 +525,11 @@ function pickSel(type, value, label, el) {
 function toggleTimeDropdown(type, event) {
     event.stopPropagation();
     document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
-    
     if (amPmErrorFlag[type]) return;
-
     const startDropdown = document.getElementById('start-time-dropdown');
     const endDropdown = document.getElementById('end-time-dropdown');
     let targetDrop = null;
     let hiddenVal = document.getElementById(type + '-time-hidden').value;
-
     if (type === 'start') {
         endDropdown.classList.remove('show-dropdown');
         startDropdown.classList.toggle('show-dropdown');
@@ -480,7 +539,6 @@ function toggleTimeDropdown(type, event) {
         endDropdown.classList.toggle('show-dropdown');
         if(endDropdown.classList.contains('show-dropdown')) targetDrop = endDropdown;
     }
-
     if (targetDrop && hiddenVal) {
         targetDrop.querySelectorAll('.custom-option').forEach(opt => {
             opt.classList.remove('selected');
@@ -633,7 +691,6 @@ function generateEndTimes() {
     todayHeader.className = 'time-header';
     todayHeader.innerText = baseDateText;
     container.appendChild(todayHeader);
-
     for (let loopMins = startMins + 15; loopMins <= startMins + 24 * 60; loopMins += 15) {
         let currentDayMins = loopMins % (24 * 60);
         let h = Math.floor(currentDayMins / 60);
@@ -663,46 +720,6 @@ function generateEndTimes() {
     }
 }
 
-function updateDateDisplay() {
-    const val = document.getElementById('date').value;
-    const display = document.getElementById('date-display');
-    if (val) {
-        const parts = val.split('-');
-        if (parts.length === 3) {
-            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-            display.value = parts[2] + '-' + months[parseInt(parts[1], 10) - 1] + '-' + parts[0];
-            clearError('date-display', 'err-date');
-        }
-    } else {
-        display.value = "";
-    }
-}
-
-function syncDateFromPicker() {
-    updateDateDisplay();
-    generateEndTimes();
-    calculateMealBreaks();
-}
-
-document.getElementById('date-display').addEventListener('blur', function() {
-    const parsed = parseDateInput(this.value);
-    if (parsed) {
-        document.getElementById('date').value = parsed;
-        updateDateDisplay();
-        generateEndTimes();
-        calculateMealBreaks();
-    } else {
-        updateDateDisplay();
-    }
-});
-
-document.getElementById('date-display').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        this.blur();
-    }
-});
-
 document.getElementById('desc-input').addEventListener('input', function() {
     if(this.value.trim() !== '') {
         clearError('desc-input', 'err-desc');
@@ -711,7 +728,6 @@ document.getElementById('desc-input').addEventListener('input', function() {
 
 document.addEventListener("DOMContentLoaded", function() {
     updateDateDisplay();
-    
     let initStart24 = "<?php echo htmlspecialchars(substr($sel_start_time, 0, 5)); ?>";
     if (initStart24) {
         document.getElementById('start-time-input').value = convertTo12Hour(initStart24);
@@ -720,22 +736,18 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('start-time-input').value = cur.text;
         document.getElementById('start-time-hidden').value = cur.val;
     }
-
     let initEnd24 = "<?php echo htmlspecialchars(substr($sel_end_time, 0, 5)); ?>";
     if (initEnd24) {
         document.getElementById('end-time-input').value = convertTo12Hour(initEnd24);
     }
-
     generateStartTimes();
     generateEndTimes();
-    
     let initialMealBreaks = parseInt(document.getElementById('actual_meal_breaks').value) || 0;
     if (initialMealBreaks > 0) {
         document.getElementById('meal_break_checkbox').checked = true;
     }
     calculateMealBreaks();
     updateDurationPreview();
-
     document.getElementById('meal_break_checkbox').addEventListener('change', function() {
         const select = document.getElementById('meal_breaks_select');
         const hiddenInput = document.getElementById('actual_meal_breaks');
@@ -757,7 +769,6 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('actual_meal_breaks').value = this.value;
         updateDurationPreview();
     });
-
     const hasConflict = <?php echo !empty($conflict_error) ? 'true' : 'false'; ?>;
     if (hasConflict) {
         const sInput = document.getElementById('start-time-input');
@@ -778,7 +789,6 @@ document.getElementById('record-form').addEventListener('submit', function(e) {
         if(inputToScroll) inputToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
-
     let isValid = true;
     let firstErr = null;
     function check(valId, visId, errId, textOverride = null) {
@@ -798,13 +808,11 @@ document.getElementById('record-form').addEventListener('submit', function(e) {
             if(err) err.style.display = 'none';
         }
     }
-    
     check('hidden-project-id', 'proj-box', 'err-proj');
     check('date', 'date-display', 'err-date');
     check('start-time-hidden', 'start-time-input', 'err-start', 'Please select a Start Time.');
     check('end-time-hidden', 'end-time-input', 'err-end', 'Please select an End Time.');
     check('desc-input', 'desc-input', 'err-desc');
-    
     if (!isValid) {
         e.preventDefault();
         firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });

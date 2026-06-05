@@ -39,7 +39,8 @@ $result = $conn->query("
         i.has_project_mgmt,
         i.target_mandays, i.target_start_date, i.target_end_date,
         i.target_billing_date,
-        i.iips_status, i.billing_status,
+        NULLIF(i.iips_status, 'Not Quoted')    AS iips_status,
+        NULLIF(i.billing_status, 'Not Forecasted') AS billing_status,
         i.account_manager, i.account_leader, i.presales_sdm, i.project_manager
     FROM projects p
     LEFT JOIN iips_tracking i ON p.project_id = i.project_id
@@ -101,16 +102,17 @@ function fmtMins($m) {
 <style>
     .is-hidden { display: none !important; }
 
-    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; }
+    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
 
     .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
     .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 
-    .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; }
-    .tbl-scroll-top { overflow-x: auto; overflow-y: hidden; height: 14px; margin-bottom: 2px; }
+    .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; margin-bottom: 30px; }
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+    .tbl-wrap::-webkit-scrollbar { display: none; }
+    .tbl-scroll-top { overflow-x: auto; overflow-y: hidden; height: 14px; margin-bottom: 2px; position: sticky; bottom: 0; background: #f4f7f6; border-top: 1px solid #e2e8f0; z-index: 10; }
     .tbl-scroll-top-inner { height: 1px; }
-    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; flex-wrap: wrap; }
     .search-input { height: 36px; padding: 0 12px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; min-width: 240px; flex: 1; }
@@ -223,11 +225,6 @@ function fmtMins($m) {
         <a href="create_iips.php" class="btn-create">+ Create IIPS</a>
     </div>
 
-    <!-- Top scroll mirror -->
-    <div class="tbl-scroll-top" id="tbl-scroll-top">
-        <div class="tbl-scroll-top-inner" id="tbl-scroll-inner"></div>
-    </div>
-
     <div class="tbl-wrap" id="tbl-wrap">
     <table id="main-table">
         <thead>
@@ -238,7 +235,7 @@ function fmtMins($m) {
                 <th class="s-timeline" colspan="3">Timeline — Target</th>
                 <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
                 <th class="s-status"   colspan="3">Status</th>
-                <th class="s-res"      colspan="4">Resources</th>
+                <th class="s-res"      colspan="4">IIPS Management</th>
                 <th class="s-act" rowspan="2">Actions</th>
             </tr>
             <!-- Column header row -->
@@ -261,7 +258,7 @@ function fmtMins($m) {
                 <th>Gross Profit (RM)</th>
                 <th>Project Mgmt</th>
                 <!-- Target -->
-                <th>Target Man-Days (hr)</th>
+                <th>Target Man-Days (hrs)</th>
                 <th>Target Start</th>
                 <th>Target End</th>
                 <!-- Actual -->
@@ -276,7 +273,7 @@ function fmtMins($m) {
                 <th>Account Manager</th>
                 <th>Account Leader</th>
                 <th>Pre-Sales / SDM</th>
-                <th>Project Manager</th>
+                <th>IIPS Manager</th>
             </tr>
         </thead>
         <tbody>
@@ -300,7 +297,7 @@ function fmtMins($m) {
             $pm_display = $r['ts_pm'] ?: ($r['project_manager'] ?: null);
         ?>
         <tr>
-            <td><code style="font-size:12px;"><?= $pid_display ?></code></td>
+            <td style="font-size:12px; font-weight:600; color:#1d4ed8;"><?= $pid_display === '-' ? '<span class="dash">—</span>' : htmlspecialchars($pid_display) ?></td>
             <td><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
             <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
             <!-- Costing -->
@@ -327,9 +324,17 @@ function fmtMins($m) {
             <td class="bg-auto"><span class="auto-val"><?= $r['ts_end']   ? fmtDate($r['ts_end'])   : '<span class="dash">—</span>' ?></span></td>
             <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
             <!-- Status -->
-            <td class="bg-dropdown"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
+            <td class="bg-dropdown">
+                <?php if (!empty($r['iips_status']) && $r['iips_status'] !== 'Not Quoted'): ?>
+                    <span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status']) ?></span>
+                <?php else: ?><span class="dash">—</span><?php endif; ?>
+            </td>
             <td class="bg-manual"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
-            <td class="bg-dropdown"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
+            <td class="bg-dropdown">
+                <?php if (!empty($r['billing_status']) && $r['billing_status'] !== 'Not Forecasted'): ?>
+                    <span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status']) ?></span>
+                <?php else: ?><span class="dash">—</span><?php endif; ?>
+            </td>
             <!-- Resources -->
             <td><?= $r['account_manager'] ? htmlspecialchars($r['account_manager']) : '<span class="dash">—</span>' ?></td>
             <td><?= $r['account_leader']  ? htmlspecialchars($r['account_leader'])  : '<span class="dash">—</span>' ?></td>
@@ -346,19 +351,25 @@ function fmtMins($m) {
         </tbody>
     </table>
     </div><!-- end tbl-wrap -->
+
+    <div class="tbl-scroll-top" id="tbl-scroll-top">
+        <div class="tbl-scroll-top-inner" id="tbl-scroll-inner"></div>
+    </div>
 </div>
 
 <script>
+
+
 // ── Top scroll mirror ─────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
-    const top = document.getElementById('tbl-scroll-top');
-    const wrap = document.getElementById('tbl-wrap');
+    const top   = document.getElementById('tbl-scroll-top');
+    const wrap  = document.getElementById('tbl-wrap');
     const inner = document.getElementById('tbl-scroll-inner');
     if (top && wrap && inner) {
         const tbl = wrap.querySelector('table');
         if (tbl) inner.style.width = tbl.offsetWidth + 'px';
-        top.addEventListener('scroll', function() { wrap.scrollLeft = top.scrollLeft; });
-        wrap.addEventListener('scroll', function() { top.scrollLeft = wrap.scrollLeft; });
+        top.addEventListener('scroll',  function() { wrap.scrollLeft = top.scrollLeft; });
+        wrap.addEventListener('scroll', function() { top.scrollLeft  = wrap.scrollLeft; });
     }
 });
 

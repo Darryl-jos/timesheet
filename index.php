@@ -18,7 +18,8 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-$filter_date = isset($_GET['date']) ? $_GET['date'] : '';
+$filter_date = isset($_GET['date']) ? trim($_GET['date']) : '';
+$filter_month = isset($_GET['month']) ? trim($_GET['month']) : '';
 
 if (!empty($filter_date)) {
     $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
@@ -28,6 +29,15 @@ if (!empty($filter_date)) {
             ORDER BY t.id DESC";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("is", $current_user_id, $filter_date);
+} elseif (!empty($filter_month)) {
+    $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
+            FROM timesheets t
+            JOIN projects p ON t.project_id = p.project_id
+            WHERE t.engineer_id = ? AND t.start_date LIKE ?
+            ORDER BY t.id DESC";
+    $month_like = $filter_month . '%';
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("is", $current_user_id, $month_like);
 } else {
     $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
             FROM timesheets t
@@ -137,7 +147,7 @@ function fmtDate($d) {
         .dur-badge { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
         .dur-badge.multiday { background: #dbeafe; color: #1e40af; }
 
-        .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; margin-right: 4px; }
+        .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
         .btn-delete { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
 
         .sort-wrap { display: inline-flex; align-items: center; gap: 5px; }
@@ -152,6 +162,8 @@ function fmtDate($d) {
         .show-sort { display:block !important; }
 
         .no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 15px; }
+        
+        .error-border { border: 2px solid #dc2626 !important; }
 
         @media (max-width: 600px) {
             .page { padding: 12px; }
@@ -174,14 +186,30 @@ function fmtDate($d) {
 </div>
 
 <div class="page">
-    <div class="stats-bar">
+    <div class="stats-bar" style="align-items: flex-end;">
+        
         <div class="stat">
             <div class="stat-label">Total Logs</div>
             <div class="stat-value"><?= $total_records ?></div>
         </div>
-        <div class="stat green">
-            <div class="stat-label">Total Hours</div>
-            <div class="stat-value"><?= $total_h ?>h <?= $total_m ?>m</div>
+
+        <div style="flex: 1; min-width: 130px; display: flex; flex-direction: column; gap: 12px;">
+    
+            <form id="month-form" method="GET" style="margin: 0 1px 0 0; align-self: flex-end; width: 180px; height: 38px;">
+                <div style="position: relative; width: 100%; height: 100%; display: flex;">
+                    <input type="text" id="month-display" placeholder="ALL MONTHS" autocomplete="off" style="flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background-color: #fff; color: #333; box-sizing: border-box; z-index: 1;">
+                    <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; z-index: 5;">
+                        <span style="position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none;">📅</span>
+                        <input type="month" name="month" id="month-filter" value="<?= htmlspecialchars($filter_month) ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;" onchange="syncMonth()">
+                    </div>
+                </div>
+            </form>
+
+            <div class="stat green" style="width: 100%; margin: 0;">
+                <div class="stat-label">Total Hours</div>
+                <div class="stat-value"><?= $total_h ?>h <?= $total_m ?>m</div>
+            </div>
+            
         </div>
     </div>
 
@@ -215,12 +243,12 @@ function fmtDate($d) {
         </div>
 
         <form id="date-form" method="GET" style="margin: 0; display: flex; flex: 1; min-width: 140px; height: 38px;">
-            <div style="position: relative; width: 100%; height: 100%; display: flex;">
-                <input type="text" id="date-display" placeholder="ALL TIME" readonly style="flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background-color: #fff; cursor: pointer; color: #333; box-sizing: border-box;">
-                <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;" onclick="document.getElementById('date-filter').showPicker()">
-                    📅
+            <div style="position: relative; width: 100%; height: 38px; display: flex;">
+                <input type="text" id="date-display" placeholder="DD MMM YYYY" autocomplete="off" style="flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background-color: #fff; color: #333; box-sizing: border-box; z-index: 1;">
+                <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; z-index: 5;">
+                    <span style="position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none;">📅</span>
+                    <input type="date" name="date" id="date-filter" value="<?= htmlspecialchars($filter_date) ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;" onchange="syncDate()">
                 </div>
-                <input type="date" name="date" id="date-filter" value="<?= htmlspecialchars($filter_date) ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" onchange="document.getElementById('date-form').submit();">
             </div>
         </form>
 
@@ -263,7 +291,7 @@ function fmtDate($d) {
                     </th>
                     <th style="width: 12%;">End Date</th>
                     <th style="width: 10%;">Duration</th>
-                    <th style="width: 110px;">Actions</th>
+                    <th style="width: 120px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -297,8 +325,10 @@ function fmtDate($d) {
                         <span class="dur-badge <?= $is_multiday ? 'multiday' : '' ?>"><?= $dur_text ?></span>
                     </td>
                     <td>
-                        <a href="edit.php?edit=<?= $row['id'] ?>" class="btn-edit">Edit</a>
-                        <a href="index.php?delete=<?= $row['id'] ?>" class="btn-delete" onclick="return confirm('Delete this record?')">Delete</a>
+                        <div style="display: flex; gap: 8px;">
+                            <a href="edit.php?edit=<?= $row['id'] ?>" class="btn-edit">Edit</a>
+                            <a href="index.php?delete=<?= $row['id'] ?>" class="btn-delete" onclick="return confirm('Delete this record?')">Delete</a>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -310,21 +340,6 @@ function fmtDate($d) {
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const val = document.getElementById('date-filter').value;
-    const display = document.getElementById('date-display');
-    if (val) {
-        const parts = val.split('-');
-        if (parts.length === 3) {
-            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-            display.value = parts[2] + '-' + months[parseInt(parts[1], 10) - 1] + '-' + parts[0];
-        }
-    } else {
-        display.value = "";
-        display.placeholder = "ALL TIME";
-    }
-});
-
 let origRows = null;
 let activeProjFilter = '';
 
@@ -334,6 +349,7 @@ function toggleSel() {
     wrap.classList.toggle('open', !isOpen);
     if (!isOpen) document.getElementById('proj-inner').focus();
 }
+
 function filterSel() {
     const val = document.getElementById('proj-inner').value.toLowerCase();
     document.querySelectorAll('#proj-list .sel-item').forEach(item => {
@@ -341,6 +357,7 @@ function filterSel() {
         item.classList.toggle('hidden', !!val && !(item.dataset.kw||'').includes(val));
     });
 }
+
 function pickProj(el, value, label) {
     activeProjFilter = value;
     document.getElementById('proj-label').textContent = label;
@@ -351,8 +368,12 @@ function pickProj(el, value, label) {
     filterSel();
     doFilter();
 }
+
 document.addEventListener('click', e => {
-    if (!e.target.closest('#proj-wrap')) document.getElementById('proj-wrap').classList.remove('open');
+    if (!e.target.closest('#proj-wrap')) {
+        const pwrap = document.getElementById('proj-wrap');
+        if(pwrap) pwrap.classList.remove('open');
+    }
 });
 
 function doFilter() {
@@ -360,8 +381,7 @@ function doFilter() {
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
         const rowPid  = tr.dataset.pid  || '';
         const rowText = tr.textContent.toLowerCase();
-        const ok = (!txt  || rowText.includes(txt))
-                && (!activeProjFilter || rowPid === activeProjFilter);
+        const ok = (!txt  || rowText.includes(txt)) && (!activeProjFilter || rowPid === activeProjFilter);
         tr.classList.toggle('is-hidden', !ok);
     });
 }
@@ -373,7 +393,7 @@ function clearFilters() {
     document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
     document.querySelector('#proj-list .sel-item[data-value=""]').classList.add('active');
     
-    if (document.getElementById('date-filter').value !== '') {
+    if (document.getElementById('date-filter').value !== '' || document.getElementById('month-filter').value !== '') {
         window.location.href = 'index.php';
     } else {
         doFilter();
@@ -391,10 +411,12 @@ function toggleSort(e, id) {
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id !== id) m.classList.remove('show-sort'); });
     document.getElementById(id).classList.toggle('show-sort');
 }
+
 window.addEventListener('click', () => document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')));
 
 function sortTable(col, type, dir) {
     const tbody = document.querySelector('#main-table tbody');
+    if (!tbody) return;
     const rows = Array.from(tbody.querySelectorAll('tr'));
     if (!origRows) origRows = [...rows];
     if (dir === 0) { origRows.forEach(r => tbody.appendChild(r)); return; }
@@ -411,6 +433,203 @@ function sortTable(col, type, dir) {
     });
     rows.forEach(r => tbody.appendChild(r));
 }
+
+function parseMonthInput(str) {
+    str = str.trim();
+    if (!str) return '';
+    let m, y;
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    
+    let textMatch = str.match(/^([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
+    if (textMatch) {
+        let mStr = textMatch[1].toUpperCase().substring(0, 3);
+        m = months.indexOf(mStr) + 1;
+        if (m === 0) return '';
+        y = parseInt(textMatch[2], 10);
+    } else {
+        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{2,4})$/);
+        if (numMatch) {
+            m = parseInt(numMatch[1], 10);
+            y = parseInt(numMatch[2], 10);
+        } else {
+            let digitMatch = str.match(/^(\d{2})(\d{4})$/);
+            if (digitMatch) {
+                m = parseInt(digitMatch[1], 10);
+                y = parseInt(digitMatch[2], 10);
+            } else {
+                let shortMatch = str.match(/^(\d{2})(\d{2})$/);
+                if (shortMatch) {
+                    m = parseInt(shortMatch[1], 10);
+                    y = parseInt(shortMatch[2], 10);
+                } else {
+                    return '';
+                }
+            }
+        }
+    }
+    if (y < 100) y += 2000;
+    if (m < 1 || m > 12) return '';
+    let mmStr = m < 10 ? '0' + m : m;
+    return y + '-' + mmStr;
+}
+
+function parseDateInput(str) {
+    str = str.trim();
+    if (!str) return '';
+    let d, m, y;
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
+    if (textMatch) {
+        d = parseInt(textMatch[1], 10);
+        let mStr = textMatch[2].toUpperCase().substring(0, 3);
+        m = months.indexOf(mStr) + 1;
+        if (m === 0) return '';
+        y = parseInt(textMatch[3], 10);
+    } else {
+        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
+        if (numMatch) {
+            d = parseInt(numMatch[1], 10);
+            m = parseInt(numMatch[2], 10);
+            y = parseInt(numMatch[3], 10);
+        } else {
+            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
+            if (digitMatch) {
+                d = parseInt(digitMatch[1], 10);
+                m = parseInt(digitMatch[2], 10);
+                y = parseInt(digitMatch[3], 10);
+            } else {
+                return '';
+            }
+        }
+    }
+    if (y < 100) y += 2000;
+    if (m < 1 || m > 12) return '';
+    let daysInMonth = new Date(y, m, 0).getDate();
+    if (d < 1 || d > daysInMonth) return '';
+    let mmStr = m < 10 ? '0' + m : m;
+    let ddStr = d < 10 ? '0' + d : d;
+    return y + '-' + mmStr + '-' + ddStr;
+}
+
+function formatMonthDisplay(val) {
+    if (!val) return '';
+    const parts = val.split('-');
+    if (parts.length === 2) {
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        return months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+    }
+    return '';
+}
+
+function formatDateDisplay(val) {
+    if (!val) return '';
+    const parts = val.split('-');
+    if (parts.length === 3) {
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        let d = parseInt(parts[2], 10);
+        let m = parseInt(parts[1], 10);
+        return d + ' ' + months[m - 1] + ' ' + parts[0];
+    }
+    return '';
+}
+
+function submitMonth(val) {
+    if (val) {
+        window.location.href = 'index.php?month=' + val;
+    } else {
+        window.location.href = 'index.php';
+    }
+}
+
+function submitDate(val) {
+    if (val) {
+        window.location.href = 'index.php?date=' + val;
+    } else {
+        window.location.href = 'index.php';
+    }
+}
+
+const mDisp = document.getElementById('month-display');
+const mFilt = document.getElementById('month-filter');
+const dDisp = document.getElementById('date-display');
+const dFilt = document.getElementById('date-filter');
+
+mDisp.addEventListener('blur', function() {
+    if (!this.value.trim()) {
+        if (mFilt.value) submitMonth(''); 
+        return;
+    }
+    const p = parseMonthInput(this.value);
+    if (p) {
+        this.classList.remove('error-border');
+        if (p !== mFilt.value) {
+            submitMonth(p);
+        } else {
+            this.value = formatMonthDisplay(p);
+        }
+    } else {
+        this.classList.add('error-border');
+    }
+});
+mDisp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+});
+mDisp.addEventListener('input', function(e) {
+    if (e.inputType === 'deleteContentBackward') return;
+    let v = this.value;
+    if (/^\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{6}$/.test(v)) this.value = v.substring(0,2) + '-' + v.substring(2,6);
+});
+
+dDisp.addEventListener('blur', function() {
+    if (!this.value.trim()) {
+        this.placeholder = "DD MMM YYYY";
+        if (dFilt.value) submitDate('');
+        return;
+    }
+    const p = parseDateInput(this.value);
+    if (p) {
+        this.classList.remove('error-border');
+        if (p !== dFilt.value) {
+            submitDate(p);
+        } else {
+            this.value = formatDateDisplay(p);
+        }
+    } else {
+        this.classList.add('error-border');
+    }
+});
+dDisp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+});
+dDisp.addEventListener('input', function(e) {
+    if (e.inputType === 'deleteContentBackward') return;
+    let v = this.value;
+    if (/^\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
+    if (/^\d{8}$/.test(v)) {
+        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
+    }
+});
+
+function syncMonth() {
+    if (mFilt.value) submitMonth(mFilt.value);
+}
+
+function syncDate() {
+    if (dFilt.value) submitDate(dFilt.value);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    if (mFilt.value) {
+        mDisp.value = formatMonthDisplay(mFilt.value);
+    }
+    if (dFilt.value) {
+        dDisp.value = formatDateDisplay(dFilt.value);
+    } else {
+        dDisp.placeholder = "DD MMM YYYY";
+    }
+});
 </script>
 </body>
 </html>
