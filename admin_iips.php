@@ -41,7 +41,8 @@ $result = $conn->query("
         i.target_billing_date,
         NULLIF(i.iips_status, 'Not Quoted')    AS iips_status,
         NULLIF(i.billing_status, 'Not Forecasted') AS billing_status,
-        i.account_manager, i.account_leader, i.presales_sdm, i.project_manager
+        i.account_manager, i.account_leader, i.presales_sdm, i.project_manager,
+        i.partner
     FROM projects p
     LEFT JOIN iips_tracking i ON p.project_id = i.project_id
     ORDER BY p.project_id ASC
@@ -90,7 +91,7 @@ function fmtMins($m) {
     if (!$m) return '-';
     $h = floor($m/60); $r = $m%60;
     $days = round($m/480, 1);
-    return $h.'h '.$r.'m ('.$days.' days)';
+    return $h.'h '.$r.'m';
 }
 ?>
 <!DOCTYPE html>
@@ -146,6 +147,7 @@ function fmtMins($m) {
     .s-status  { background: #6a1b4d; }
     .s-res     { background: #4a235a; }
     .s-act     { background: #343a40; width: 90px; }
+    th.s-act-col, td.s-act-col { background: white; white-space: nowrap; }
 
     /* Column tints */
     .bg-manual   { background: #fffbf0; }
@@ -235,8 +237,7 @@ function fmtMins($m) {
                 <th class="s-timeline" colspan="3">Timeline — Target</th>
                 <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
                 <th class="s-status"   colspan="3">Status</th>
-                <th class="s-res"      colspan="4">IIPS Management</th>
-                <th class="s-act" rowspan="2">Actions</th>
+                <th class="s-res"      colspan="7">IIPS Management</th>
             </tr>
             <!-- Column header row -->
             <tr>
@@ -274,11 +275,14 @@ function fmtMins($m) {
                 <th>Account Leader</th>
                 <th>Pre-Sales / SDM</th>
                 <th>IIPS Manager</th>
+                <th>Partner</th>
+                <th>Engineers</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
         <?php if (empty($rows)): ?>
-            <tr><td colspan="21" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "Create IIPS" to add one.</td></tr>
+            <tr><td colspan="24" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "Create IIPS" to add one.</td></tr>
         <?php else: foreach ($rows as $r):
             $pid_display = fmtPid($r['project_id']);
             $gp  = floatval($r['gross_profit'] ?? 0);
@@ -321,11 +325,11 @@ function fmtMins($m) {
             <td class="bg-manual"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></td>
             <!-- Actual from timesheet -->
             <td class="bg-auto"><span class="auto-val"><?= $r['ts_start'] ? fmtDate($r['ts_start']) : '<span class="dash">—</span>' ?></span></td>
-            <td class="bg-auto"><span class="auto-val"><?= $r['ts_end']   ? fmtDate($r['ts_end'])   : '<span class="dash">—</span>' ?></span></td>
+            <td class="bg-auto"><span class="auto-val"><?= ($r['ts_end'] && $r['iips_status'] === 'Completed') ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?></span></td>
             <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
             <!-- Status -->
             <td class="bg-dropdown">
-                <?php if (!empty($r['iips_status']) && $r['iips_status'] !== 'Not Quoted'): ?>
+                <?php if (!empty($r['iips_status']) && $r['iips_status'] === 'Completed'): ?>
                     <span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status']) ?></span>
                 <?php else: ?><span class="dash">—</span><?php endif; ?>
             </td>
@@ -339,9 +343,17 @@ function fmtMins($m) {
             <td><?= $r['account_manager'] ? htmlspecialchars($r['account_manager']) : '<span class="dash">—</span>' ?></td>
             <td><?= $r['account_leader']  ? htmlspecialchars($r['account_leader'])  : '<span class="dash">—</span>' ?></td>
             <td><?= $r['presales_sdm']    ? htmlspecialchars($r['presales_sdm'])    : '<span class="dash">—</span>' ?></td>
-            <td><?= $pm_display           ? htmlspecialchars($pm_display)            : '<span class="dash">—</span>' ?></td>
+            <td style="color:#4a235a;font-weight:600;"><?= $r['project_manager'] ? htmlspecialchars($r['project_manager']) : '<span class="dash">—</span>' ?></td>
+            <td><?= !empty($r['partner']) ? htmlspecialchars($r['partner']) : '<span class="dash">—</span>' ?></td>
+            <td style="font-size:12px;">
+                <?php if (!empty($r['ts_engineers'])): ?>
+                    <?php foreach(explode(', ', $r['ts_engineers']) as $eng): ?>
+                        <div style="white-space:nowrap;">• <?= htmlspecialchars(trim($eng)) ?></div>
+                    <?php endforeach; ?>
+                <?php else: ?><span class="dash">—</span><?php endif; ?>
+            </td>
             <!-- Actions -->
-            <td>
+            <td class="s-act-col">
                 <a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a>
                 <a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del"
                    onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a>
