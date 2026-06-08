@@ -136,26 +136,8 @@ sort($actual_end_years);
     .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 0; }
 
     /* Sticky scrollbar wrapper */
-    .tbl-outer { position: relative; }
-    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-    .tbl-wrap::-webkit-scrollbar { display: none; }
-
-    /* Make the scrollbar stick to bottom of viewport */
-    .sticky-scroll-wrap {
-        position: sticky;
-        bottom: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        background: white;
-        z-index: 50;
-        border-top: 1px solid #e5e7eb;
-        box-shadow: 0 -2px 6px rgba(0,0,0,0.06);
-    }
-    .sticky-scroll-wrap::-webkit-scrollbar { height: 10px; }
-    .sticky-scroll-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
-    .sticky-scroll-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
-    .sticky-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    .sticky-scroll-inner { height: 1px; }
+    
+    /* Horizontal scroll handled by tbl-wrap */
 
     .filter-bar { background: white; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .filter-bar-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
@@ -180,13 +162,24 @@ sort($actual_end_years);
 
     .alert-err { background:#f8d7da; color:#721c24; padding:12px; border-radius:4px; margin-bottom:15px; border:1px solid #f5c6cb; font-size:13px; }
 
-    /* Table */
+    /* Sticky header */
+    
+    .tbl-outer { position: relative; }
+    .tbl-wrap {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 70vh;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
+    .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
+    .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
+    .tbl-wrap::-webkit-scrollbar-thumb:hover { background: #64748b; }
     table { width: 100%; border-collapse: collapse; min-width: 1800px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
-    th { background: #f8f9fa; font-weight: bold; color: #495057; white-space: nowrap; }
+    th { font-weight: bold; color: #495057; background: #f8f9fa; }
     tbody tr:hover { background: #f8faff; }
 
-    /* Section header rows */
     .sec-row th {
         text-align: center;
         font-size: 10px;
@@ -196,6 +189,16 @@ sort($actual_end_years);
         padding: 5px 8px;
         color: white;
         border: 1px solid rgba(255,255,255,0.15);
+        position: sticky;
+        top: 0;
+        z-index: 22;
+    }
+    thead tr:last-child th {
+        position: sticky;
+        top: 27px; /* updated by JS */
+        z-index: 21;
+        background: #f8f9fa;
+        box-shadow: 0 2px 0 #dee2e6;
     }
     .s-base    { background: #343a40; }
     .s-costing { background: #155724; }
@@ -283,7 +286,7 @@ sort($actual_end_years);
         <div class="filter-date-row">
             <label>Actual Start:</label>
             <div style="position:relative;height:34px;display:flex;min-width:150px;">
-                <input type="text" id="filter-actual-start-display" placeholder="DD MMMYYYY"
+                <input type="text" id="filter-actual-start-display" placeholder="DD MMM YYYY"
                        style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
                        oninput="this.value=this.value.toUpperCase()"
                        onblur="parseFilerDate('start')" onkeydown="if(event.key==='Enter'){this.blur()}"
@@ -304,16 +307,41 @@ sort($actual_end_years);
             <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear</button>
         </div>
         <div class="filter-cats">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Filter by:</span>
-            <label><input type="checkbox" value="iips_status"      onchange="applyFilters()"> IIPS Status</label>
-            <label><input type="checkbox" value="billing_status"   onchange="applyFilters()"> Billing Status</label>
-            <label><input type="checkbox" value="has_pm"           onchange="applyFilters()"> Project Mgmt: Yes</label>
-            <label><input type="checkbox" value="has_data"         onchange="applyFilters()"> Has Timesheet Data</label>
-            <label><input type="checkbox" value="no_data"          onchange="applyFilters()"> No Timesheet Data</label>
-            <label><input type="checkbox" value="completed"        onchange="applyFilters()"> IIPS Completed</label>
-            <label><input type="checkbox" value="in_progress"      onchange="applyFilters()"> In Progress</label>
-            <label><input type="checkbox" value="billing_pending"  onchange="applyFilters()"> Billing Pending</label>
-            <label><input type="checkbox" value="billing_done"     onchange="applyFilters()"> Billing Completed</label>
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">IIPS Status:</span>
+            <label><input type="checkbox" value="not_quoted"   onchange="applyFilters()"> Not Quoted</label>
+            <label><input type="checkbox" value="quoted"       onchange="applyFilters()"> Quoted</label>
+            <label><input type="checkbox" value="not_started"  onchange="applyFilters()"> Not Started</label>
+            <label><input type="checkbox" value="in_progress"  onchange="applyFilters()"> In Progress</label>
+            <label><input type="checkbox" value="completed"    onchange="applyFilters()"> Completed</label>
+            <label><input type="checkbox" value="cancelled"    onchange="applyFilters()"> Cancelled</label>
+        </div>
+        <div class="filter-cats" style="margin-top:6px;">
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Billing Status:</span>
+            <label><input type="checkbox" value="billing_nf"     onchange="applyFilters()"> Not Forecasted</label>
+            <label><input type="checkbox" value="billing_fc"     onchange="applyFilters()"> Forecasted</label>
+            <label><input type="checkbox" value="billing_pending" onchange="applyFilters()"> Pending</label>
+            <label><input type="checkbox" value="billing_done"   onchange="applyFilters()"> Billing Completed</label>
+        </div>
+        <div class="filter-cats" style="margin-top:6px;">
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timesheet:</span>
+            <label><input type="checkbox" value="has_data"  onchange="applyFilters()"> Has Timesheet Data</label>
+            <label><input type="checkbox" value="no_data"   onchange="applyFilters()"> No Timesheet Data</label>
+        </div>
+        <div class="filter-cats" style="margin-top:6px;">
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Costing:</span>
+            <label><input type="checkbox" value="has_selling"  onchange="applyFilters()"> Has Selling Price</label>
+            <label><input type="checkbox" value="has_gp"       onchange="applyFilters()"> Positive GP</label>
+        </div>
+        <div class="filter-cats" style="margin-top:6px;">
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timeline:</span>
+            <label><input type="checkbox" value="has_target"   onchange="applyFilters()"> Has Target Dates</label>
+            <label><input type="checkbox" value="has_mandays"  onchange="applyFilters()"> Has Target Man-Days</label>
+        </div>
+        <div class="filter-cats" style="margin-top:6px;">
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Resources:</span>
+            <label><input type="checkbox" value="has_pm"       onchange="applyFilters()"> Project Mgmt: Yes</label>
+            <label><input type="checkbox" value="has_acc_mgr"  onchange="applyFilters()"> Has Account Manager</label>
+            <label><input type="checkbox" value="has_partner"  onchange="applyFilters()"> Has Partner</label>
         </div>
     </div>
 
@@ -443,7 +471,19 @@ sort($actual_end_years);
                 data-tsd-year="<?= $r['target_start_date']   ? date('Y', strtotime($r['target_start_date']))   : '' ?>"
                 data-ted-year="<?= $r['target_end_date']     ? date('Y', strtotime($r['target_end_date']))     : '' ?>"
                 data-asd-year="<?= $r['ts_start']            ? date('Y', strtotime($r['ts_start']))            : '' ?>"
-                data-aed-year="<?= $r['ts_end']              ? date('Y', strtotime($r['ts_end']))              : '' ?>">
+                data-aed-year="<?= $r['ts_end']              ? date('Y', strtotime($r['ts_end']))              : '' ?>"
+                data-has-selling="<?= ($r['selling_price'] !== null && $r['selling_price'] > 0) ? '1' : '0' ?>"
+                data-has-target="<?= (!empty($r['target_start_date']) || !empty($r['target_end_date'])) ? '1' : '0' ?>"
+                data-has-gp="<?= ($r['gross_profit'] !== null && floatval($r['gross_profit']) > 0) ? '1' : '0' ?>"
+                data-has-acc-mgr="<?= !empty($r['account_manager']) ? '1' : '0' ?>"
+                data-has-partner="<?= !empty($r['partner']) ? '1' : '0' ?>"
+                data-has-mandays="<?= (!empty($r['target_mandays']) && $r['target_mandays'] > 0) ? '1' : '0' ?>"
+                data-not-quoted="<?= ($r['iips_status'] ?? '') === 'Not Quoted' ? '1' : '0' ?>"
+                data-cancelled="<?= ($r['iips_status'] ?? '') === 'Cancelled' ? '1' : '0' ?>"
+                data-not-started="<?= ($r['iips_status'] ?? '') === 'Not Started' ? '1' : '0' ?>"
+                data-quoted="<?= ($r['iips_status'] ?? '') === 'Quoted' ? '1' : '0' ?>"
+                data-billing-fc="<?= ($r['billing_status'] ?? '') === 'Forecasted' ? '1' : '0' ?>"
+                data-billing-nf="<?= ($r['billing_status'] ?? '') === 'Not Forecasted' ? '1' : '0' ?>">
                 <td><code style="font-size:12px;"><?= $pid_display ?></code></td>
                 <td><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
                 <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
@@ -516,46 +556,23 @@ sort($actual_end_years);
             <?php endforeach; endif; ?>
             </tbody>
         </table>
-        </div><!-- end tbl-wrap -->
-
-        <!-- Sticky bottom scrollbar -->
-        <div class="sticky-scroll-wrap" id="sticky-scroll">
-            <div class="sticky-scroll-inner" id="sticky-scroll-inner"></div>
-        </div>
+    </div><!-- end tbl-wrap -->
     </div><!-- end tbl-outer -->
     </div><!-- end card -->
 </div>
 
 <script>
-// ── Sticky scrollbar sync ─────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', function() {
-    const wrap   = document.getElementById('tbl-wrap');
-    const sticky = document.getElementById('sticky-scroll');
-    const inner  = document.getElementById('sticky-scroll-inner');
-    const tbl    = wrap ? wrap.querySelector('table') : null;
-
-    function setWidth() {
-        if (tbl && inner) inner.style.width = tbl.scrollWidth + 'px';
+// ── Sticky header exact offset ────────────────────────────────────────────────
+function fixStickyHeaders() {
+    const secRow = document.querySelector('#main-table thead tr.sec-row');
+    const colRow = document.querySelector('#main-table thead tr:last-child');
+    if (secRow && colRow) {
+        const h = secRow.getBoundingClientRect().height;
+        colRow.querySelectorAll('th').forEach(th => th.style.top = h + 'px');
     }
-    setWidth();
-    window.addEventListener('resize', setWidth);
-
-    if (wrap && sticky) {
-        let syncing = false;
-        wrap.addEventListener('scroll', function() {
-            if (syncing) return;
-            syncing = true;
-            sticky.scrollLeft = wrap.scrollLeft;
-            syncing = false;
-        });
-        sticky.addEventListener('scroll', function() {
-            if (syncing) return;
-            syncing = true;
-            wrap.scrollLeft = sticky.scrollLeft;
-            syncing = false;
-        });
-    }
-});
+}
+window.addEventListener('DOMContentLoaded', fixStickyHeaders);
+window.addEventListener('resize', fixStickyHeaders);
 
 // ── Search ────────────────────────────────────────────────────────────────────
 document.getElementById('search-input').addEventListener('input', applyFilters);
@@ -566,34 +583,72 @@ function applyFilters() {
     const actEnd   = document.getElementById('filter-actual-end-hidden').value;
     const checks   = Array.from(document.querySelectorAll('.filter-cats input[type="checkbox"]:checked')).map(c => c.value);
 
+    // Group checkboxes by category for AND-between / OR-within logic
+    // Exception: within Resources, has_pm/has_acc_mgr/has_partner are each independent AND conditions
+    const groups = {
+        iips_status: ['not_quoted','quoted','not_started','in_progress','completed','cancelled'],
+        billing:     ['billing_nf','billing_fc','billing_pending','billing_done'],
+        timesheet:   ['has_data','no_data'],
+        costing:     ['has_selling','has_gp','gp_neg'],
+        timeline:    ['has_target','has_mandays'],
+    };
+
+    // Which groups have at least one checked box?
+    const activeGroups = {};
+    Object.entries(groups).forEach(([grp, vals]) => {
+        const active = vals.filter(v => checks.includes(v));
+        if (active.length > 0) activeGroups[grp] = active;
+    });
+
+    // Resource filters — each one is its own AND condition
+    const resFilters = ['has_pm','has_acc_mgr','has_partner'].filter(v => checks.includes(v));
+
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
+        const d       = tr.dataset;
         const text    = tr.textContent.toLowerCase();
-        const iipsSt  = (tr.dataset.iipsStatus   || '').toLowerCase();
-        const billSt  = (tr.dataset.billingStatus || '').toLowerCase();
-        const hasPm   = tr.dataset.hasPm  === '1';
-        const hasTs   = tr.dataset.hasTs  === '1';
-        const tsStart = tr.dataset.tsStart || '';
-        const tsEnd   = tr.dataset.tsEnd   || '';
+        const tsStart = d.tsStart || '';
+        const tsEnd   = d.tsEnd   || '';
 
         let ok = true;
-        if (txt && !text.includes(txt)) ok = false;
-        if (actStart && tsStart < actStart) ok = false;
-        if (actEnd   && tsEnd   > actEnd)   ok = false;
+        if (txt      && !text.includes(txt))    ok = false;
+        if (actStart && tsStart < actStart)      ok = false;
+        if (actEnd   && tsEnd   > actEnd)        ok = false;
 
-        if (checks.length > 0) {
-            let matchAny = false;
-            checks.forEach(chk => {
-                if (chk === 'has_pm'         && hasPm)                          matchAny = true;
-                if (chk === 'has_data'       && hasTs)                          matchAny = true;
-                if (chk === 'no_data'        && !hasTs)                         matchAny = true;
-                if (chk === 'completed'      && iipsSt === 'completed')         matchAny = true;
-                if (chk === 'in_progress'    && iipsSt === 'in progress')       matchAny = true;
-                if (chk === 'iips_status'    && iipsSt !== '')                  matchAny = true;
-                if (chk === 'billing_status' && billSt !== '')                  matchAny = true;
-                if (chk === 'billing_pending'&& billSt === 'pending')           matchAny = true;
-                if (chk === 'billing_done'   && billSt === 'completed')         matchAny = true;
+        // For each active group, row must match AT LEAST ONE checked item (OR within group)
+        // All active groups must be satisfied (AND between groups)
+        if (ok && Object.keys(activeGroups).length > 0) {
+            Object.entries(activeGroups).forEach(([grp, active]) => {
+                let groupMatch = false;
+                active.forEach(chk => {
+                    if (chk === 'not_quoted'     && d.notQuoted    === '1') groupMatch = true;
+                    if (chk === 'quoted'         && d.quoted       === '1') groupMatch = true;
+                    if (chk === 'not_started'    && d.notStarted   === '1') groupMatch = true;
+                    if (chk === 'in_progress'    && (d.iipsStatus||'').toLowerCase() === 'in progress')  groupMatch = true;
+                    if (chk === 'completed'      && (d.iipsStatus||'').toLowerCase() === 'completed')    groupMatch = true;
+                    if (chk === 'cancelled'      && d.cancelled    === '1') groupMatch = true;
+                    if (chk === 'billing_nf'     && d.billingNf    === '1') groupMatch = true;
+                    if (chk === 'billing_fc'     && d.billingFc    === '1') groupMatch = true;
+                    if (chk === 'billing_pending'&& (d.billingStatus||'').toLowerCase() === 'pending')   groupMatch = true;
+                    if (chk === 'billing_done'   && (d.billingStatus||'').toLowerCase() === 'completed') groupMatch = true;
+                    if (chk === 'has_data'       && d.hasTs        === '1') groupMatch = true;
+                    if (chk === 'no_data'        && d.hasTs        === '0') groupMatch = true;
+                    if (chk === 'has_selling'    && d.hasSelling   === '1') groupMatch = true;
+                    if (chk === 'has_gp'         && d.hasGp        === '1') groupMatch = true;
+                    if (chk === 'gp_neg'         && d.gpNeg        === '1') groupMatch = true;
+                    if (chk === 'has_target'     && d.hasTarget    === '1') groupMatch = true;
+                    if (chk === 'has_mandays'    && d.hasMandays   === '1') groupMatch = true;
+                });
+                if (!groupMatch) ok = false;
             });
-            if (!matchAny) ok = false;
+        }
+
+        // Apply resource AND filters independently
+        if (ok && resFilters.length > 0) {
+            resFilters.forEach(chk => {
+                if (chk === 'has_pm'      && d.hasPm      !== '1') ok = false;
+                if (chk === 'has_acc_mgr' && d.hasAccMgr  !== '1') ok = false;
+                if (chk === 'has_partner' && d.hasPartner !== '1') ok = false;
+            });
         }
 
         tr.classList.toggle('is-hidden', !ok);

@@ -267,9 +267,23 @@ tbody tr:hover { background: #f8faff; }
 
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">Start:</span>
-            <input type="date" id="date-start" onchange="doFilter()" style="height:38px;padding:0 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+            <div style="position:relative;height:38px;display:flex;min-width:150px;">
+                <input type="text" id="date-start-display" placeholder="DD MMM YYYY" autocomplete="off"
+                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+                       oninput="this.value=this.value.toUpperCase()"
+                       onblur="parseTsDate('start')" onkeydown="if(event.key==='Enter')this.blur()">
+                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('date-start').showPicker()">📅</div>
+                <input type="date" id="date-start" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncTsDate('start')">
+            </div>
             <span style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">to End:</span>
-            <input type="date" id="date-end" onchange="doFilter()" style="height:38px;padding:0 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+            <div style="position:relative;height:38px;display:flex;min-width:150px;">
+                <input type="text" id="date-end-display" placeholder="DD MMM YYYY" autocomplete="off"
+                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+                       oninput="this.value=this.value.toUpperCase()"
+                       onblur="parseTsDate('end')" onkeydown="if(event.key==='Enter')this.blur()">
+                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('date-end').showPicker()">📅</div>
+                <input type="date" id="date-end" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncTsDate('end')">
+            </div>
         </div>
         <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
@@ -436,6 +450,47 @@ let activeProjFilter = '';
 let activeEngFilter  = '';
 let origRows = null;
 
+// ── DD-MMM-YYYY date helpers ──────────────────────────────────────────────────
+const TS_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function syncTsDate(type) {
+    const hidden  = document.getElementById('date-' + type);
+    const display = document.getElementById('date-' + type + '-display');
+    if (hidden.value) {
+        const p = hidden.value.split('-');
+        display.value = p[2] + '-' + TS_MONTHS_SHORT[parseInt(p[1],10)-1].toUpperCase() + '-' + p[0];
+    } else {
+        display.value = '';
+    }
+    doFilter();
+}
+
+function parseTsDate(type) {
+    const display = document.getElementById('date-' + type + '-display');
+    const hidden  = document.getElementById('date-' + type);
+    const str = display.value.trim().toUpperCase();
+    if (!str) { hidden.value = ''; doFilter(); return; }
+    const parts = str.split(/[\-\/\. ]+/);
+    if (parts.length === 3) {
+        let d = parts[0].padStart(2,'0');
+        let m = parts[1];
+        let y = parts[2].length === 2 ? '20'+parts[2] : parts[2];
+        if (isNaN(m)) {
+            const mIdx = TS_MONTHS_SHORT.findIndex(x => x.toUpperCase().startsWith(m.substring(0,3)));
+            if (mIdx !== -1) m = String(mIdx+1).padStart(2,'0');
+        } else {
+            m = String(parseInt(m)).padStart(2,'0');
+        }
+        if (d.length===2 && m.length===2 && y.length===4) {
+            hidden.value = y+'-'+m+'-'+d;
+            syncTsDate(type);
+            return;
+        }
+    }
+    if (hidden.value) syncTsDate(type); else display.value = '';
+    doFilter();
+}
+
 // ── Searchable select ─────────────────────────────────────────────────────────
 function toggleSel(type) {
     const wrap = document.getElementById(type+'-wrap');
@@ -550,6 +605,8 @@ function clearAllFilters() {
     document.getElementById('txt-search').value  = '';
     document.getElementById('date-start').value  = '';
     document.getElementById('date-end').value    = '';
+    document.getElementById('date-start-display').value = '';
+    document.getElementById('date-end-display').value   = '';
     activeProjFilter = '';
     activeEngFilter  = '';
     document.getElementById('proj-label').textContent = 'All Projects';
