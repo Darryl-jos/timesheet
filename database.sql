@@ -39,6 +39,7 @@ CREATE TABLE timesheets (
     start_time TIME NOT NULL,
     end_date DATE NOT NULL,
     end_time TIME NOT NULL,
+    meal_breaks INT DEFAULT 0;
     work_description TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (engineer_id) REFERENCES engineers(id) ON DELETE CASCADE,

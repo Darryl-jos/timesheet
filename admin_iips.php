@@ -7,7 +7,6 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
 
 $error = "";
 
-// ── Delete IIPS row ───────────────────────────────────────────────────────────
 if (isset($_GET['delete_proj'])) {
     $del_id = $_GET['delete_proj'];
     $chk = $conn->prepare("SELECT COUNT(*) as total FROM timesheets WHERE project_id=?");
@@ -24,12 +23,10 @@ if (isset($_GET['delete_proj'])) {
     }
 }
 
-// ── Edit redirect ─────────────────────────────────────────────────────────────
 if (isset($_GET['edit_proj'])) {
     header("Location: create_iips.php?edit=".urlencode($_GET['edit_proj'])); exit;
 }
 
-// ── Fetch all projects joined with iips_tracking ──────────────────────────────
 $result = $conn->query("
     SELECT 
         p.*,
@@ -46,16 +43,17 @@ $result = $conn->query("
     ORDER BY p.project_id ASC
 ");
 
-// Pull timesheet data per project
 function getTimesheetData($conn, $project_id) {
     $stmt = $conn->prepare("
         SELECT
             MIN(start_date) AS actual_start,
             MAX(end_date)   AS actual_end,
-            SUM(TIMESTAMPDIFF(MINUTE,
-                CONCAT(start_date,' ',start_time),
-                CONCAT(end_date,' ',end_time)
-            )) AS total_minutes,
+            SUM(
+                GREATEST(0, TIMESTAMPDIFF(MINUTE,
+                    CONCAT(start_date,' ',start_time),
+                    CONCAT(end_date,' ',end_time)
+                ) - (COALESCE(meal_breaks, 0) * 60))
+            ) AS total_minutes,
             GROUP_CONCAT(DISTINCT engineer_name ORDER BY engineer_name SEPARATOR ', ') AS engineers
         FROM timesheets WHERE project_id=?
     ");
@@ -124,32 +122,18 @@ sort($actual_end_years);
 <title>IIPS List</title>
 <style>
     .is-hidden { display: none !important; }
-
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
-
     .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; color: white; flex-wrap: wrap; gap: 10px; }
     .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
-
     .page { padding: 20px; }
     .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 0; }
-
-    /* Sticky scrollbar wrapper */
-    
-    /* Horizontal scroll handled by tbl-wrap */
-
     .filter-bar { background: white; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .filter-bar-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
     .filter-bar-top input[type="text"] { flex: 1; min-width: 200px; height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-    .btn-create-iips {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: #28a745; color: white; text-decoration: none;
-        font-size: 13px; font-weight: 700; padding: 0 16px; height: 36px;
-        border-radius: 4px; white-space: nowrap; border: none; cursor: pointer;
-    }
+    .btn-create-iips { display: inline-flex; align-items: center; gap: 6px; background: #28a745; color: white; text-decoration: none; font-size: 13px; font-weight: 700; padding: 0 16px; height: 36px; border-radius: 4px; white-space: nowrap; border: none; cursor: pointer; }
     .btn-create-iips:hover { background: #218838; color: white; }
-
     .filter-date-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
     .filter-date-row label { font-size: 12px; font-weight: 600; color: #475569; white-space: nowrap; }
     .filter-date-row input[type="date"] { height: 34px; padding: 0 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
@@ -159,18 +143,9 @@ sort($actual_end_years);
     .filter-cats input[type="checkbox"] { width: 13px; height: 13px; cursor: pointer; }
     .filter-cats label.active-cat { background: #1d4ed8; color: white; border-color: #1d4ed8; }
     .btn-clear-filter { background: #6c757d; color: white; border: none; height: 34px; padding: 0 14px; border-radius: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-
     .alert-err { background:#f8d7da; color:#721c24; padding:12px; border-radius:4px; margin-bottom:15px; border:1px solid #f5c6cb; font-size:13px; }
-
-    /* Sticky header */
-    
     .tbl-outer { position: relative; }
-    .tbl-wrap {
-        overflow-x: auto;
-        overflow-y: auto;
-        max-height: 70vh;
-        -webkit-overflow-scrolling: touch;
-    }
+    .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
     .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
     .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
@@ -179,27 +154,8 @@ sort($actual_end_years);
     th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
     th { font-weight: bold; color: #495057; background: #f8f9fa; }
     tbody tr:hover { background: #f8faff; }
-
-    .sec-row th {
-        text-align: center;
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        padding: 5px 8px;
-        color: white;
-        border: 1px solid rgba(255,255,255,0.15);
-        position: sticky;
-        top: 0;
-        z-index: 22;
-    }
-    thead tr:last-child th {
-        position: sticky;
-        top: 27px; /* updated by JS */
-        z-index: 21;
-        background: #f8f9fa;
-        box-shadow: 0 2px 0 #dee2e6;
-    }
+    .sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); position: sticky; top: 0; z-index: 22; }
+    thead tr:last-child th { position: sticky; top: 27px; z-index: 21; background: #f8f9fa; box-shadow: 0 2px 0 #dee2e6; }
     .s-base    { background: #343a40; }
     .s-costing { background: #155724; }
     .s-timeline{ background: #1a237e; }
@@ -207,14 +163,10 @@ sort($actual_end_years);
     .s-status  { background: #6a1b4d; }
     .s-res     { background: #4a235a; }
     .s-act     { background: #343a40; width: 90px; }
-
-    /* Column tints */
     .bg-manual   { background: #fffbf0; }
     .bg-auto     { background: #f0fdf4; color: #065f46; }
     .bg-calc     { background: #eff6ff; }
     .bg-dropdown { background: #fdf4ff; }
-
-    /* Badges */
     .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
     .b-nq   { background:#f1f5f9; color:#475569; }
     .b-q    { background:#dbeafe; color:#1e40af; }
@@ -226,8 +178,6 @@ sort($actual_end_years);
     .b-fc   { background:#dbeafe; color:#1e40af; }
     .b-pend { background:#fef9c3; color:#854d0e; }
     .b-bdc  { background:#166534; color:white; }
-
-    /* PM toggle */
     .tog { display: inline-flex; align-items: center; gap: 5px; }
     .tog-track { width: 30px; height: 16px; background: #d1d5db; border-radius: 8px; position: relative; }
     .tog-track.on { background: #28a745; }
@@ -235,14 +185,11 @@ sort($actual_end_years);
     .tog-track.on .tog-thumb { transform: translateX(14px); }
     .tog-lbl { font-size: 11px; font-weight: 700; color: #6b7280; }
     .tog-lbl.yes { color: #166534; }
-
     td:last-child { white-space: nowrap; }
     .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; }
     .btn-del  { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; }
     .btn-edit:hover { background: #e0a800; }
     .btn-del:hover  { background: #c82333; }
-
-    /* Sort */
     .sort-wrap { display: inline-flex; align-items: center; gap: 4px; position: relative; }
     .sort-btn { background:none; border:none; width:13px; height:13px; cursor:pointer; position:relative; padding:0; }
     .sort-btn::before { content:""; position:absolute; top:1px; left:1px; border-left:4px solid transparent; border-right:4px solid transparent; border-bottom:4px solid #888; }
@@ -253,16 +200,9 @@ sort($actual_end_years);
     .sort-menu a { display:block; padding:7px 12px; font-size:12px; color:#333; text-decoration:none; }
     .sort-menu a:hover { background:#f8fafc; color:#007bff; }
     .show-sort { display:block !important; }
-
     .auto-val { font-size: 12px; color: #065f46; white-space: nowrap; }
     .dash { color: #9ca3af; }
-
-    @media (max-width: 768px) {
-        body { margin: 0; }
-        .page { padding: 10px; }
-        .header { padding: 10px; }
-        .card { padding: 12px; }
-    }
+    @media (max-width: 768px) { body { margin: 0; } .page { padding: 10px; } .header { padding: 10px; } .card { padding: 12px; } }
 </style>
 </head>
 <body>
@@ -277,7 +217,6 @@ sort($actual_end_years);
         <div class="alert-err">⚠️ <?= $error ?></div>
     <?php endif; ?>
 
-    <!-- Filter bar -->
     <div class="filter-bar">
         <div class="filter-bar-top">
             <input type="text" id="search-input" placeholder="🔍 Search IIPS ID, name, customer, manager, partner...">
@@ -350,7 +289,6 @@ sort($actual_end_years);
         <div class="tbl-wrap" id="tbl-wrap">
         <table id="main-table">
             <thead>
-                <!-- Section header row -->
                 <tr class="sec-row">
                     <th class="s-base"    colspan="3">IIPS Details</th>
                     <th class="s-costing" colspan="4">IIPS Costing</th>
@@ -360,77 +298,23 @@ sort($actual_end_years);
                     <th class="s-res"      colspan="6">Resources</th>
                     <th class="s-act" rowspan="2">Actions</th>
                 </tr>
-                <!-- Column header row -->
                 <tr>
-                    <th>
-                        <div class="sort-wrap">IIPS ID
-                            <button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button>
-                            <div id="s-pid" class="sort-menu">
-                                <a href="#" onclick="sortT(0,'alpha',0);return false;">Default</a>
-                                <a href="#" onclick="sortT(0,'alpha',1);return false;">A → Z</a>
-                                <a href="#" onclick="sortT(0,'alpha',2);return false;">Z → A</a>
-                            </div>
-                        </div>
-                    </th>
+                    <th><div class="sort-wrap">IIPS ID<button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(0,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(0,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(0,'alpha',2);return false;">Z → A</a></div></div></th>
                     <th><div class="sort-wrap">IIPS Name<button class="sort-btn" onclick="toggleSort(event,'s-name')"></button><div id="s-name" class="sort-menu"><a href="#" onclick="sortT(1,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(1,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(1,'alpha',2);return false;">Z → A</a></div></div></th>
                     <th><div class="sort-wrap">Customer Name<button class="sort-btn" onclick="toggleSort(event,'s-cust')"></button><div id="s-cust" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <!-- Costing -->
                     <th><div class="sort-wrap">Selling Price (RM)<button class="sort-btn" onclick="toggleSort(event,'s-sp')"></button><div id="s-sp" class="sort-menu"><a href="#" onclick="sortT(3,'num',0);return false;">Default</a><a href="#" onclick="sortT(3,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(3,'num',2);return false;">High → Low</a></div></div></th>
                     <th><div class="sort-wrap">Partner Cost (RM)<button class="sort-btn" onclick="toggleSort(event,'s-pc')"></button><div id="s-pc" class="sort-menu"><a href="#" onclick="sortT(4,'num',0);return false;">Default</a><a href="#" onclick="sortT(4,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(4,'num',2);return false;">High → Low</a></div></div></th>
                     <th><div class="sort-wrap">Gross Profit (RM)<button class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(5,'num',0);return false;">Default</a><a href="#" onclick="sortT(5,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(5,'num',2);return false;">High → Low</a></div></div></th>
                     <th><div class="sort-wrap">Project Mgmt<button class="sort-btn" onclick="toggleSort(event,'s-pm')"></button><div id="s-pm" class="sort-menu"><a href="#" onclick="filterCol('pm','');return false;">Default (All)</a><a href="#" onclick="filterCol('pm','1');return false;">Yes</a><a href="#" onclick="filterCol('pm','0');return false;">No</a></div></div></th>
-                    <!-- Target -->
                     <th><div class="sort-wrap">Target Man-Days (hr)<button class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(7,'num',0);return false;">Default</a><a href="#" onclick="sortT(7,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(7,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Target Start<button class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu">
-                        <a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a>
-                        <?php foreach ($target_start_years as $y): ?>
-                        <a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a>
-                        <?php endforeach; ?>
-                    </div></div></th>
-                    <th><div class="sort-wrap">Target End<button class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu">
-                        <a href="#" onclick="filterCol('ted-year','');return false;">All Years</a>
-                        <?php foreach ($target_end_years as $y): ?>
-                        <a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a>
-                        <?php endforeach; ?>
-                    </div></div></th>
-                    <!-- Actual -->
+                    <th><div class="sort-wrap">Target Start<button class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu"><a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a><?php foreach ($target_start_years as $y): ?><a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                    <th><div class="sort-wrap">Target End<button class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu"><a href="#" onclick="filterCol('ted-year','');return false;">All Years</a><?php foreach ($target_end_years as $y): ?><a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                     <th><div class="sort-wrap">Actual Man-Days (hr)<button class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(10,'num',0);return false;">Default</a><a href="#" onclick="sortT(10,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(10,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Actual Start<button class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu">
-                        <a href="#" onclick="filterCol('asd-year','');return false;">All Years</a>
-                        <?php foreach ($actual_start_years as $y): ?>
-                        <a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a>
-                        <?php endforeach; ?>
-                    </div></div></th>
-                    <th><div class="sort-wrap">Actual End<button class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu">
-                        <a href="#" onclick="filterCol('aed-year','');return false;">All Years</a>
-                        <?php foreach ($actual_end_years as $y): ?>
-                        <a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a>
-                        <?php endforeach; ?>
-                    </div></div></th>
-                    <!-- Status -->
-                    <th><div class="sort-wrap">IIPS Status<button class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu">
-                        <a href="#" onclick="filterCol('iips','');return false;">Default (All)</a>
-                        <a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a>
-                        <a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a>
-                        <a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a>
-                        <a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a>
-                        <a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a>
-                        <a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a>
-                    </div></div></th>
-                    <th><div class="sort-wrap">Target Billing Date<button class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu">
-                        <a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a>
-                        <?php foreach ($billing_years as $by): ?>
-                        <a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a>
-                        <?php endforeach; ?>
-                    </div></div></th>
-                    <th><div class="sort-wrap">Billing Status<button class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu">
-                        <a href="#" onclick="filterCol('billing','');return false;">Default (All)</a>
-                        <a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a>
-                        <a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a>
-                        <a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a>
-                        <a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a>
-                    </div></div></th>
-                    <!-- Resources -->
+                    <th><div class="sort-wrap">Actual Start<button class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu"><a href="#" onclick="filterCol('asd-year','');return false;">All Years</a><?php foreach ($actual_start_years as $y): ?><a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                    <th><div class="sort-wrap">Actual End<button class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu"><a href="#" onclick="filterCol('aed-year','');return false;">All Years</a><?php foreach ($actual_end_years as $y): ?><a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                    <th><div class="sort-wrap">IIPS Status<button class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
+                    <th><div class="sort-wrap">Target Billing Date<button class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
+                    <th><div class="sort-wrap">Billing Status<button class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
                     <th><div class="sort-wrap">Account Manager<button class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(16,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(16,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(16,'alpha',2);return false;">Z → A</a></div></div></th>
                     <th><div class="sort-wrap">Account Leader<button class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(17,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(17,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(17,'alpha',2);return false;">Z → A</a></div></div></th>
                     <th><div class="sort-wrap">Pre-Sales / SDM<button class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(18,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(18,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(18,'alpha',2);return false;">Z → A</a></div></div></th>
@@ -447,14 +331,8 @@ sort($actual_end_years);
                 $gp  = floatval($r['gross_profit'] ?? 0);
                 $gp_color = $gp > 0 ? '#166534' : ($gp < 0 ? '#dc2626' : '#6b7280');
 
-                $status_badge = [
-                    'Not Quoted'=>'b-nq','Quoted'=>'b-q','Not Started'=>'b-ns',
-                    'In Progress'=>'b-ip','Completed'=>'b-done','Cancelled'=>'b-can',
-                ][$r['iips_status'] ?? 'Not Quoted'] ?? 'b-nq';
-                $billing_badge = [
-                    'Not Forecasted'=>'b-nf','Forecasted'=>'b-fc',
-                    'Pending'=>'b-pend','Completed'=>'b-bdc',
-                ][$r['billing_status'] ?? 'Not Forecasted'] ?? 'b-nf';
+                $status_badge = ['Not Quoted'=>'b-nq','Quoted'=>'b-q','Not Started'=>'b-ns','In Progress'=>'b-ip','Completed'=>'b-done','Cancelled'=>'b-can'][$r['iips_status'] ?? 'Not Quoted'] ?? 'b-nq';
+                $billing_badge = ['Not Forecasted'=>'b-nf','Forecasted'=>'b-fc','Pending'=>'b-pend','Completed'=>'b-bdc'][$r['billing_status'] ?? 'Not Forecasted'] ?? 'b-nf';
 
                 $pm_display = $r['project_manager'] ?: null;
                 $partner_display = $r['partner'] ?: null;
@@ -465,8 +343,6 @@ sort($actual_end_years);
                 data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
                 data-ts-end="<?= htmlspecialchars($r['ts_end'] ?? '') ?>"
                 data-has-ts="<?= $r['ts_minutes'] > 0 ? '1' : '0' ?>"
-                data-iips-status="<?= htmlspecialchars($r['iips_status'] ?? '') ?>"
-                data-billing-status="<?= htmlspecialchars($r['billing_status'] ?? '') ?>"
                 data-tbd-year="<?= $r['target_billing_date'] ? date('Y', strtotime($r['target_billing_date'])) : '' ?>"
                 data-tsd-year="<?= $r['target_start_date']   ? date('Y', strtotime($r['target_start_date']))   : '' ?>"
                 data-ted-year="<?= $r['target_end_date']     ? date('Y', strtotime($r['target_end_date']))     : '' ?>"
@@ -487,82 +363,39 @@ sort($actual_end_years);
                 <td><code style="font-size:12px;"><?= $pid_display ?></code></td>
                 <td><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
                 <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
-                <!-- Costing -->
                 <td class="bg-manual"><?= $r['selling_price'] !== null ? 'RM '.number_format($r['selling_price'],2) : '<span class="dash">—</span>' ?></td>
                 <td class="bg-manual"><?= $r['partner_cost']  !== null ? 'RM '.number_format($r['partner_cost'],2)  : '<span class="dash">—</span>' ?></td>
-                <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>">
-                    <?= ($r['selling_price'] !== null && $r['partner_cost'] !== null) ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?>
-                </td>
+                <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= ($r['selling_price'] !== null && $r['partner_cost'] !== null) ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
                 <td class="bg-manual">
                     <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
-                    <div class="tog">
-                        <div class="tog-track <?= $pm_val ? 'on' : '' ?>">
-                            <div class="tog-thumb"></div>
-                        </div>
-                        <span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span>
-                    </div>
+                    <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
                 </td>
-                <!-- Target -->
-                <td class="bg-manual"><?php
-                    if ($r['target_mandays']) {
-                        $td_total_mins = round(floatval($r['target_mandays']) * 60);
-                        $td_h = floor($td_total_mins / 60);
-                        $td_m = $td_total_mins % 60;
-                        echo $td_h.'h '.$td_m.'m';
-                    } else {
-                        echo '<span class="dash">—</span>';
-                    }
-                ?></td>
+                <td class="bg-manual"><?php if ($r['target_mandays']) { $td_total_mins = round(floatval($r['target_mandays']) * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m'; } else { echo '<span class="dash">—</span>'; } ?></td>
                 <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
                 <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
-                <!-- Actual — Man-Days FIRST, then dates -->
                 <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
                 <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['ts_start'] ? fmtDate($r['ts_start']) : '<span class="dash">—</span>' ?></span></td>
-                <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val">
-                    <?php if (($r['iips_status'] ?? '') === 'Completed'): ?>
-                        <?= $r['ts_end'] ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?>
-                    <?php else: ?>
-                        <span class="dash">—</span>
-                    <?php endif; ?>
-                </span></td>
-                <!-- Status -->
+                <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?php if (($r['iips_status'] ?? '') === 'Completed'): ?><?= $r['ts_end'] ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?><?php else: ?><span class="dash">—</span><?php endif; ?></span></td>
                 <td class="bg-dropdown"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
                 <td class="bg-manual"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
                 <td class="bg-dropdown"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
-                <!-- Resources -->
                 <td><?= $r['account_manager'] ? htmlspecialchars($r['account_manager']) : '<span class="dash">—</span>' ?></td>
                 <td><?= $r['account_leader']  ? htmlspecialchars($r['account_leader'])  : '<span class="dash">—</span>' ?></td>
                 <td><?= $r['presales_sdm']    ? htmlspecialchars($r['presales_sdm'])    : '<span class="dash">—</span>' ?></td>
                 <td><?= $pm_display           ? htmlspecialchars($pm_display)           : '<span class="dash">—</span>' ?></td>
-                <td class="bg-auto">
-                    <?php if ($r['ts_engineers']): ?>
-                        <ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;">
-                            <?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?>
-                                <li><?= htmlspecialchars(trim($eng)) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php else: ?>
-                        <span class="dash">—</span>
-                    <?php endif; ?>
-                </td>
+                <td class="bg-auto"><?php if ($r['ts_engineers']): ?><ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;"><?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?><li><?= htmlspecialchars(trim($eng)) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                 <td><?= $partner_display      ? htmlspecialchars($partner_display)      : '<span class="dash">—</span>' ?></td>
-                <!-- Actions -->
-                <td>
-                    <a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a>
-                    <a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del"
-                       onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a>
-                </td>
+                <td><a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a><a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a></td>
             </tr>
             <?php endforeach; endif; ?>
             </tbody>
         </table>
-    </div><!-- end tbl-wrap -->
-    </div><!-- end tbl-outer -->
-    </div><!-- end card -->
+    </div>
+    </div>
+    </div>
 </div>
 
 <script>
-// ── Sticky header exact offset ────────────────────────────────────────────────
 function fixStickyHeaders() {
     const secRow = document.querySelector('#main-table thead tr.sec-row');
     const colRow = document.querySelector('#main-table thead tr:last-child');
@@ -573,8 +406,6 @@ function fixStickyHeaders() {
 }
 window.addEventListener('DOMContentLoaded', fixStickyHeaders);
 window.addEventListener('resize', fixStickyHeaders);
-
-// ── Search ────────────────────────────────────────────────────────────────────
 document.getElementById('search-input').addEventListener('input', applyFilters);
 
 function applyFilters() {
@@ -583,8 +414,6 @@ function applyFilters() {
     const actEnd   = document.getElementById('filter-actual-end-hidden').value;
     const checks   = Array.from(document.querySelectorAll('.filter-cats input[type="checkbox"]:checked')).map(c => c.value);
 
-    // Group checkboxes by category for AND-between / OR-within logic
-    // Exception: within Resources, has_pm/has_acc_mgr/has_partner are each independent AND conditions
     const groups = {
         iips_status: ['not_quoted','quoted','not_started','in_progress','completed','cancelled'],
         billing:     ['billing_nf','billing_fc','billing_pending','billing_done'],
@@ -593,14 +422,12 @@ function applyFilters() {
         timeline:    ['has_target','has_mandays'],
     };
 
-    // Which groups have at least one checked box?
     const activeGroups = {};
     Object.entries(groups).forEach(([grp, vals]) => {
         const active = vals.filter(v => checks.includes(v));
         if (active.length > 0) activeGroups[grp] = active;
     });
 
-    // Resource filters — each one is its own AND condition
     const resFilters = ['has_pm','has_acc_mgr','has_partner'].filter(v => checks.includes(v));
 
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
@@ -614,8 +441,6 @@ function applyFilters() {
         if (actStart && tsStart < actStart)      ok = false;
         if (actEnd   && tsEnd   > actEnd)        ok = false;
 
-        // For each active group, row must match AT LEAST ONE checked item (OR within group)
-        // All active groups must be satisfied (AND between groups)
         if (ok && Object.keys(activeGroups).length > 0) {
             Object.entries(activeGroups).forEach(([grp, active]) => {
                 let groupMatch = false;
@@ -641,8 +466,6 @@ function applyFilters() {
                 if (!groupMatch) ok = false;
             });
         }
-
-        // Apply resource AND filters independently
         if (ok && resFilters.length > 0) {
             resFilters.forEach(chk => {
                 if (chk === 'has_pm'      && d.hasPm      !== '1') ok = false;
@@ -650,13 +473,9 @@ function applyFilters() {
                 if (chk === 'has_partner' && d.hasPartner !== '1') ok = false;
             });
         }
-
         tr.classList.toggle('is-hidden', !ok);
     });
-
-    document.querySelectorAll('.filter-cats label').forEach(lbl => {
-        lbl.classList.toggle('active-cat', lbl.querySelector('input').checked);
-    });
+    document.querySelectorAll('.filter-cats label').forEach(lbl => { lbl.classList.toggle('active-cat', lbl.querySelector('input').checked); });
 }
 
 function clearAllFilters() {
@@ -671,7 +490,6 @@ function clearAllFilters() {
     document.querySelectorAll('#main-table tbody tr').forEach(tr => tr.classList.remove('is-hidden'));
 }
 
-// ── Date filter helpers ───────────────────────────────────────────────────────
 const F_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const F_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -681,9 +499,7 @@ function syncFilterDate(type) {
     if (hidden.value) {
         const p = hidden.value.split('-');
         display.value = p[2] + '-' + F_MONTHS_SHORT[parseInt(p[1],10)-1].toUpperCase() + '-' + p[0];
-    } else {
-        display.value = '';
-    }
+    } else { display.value = ''; }
     applyFilters();
 }
 
@@ -700,29 +516,23 @@ function parseFilerDate(type) {
         if (isNaN(m)) {
             const mIdx = F_MONTHS.findIndex(x => m.startsWith(x.substring(0,3)));
             if (mIdx !== -1) m = String(mIdx+1).padStart(2,'0');
-        } else {
-            m = String(m).padStart(2,'0');
-        }
+        } else { m = String(m).padStart(2,'0'); }
         if (d.length===2 && m.length===2 && y.length===4) {
             hidden.value = y + '-' + m + '-' + d;
             syncFilterDate(type);
             return;
         }
     }
-    // Invalid — restore from hidden if exists
     if (hidden.value) syncFilterDate(type); else display.value = '';
     applyFilters();
 }
 
-// ── Column Filters ────────────────────────────────────────────────────────────
 let colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
-
 function filterCol(type, value) {
     colFilters[type] = value;
     document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort'));
     applyColFilters();
 }
-
 function applyColFilters() {
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
         let ok = true;
@@ -738,13 +548,8 @@ function applyColFilters() {
     });
 }
 
-// ── Sort ──────────────────────────────────────────────────────────────────────
 let origRows = null;
-function toggleSort(e, id) {
-    e.stopPropagation();
-    document.querySelectorAll('.sort-menu').forEach(m => { if(m.id!==id) m.classList.remove('show-sort'); });
-    document.getElementById(id).classList.toggle('show-sort');
-}
+function toggleSort(e, id) { e.stopPropagation(); document.querySelectorAll('.sort-menu').forEach(m => { if(m.id!==id) m.classList.remove('show-sort'); }); document.getElementById(id).classList.toggle('show-sort'); }
 window.addEventListener('click', () => document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')));
 function sortT(col, type, dir) {
     const tbody = document.querySelector('#main-table tbody');

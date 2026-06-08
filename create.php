@@ -46,7 +46,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         elseif ($diff_hours > 8) $max_breaks = 1;
         
         if ($sel_meal_breaks > $max_breaks) $sel_meal_breaks = $max_breaks;
-        if ($sel_meal_breaks > 0) $end_dt->modify("-{$sel_meal_breaks} hours");
         
         $final_start_date = $start_dt->format('Y-m-d');
         $final_start_time = $start_dt->format('H:i:s');
@@ -69,8 +68,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $c_stmt->close();
 
         if (empty($conflict_error)) {
-            $stmt = $conn->prepare("INSERT INTO timesheets (engineer_id, engineer_name, project_id, start_date, start_time, end_date, end_time, work_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isssssss", $current_user_id, $current_user_name, $sel_proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $sel_work_desc);
+            $stmt = $conn->prepare("INSERT INTO timesheets (engineer_id, engineer_name, project_id, start_date, start_time, end_date, end_time, work_description, meal_breaks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("isssssssi", $current_user_id, $current_user_name, $sel_proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $sel_work_desc, $sel_meal_breaks);
             $stmt->execute();
             $stmt->close();
 

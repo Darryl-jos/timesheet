@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     elseif ($diff_hours_raw > 8) $expected_hours = $diff_hours_raw + 1;
     else $expected_hours = $diff_hours_raw;
 
-    $sel_meal_breaks = '0';
+    $sel_meal_breaks = isset($edit_data['meal_breaks']) ? (int)$edit_data['meal_breaks'] : 0;
 
     $chk_iips = $conn->prepare("SELECT project_manager, partner FROM iips_tracking WHERE project_id=?");
     $chk_iips->bind_param("s", $sel_proj_id);
@@ -89,8 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
         if ($diff_hours >= 24) $max_breaks = 3;
         elseif ($diff_hours > 16) $max_breaks = 2;
         elseif ($diff_hours > 8) $max_breaks = 1;
+        
         if ($sel_meal_breaks > $max_breaks) $sel_meal_breaks = $max_breaks;
-        if ($sel_meal_breaks > 0) $end_dt->modify("-{$sel_meal_breaks} hours");
 
         $final_start_date = $start_dt->format('Y-m-d');
         $final_start_time = $start_dt->format('H:i:s');
@@ -113,8 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
         $c_stmt->close();
 
         if (empty($conflict_error)) {
-            $stmt = $conn->prepare("UPDATE timesheets SET project_id=?, start_date=?, start_time=?, end_date=?, end_time=?, work_description=? WHERE id=?");
-            $stmt->bind_param("ssssssi", $sel_proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $sel_work_desc, $edit_id);
+            $stmt = $conn->prepare("UPDATE timesheets SET project_id=?, start_date=?, start_time=?, end_date=?, end_time=?, work_description=?, meal_breaks=? WHERE id=?");
+            $stmt->bind_param("ssssssii", $sel_proj_id, $final_start_date, $final_start_time, $final_end_date, $final_end_time, $sel_work_desc, $sel_meal_breaks, $edit_id);
             $stmt->execute();
             $stmt->close();
 

@@ -15,7 +15,7 @@ if ($conn->connect_error) {
 }
 $conn->set_charset("utf8mb4");
 
-function calculateDuration($date, $s_time, $e_time) {
+function calculateDuration($date, $s_time, $e_time, $meal_breaks = 0) {
     if (empty($s_time) || empty($e_time)) {
         return "<span style='color:#aaa;'>Missing Time</span>";
     }
@@ -29,6 +29,11 @@ function calculateDuration($date, $s_time, $e_time) {
 
     $diff = $start->diff($end);
     $total_minutes = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
+    $total_minutes -= ($meal_breaks * 60);
+
+    if ($total_minutes < 0) {
+        $total_minutes = 0;
+    }
 
     $hours = floor($total_minutes / 60);
     $minutes = $total_minutes % 60;
@@ -48,7 +53,7 @@ function calculateTotalProjectManDays($total_minutes_spent) {
            "<span style='font-size:11px; color:#aaa; display:block;'>(Total: " . floor($total_hours) . "h " . ($total_minutes_spent % 60) . "m)</span>";
 }
 
-function calculateProjectGap($date, $s_time, $e_time, $expected_hours) {
+function calculateProjectGap($date, $s_time, $e_time, $expected_hours, $meal_breaks = 0) {
     if (empty($s_time) || empty($e_time)) { 
         return "-"; 
     }
@@ -62,6 +67,11 @@ function calculateProjectGap($date, $s_time, $e_time, $expected_hours) {
 
     $diff = $start->diff($end);
     $actual_minutes = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
+    $actual_minutes -= ($meal_breaks * 60);
+
+    if ($actual_minutes < 0) {
+        $actual_minutes = 0;
+    }
 
     $expected_minutes = intval($expected_hours) * 60;
     $gap_minutes = $expected_minutes - $actual_minutes;

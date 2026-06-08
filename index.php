@@ -69,6 +69,13 @@ while ($row = $result->fetch_assoc()) {
     if ($end <= $start) $end->modify('+1 day');
     $diff = $start->diff($end);
     $mins = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
+    
+    $mb = isset($row['meal_breaks']) ? intval($row['meal_breaks']) : 0;
+    $mins -= ($mb * 60);
+    if ($mins < 0) {
+        $mins = 0;
+    }
+
     $row['_minutes'] = $mins;
     $total_minutes += $mins;
     $total_records++;
@@ -334,7 +341,7 @@ function fmtDateDisplay($d) {
                         </div>
                     </td>
                     <td>
-                        <?= calculateDuration($row['start_date'], $row['start_time'], $row['end_time']) ?>
+                        <?= calculateDuration($row['start_date'], $row['start_time'], $row['end_time'], isset($row['meal_breaks']) ? intval($row['meal_breaks']) : 0) ?>
                     </td>
                     <td>
                         <div style="display: flex; gap: 8px;">
