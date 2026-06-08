@@ -8,7 +8,6 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
 $msg = "";
 $msg_type = "";
 
-// ── Add new engineer ──────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_engineer'])) {
     $uname  = strtolower(trim($_POST['username_id']));
     $ename  = trim($_POST['engineer_name']);
@@ -34,45 +33,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_engineer'])) {
     }
 }
 
-// ── Delete engineer ───────────────────────────────────────────────────────────
 if (isset($_GET['delete_eng'])) {
     $del_id = intval($_GET['delete_eng']);
     if ($del_id == $_SESSION['engineer_id']) {
         $msg = "You cannot delete your own account."; $msg_type = "error";
     } else {
-        $stmt = $conn->prepare("DELETE FROM engineers WHERE id=?");
-        $stmt->bind_param("i", $del_id); $stmt->execute(); $stmt->close();
-        header("Location: admin_engineers.php"); exit;
+        $stmt = $conn->prepare("SELECT is_admin FROM engineers WHERE id=?");
+        $stmt->bind_param("i", $del_id);
+        $stmt->execute();
+        $target_user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($target_user && $target_user['is_admin'] == 1) {
+            $msg = "Level 1 Admin accounts are protected and cannot be deleted."; $msg_type = "error";
+        } else {
+            $stmt = $conn->prepare("DELETE FROM engineers WHERE id=?");
+            $stmt->bind_param("i", $del_id); $stmt->execute(); $stmt->close();
+            header("Location: admin_engineers.php"); exit;
+        }
     }
 }
 
-// ── Edit engineer ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_engineer'])) {
     $edit_id = intval($_POST['edit_id']);
-    $ename   = trim($_POST['engineer_name']);
-    $uname   = strtolower(trim($_POST['username_id']));
-    $is_adm  = isset($_POST['is_admin']) ? 2 : 0;
-    $new_pwd = trim($_POST['password'] ?? '');
+    
+    $stmt = $conn->prepare("SELECT is_admin FROM engineers WHERE id=?");
+    $stmt->bind_param("i", $edit_id);
+    $stmt->execute();
+    $target_user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-    if (empty($ename) || empty($uname)) {
-        $msg = "Username and Name cannot be empty."; $msg_type = "error";
-    } elseif (!empty($new_pwd) && strlen($new_pwd) < 6) {
-        $msg = "Password must be at least 6 characters."; $msg_type = "error";
+    if ($target_user && $target_user['is_admin'] == 1) {
+        $msg = "Level 1 Admin accounts are protected and cannot be modified."; $msg_type = "error";
     } else {
-        if (!empty($new_pwd)) {
-            $hashed = password_hash($new_pwd, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE engineers SET username_id=?, engineer_name=?, is_admin=?, password=? WHERE id=?");
-            $stmt->bind_param("ssisi", $uname, $ename, $is_adm, $hashed, $edit_id);
-        } else {
-            $stmt = $conn->prepare("UPDATE engineers SET username_id=?, engineer_name=?, is_admin=? WHERE id=?");
-            $stmt->bind_param("ssii", $uname, $ename, $is_adm, $edit_id);
+        $ename   = trim($_POST['engineer_name']);
+        $uname   = strtolower(trim($_POST['username_id']));
+        $is_adm  = isset($_POST['is_admin']) ? 2 : 0;
+        $new_pwd = trim($_POST['password'] ?? '');
+
+        if ($edit_id == $_SESSION['engineer_id'] && $_SESSION['is_admin'] == 2) {
+            $is_adm = 2; 
         }
-        $stmt->execute(); $stmt->close();
-        header("Location: admin_engineers.php?saved=1"); exit;
+
+        if (empty($ename) || empty($uname)) {
+            $msg = "Username and Name cannot be empty."; $msg_type = "error";
+        } elseif (!empty($new_pwd) && strlen($new_pwd) < 6) {
+            $msg = "Password must be at least 6 characters."; $msg_type = "error";
+        } else {
+            if (!empty($new_pwd)) {
+                $hashed = password_hash($new_pwd, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("UPDATE engineers SET username_id=?, engineer_name=?, is_admin=?, password=? WHERE id=?");
+                $stmt->bind_param("ssisi", $uname, $ename, $is_adm, $hashed, $edit_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE engineers SET username_id=?, engineer_name=?, is_admin=? WHERE id=?");
+                $stmt->bind_param("ssii", $uname, $ename, $is_adm, $edit_id);
+            }
+            $stmt->execute(); $stmt->close();
+            header("Location: admin_engineers.php?saved=1"); exit;
+        }
     }
 }
 
-// ── Edit mode ─────────────────────────────────────────────────────────────────
 $edit_eng = null;
 $show_add = isset($_GET['add']);
 if (isset($_GET['edit_eng'])) {
@@ -80,6 +101,11 @@ if (isset($_GET['edit_eng'])) {
     $stmt = $conn->prepare("SELECT * FROM engineers WHERE id=?");
     $stmt->bind_param("i", $eid); $stmt->execute();
     $edit_eng = $stmt->get_result()->fetch_assoc(); $stmt->close();
+
+    if ($edit_eng && $edit_eng['is_admin'] == 1) {
+        $msg = "Level 1 Admin accounts are protected and cannot be modified."; $msg_type = "error";
+        $edit_eng = null; 
+    }
 }
 
 if (isset($_GET['saved'])) { $msg = "Changes saved successfully."; $msg_type = "success"; }
@@ -96,22 +122,14 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     .is-hidden { display: none !important; }
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-
-    /* ── Header ── */
     .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
     .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
-
-    /* ── Page ── */
     .page { padding: 16px; }
     .card { background: white; padding: 16px 18px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 14px; }
-
-    /* ── Alert ── */
     .alert { padding: 11px 15px; border-radius: 4px; margin-bottom: 14px; font-size: 13px; }
     .alert.success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
     .alert.error   { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-
-    /* ── Form ── */
     .form-wrap { background: #f8f9fa; padding: 14px; border-radius: 6px; border: 1px solid #e9ecef; margin-bottom: 14px; }
     .form-wrap h4 { margin: 0 0 12px; font-size: 14px; color: #343a40; font-weight: 700; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
@@ -119,11 +137,9 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     .fg label { font-size: 12px; font-weight: 700; color: #495057; }
     .fg input { height: 42px; padding: 0 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; width: 100%; }
     .fg input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
-    /* password toggle */
     .pwd-wrap { position: relative; }
     .pwd-wrap input { padding-right: 42px; }
     .pwd-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: #6c757d; padding: 0; line-height: 1; }
-    /* form bottom */
     .form-bottom { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
     .admin-check { display: flex; align-items: center; gap: 8px; }
     .admin-check input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
@@ -131,13 +147,9 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     .form-actions { display: flex; gap: 10px; align-items: center; margin-left: auto; }
     .btn-save { background: #28a745; color: white; border: none; height: 42px; padding: 0 22px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; }
     .btn-cancel-link { color: #6c757d; text-decoration: none; font-size: 13px; }
-
-    /* ── Toolbar ── */
     .toolbar { display: flex; gap: 10px; margin-bottom: 14px; }
     .search-input { flex: 1; height: 42px; padding: 0 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
     .btn-add { background: #28a745; color: white; text-decoration: none; height: 42px; padding: 0 16px; border-radius: 4px; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; border: none; cursor: pointer; flex-shrink: 0; }
-
-    /* ── Desktop table ── */
     .tbl-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
@@ -148,8 +160,6 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     .role-user  { background: #d1ecf1; color: #0c5460; }
     .btn-edit { background: #ffc107; color: #333; padding: 5px 12px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; display: inline-block; }
     .btn-del  { background: #dc3545; color: white; padding: 5px 12px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
-
-    /* ── Mobile cards (replace table on small screens) ── */
     .mobile-list { display: none; }
     .eng-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid #dee2e6; }
     .eng-card.is-admin-card { border-left-color: #ffc107; }
@@ -159,18 +169,14 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     .eng-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .eng-card-actions .btn-edit,
     .eng-card-actions .btn-del { padding: 6px 14px; font-size: 13px; margin: 0; }
-
-    /* ── Responsive ── */
     @media (max-width: 600px) {
         .page { padding: 10px; }
         .header { padding: 12px 14px; border-radius: 0; }
         .header h2 { font-size: 15px; }
-        /* Form: single column on mobile */
         .form-grid { grid-template-columns: 1fr; }
         .form-actions { margin-left: 0; width: 100%; }
         .btn-save { width: 100%; justify-content: center; }
         .form-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
-        /* Hide desktop table, show mobile cards */
         .tbl-wrap { display: none; }
         .mobile-list { display: block; }
     }
@@ -192,7 +198,6 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
         <div class="alert <?= $msg_type ?>"><?= $msg_type==='success'?'✅':'⚠️' ?> <?= $msg ?></div>
     <?php endif; ?>
 
-    <!-- Add form -->
     <?php if ($show_add && !$edit_eng): ?>
     <div class="form-wrap">
         <h4>+ Add New Engineer</h4>
@@ -236,7 +241,6 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     </div>
     <?php endif; ?>
 
-    <!-- Edit form -->
     <?php if ($edit_eng): ?>
     <div class="form-wrap">
         <h4>✏️ Editing: <?= htmlspecialchars($edit_eng['engineer_name']) ?></h4>
@@ -269,8 +273,14 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
             </div>
             <div class="form-bottom">
                 <div class="admin-check">
-                    <input type="checkbox" name="is_admin" value="1" id="edit_is_admin" <?= $edit_eng['is_admin'] >= 1 ? 'checked' : '' ?>>
-                    <label for="edit_is_admin">Grant Admin Access</label>
+                    <?php if ($edit_eng['id'] == $_SESSION['engineer_id'] && $_SESSION['is_admin'] == 2): ?>
+                        <input type="checkbox" checked disabled>
+                        <input type="hidden" name="is_admin" value="1">
+                        <label>Grant Admin Access <span style="font-size:11px;color:#dc3545;margin-left:4px;">(Cannot revoke own admin rights)</span></label>
+                    <?php else: ?>
+                        <input type="checkbox" name="is_admin" value="1" id="edit_is_admin" <?= $edit_eng['is_admin'] >= 1 ? 'checked' : '' ?>>
+                        <label for="edit_is_admin">Grant Admin Access</label>
+                    <?php endif; ?>
                 </div>
                 <div class="form-actions">
                     <button type="submit" name="edit_engineer" class="btn-save">Save Changes</button>
@@ -281,13 +291,11 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     </div>
     <?php endif; ?>
 
-    <!-- Toolbar -->
     <div class="toolbar">
         <input type="text" class="search-input" id="eng-search" placeholder="🔍 Search name or username...">
         <a href="admin_engineers.php?add=1" class="btn-add">+ Add Engineer</a>
     </div>
 
-    <!-- Desktop table -->
     <div class="tbl-wrap">
     <table id="eng-table">
         <thead>
@@ -310,12 +318,16 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
                 <td><?= $i++ ?></td>
                 <td><code><?= htmlspecialchars($e['username_id']) ?></code></td>
                 <td><strong><?= htmlspecialchars($e['engineer_name']) ?></strong></td>
-                <td><span class="role-badge <?= $e['is_admin']>=1?'role-admin':'role-user' ?>"><?= $e['is_admin']>=1?'Admin':'Engineer' ?></span></td>
+                <td><span class="role-badge <?= $e['is_admin']>=1?'role-admin':'role-user' ?>"><?= $e['is_admin']>=1?($e['is_admin']==1?'Admin':'Admin'):'Engineer' ?></span></td>
                 <td>
-                    <a href="admin_engineers.php?edit_eng=<?= $e['id'] ?>" class="btn-edit">Edit</a>
-                    <?php if ($e['id'] != $_SESSION['engineer_id']): ?>
-                    <a href="admin_engineers.php?delete_eng=<?= $e['id'] ?>" class="btn-del"
-                       onclick="return confirm('Delete <?= htmlspecialchars(addslashes($e['engineer_name'])) ?>?')">Delete</a>
+                    <?php if ($e['is_admin'] == 1): ?>
+                        <span style="font-size:12px;color:#9ca3af;font-style:italic;"></span>
+                    <?php else: ?>
+                        <a href="admin_engineers.php?edit_eng=<?= $e['id'] ?>" class="btn-edit">Edit</a>
+                        <?php if ($e['id'] != $_SESSION['engineer_id']): ?>
+                        <a href="admin_engineers.php?delete_eng=<?= $e['id'] ?>" class="btn-del"
+                           onclick="return confirm('Delete <?= htmlspecialchars(addslashes($e['engineer_name'])) ?>?')">Delete</a>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -324,7 +336,6 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     </table>
     </div>
 
-    <!-- Mobile cards -->
     <div class="mobile-list" id="mobile-list">
     <?php foreach ($eng_rows as $e): ?>
         <div class="eng-card <?= $e['is_admin']>=1?'is-admin-card':'' ?>"
@@ -334,14 +345,18 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
                 <div>
                     <div class="eng-card-name"><?= htmlspecialchars($e['engineer_name']) ?></div>
                     <div class="eng-card-username">@<?= htmlspecialchars($e['username_id']) ?> &nbsp;·&nbsp;
-                        <span class="role-badge <?= $e['is_admin']>=1?'role-admin':'role-user' ?>"><?= $e['is_admin']>=1?'Admin':'Engineer' ?></span>
+                        <span class="role-badge <?= $e['is_admin']>=1?'role-admin':'role-user' ?>"><?= $e['is_admin']>=1?($e['is_admin']==1?'Admin':'Admin'):'Engineer' ?></span>
                     </div>
                 </div>
                 <div class="eng-card-actions">
-                    <a href="admin_engineers.php?edit_eng=<?= $e['id'] ?>" class="btn-edit">Edit</a>
-                    <?php if ($e['id'] != $_SESSION['engineer_id']): ?>
-                    <a href="admin_engineers.php?delete_eng=<?= $e['id'] ?>" class="btn-del"
-                       onclick="return confirm('Delete <?= htmlspecialchars(addslashes($e['engineer_name'])) ?>?')">Delete</a>
+                    <?php if ($e['is_admin'] == 1): ?>
+                        <span style="font-size:12px;color:#9ca3af;font-style:italic;margin-top:6px;">Protected</span>
+                    <?php else: ?>
+                        <a href="admin_engineers.php?edit_eng=<?= $e['id'] ?>" class="btn-edit">Edit</a>
+                        <?php if ($e['id'] != $_SESSION['engineer_id']): ?>
+                        <a href="admin_engineers.php?delete_eng=<?= $e['id'] ?>" class="btn-del"
+                           onclick="return confirm('Delete <?= htmlspecialchars(addslashes($e['engineer_name'])) ?>?')">Delete</a>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -349,10 +364,9 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     <?php endforeach; ?>
     </div>
 
-</div><!-- end .page -->
+</div>
 
 <script>
-// Search — filters both desktop table and mobile cards
 document.getElementById('eng-search').addEventListener('input', function() {
     const f = this.value.toLowerCase();
     document.querySelectorAll('#eng-table tbody tr').forEach(tr => {
@@ -365,14 +379,12 @@ document.getElementById('eng-search').addEventListener('input', function() {
     });
 });
 
-// Show/hide password
 function togglePwd(id, btn) {
     const inp = document.getElementById(id);
     inp.type = inp.type === 'password' ? 'text' : 'password';
     btn.textContent = inp.type === 'password' ? '👁' : '🙈';
 }
 
-// Confirm password check
 function checkPwd(prefix) {
     const pwd  = document.getElementById(prefix + '_pwd');
     const pwd2 = document.getElementById(prefix + '_pwd2');

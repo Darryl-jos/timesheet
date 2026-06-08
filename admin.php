@@ -49,7 +49,7 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
             <a href="index.php" style="color: #28a745; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">📋 Timesheet Home</a>
         <?php endif; ?>
         
-        <a href="profile.php" style="color: #007bff; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">👤 My Profile</a>
+        <a href="profile.php?from=admin" style="color: #007bff; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">👤 My Profile</a>
         <a href="login.php?action=logout" style="color: #ffc107; font-weight: bold; text-decoration: none;">Logout</a>
     </div>
 </div>

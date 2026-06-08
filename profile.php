@@ -7,6 +7,24 @@ if (!isset($_SESSION['engineer_id'])) {
 }
 
 $user_id = $_SESSION['engineer_id'];
+$is_admin = isset($_SESSION['is_admin']) ? intval($_SESSION['is_admin']) : 0;
+
+$from_source = isset($_GET['from']) ? $_GET['from'] : '';
+
+if ($from_source === 'admin') {
+    $back_url = 'admin.php';
+} elseif ($from_source === 'index') {
+    $back_url = 'index.php';
+} else {
+    if ($is_admin === 1) {
+        $back_url = 'admin.php';
+        $from_source = 'admin';
+    } else {
+        $back_url = 'index.php';
+        $from_source = 'index';
+    }
+}
+
 $msg = "";
 $status = "";
 $stmt = $conn->prepare("SELECT username_id, engineer_name FROM engineers WHERE id = ?");
@@ -31,13 +49,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         
         if (password_verify($old_pwd, $pwd_row['password'])) {
             $new_hashed = password_hash($new_pwd, PASSWORD_DEFAULT);
-            $update_stmt = $conn->prepare("UPDATE engineers SET password = ? WHERE id = ?");
-            $update_stmt->bind_param("si", $new_hashed, $user_id);
-            $update_stmt->execute();
-            $update_stmt->close();
-            
-            $msg = "Password updated successfully!";
-            $status = "success";
+            $upd = $conn->prepare("UPDATE engineers SET password = ? WHERE id = ?");
+            $upd->bind_param("si", $new_hashed, $user_id);
+            if ($upd->execute()) {
+                $msg = "Password updated successfully!";
+                $status = "success";
+            } else {
+                $msg = "Error updating password.";
+                $status = "error";
+            }
+            $upd->close();
         } else {
             $msg = "Incorrect current password!";
             $status = "error";
@@ -52,25 +73,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>My Profile</title>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
-        .header h2 { color: #333; margin: 0; font-size: 18px; }
-        .header a { color: #0056b3; font-weight: bold; text-decoration: none; font-size: 13px; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 500px; margin: 20px auto; }
-        .info-group { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .info-label { font-weight: bold; color: #666; font-size: 13px; }
-        .info-value { font-size: 16px; font-weight: bold; margin-top: 5px; color: #111; }
-        input { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; }
+        .topbar { background: #ffffff; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .topbar h2 { color: #1f2937; margin: 0; font-size: 18px; }
+        .topbar a { color: #007bff; font-weight: bold; text-decoration: none; font-size: 13px; }
+        .card { max-width: 600px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
+        .card h3 { margin-top: 0; font-size: 16px; color: #1f2937; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+        .info-group { margin-bottom: 15px; }
+        .info-label { font-size: 12px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+        .info-value { font-size: 15px; font-weight: bold; color: #1e293b; }
+        form { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
+        input[type="password"] { padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
+        input[type="password"]:focus { border-color: #007bff; outline: none; }
+        button { background: #007bff; color: white; border: none; padding: 12px; border-radius: 4px; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: 5px; }
         button:hover { background: #0056b3; }
-        .btn-back { display: block; text-align: center; margin-top: 15px; color: #6c757d; text-decoration: none; font-size: 14px; }
+        code { background: #f1f5f9; padding: 3px 6px; border-radius: 4px; color: #d926a9; }
+        @media (max-width: 600px) { body { margin: 15px; } }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h2>👷 My Profile</h2>
-    <a href="index.php">← Back to Dashboard</a>
+<div class="topbar">
+    <h2>👤 Profile Settings</h2>
+    <a href="<?php echo htmlspecialchars($back_url); ?>">← Back to Dashboard</a>
 </div>
 
 <div class="card">
@@ -93,14 +119,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         </div>
     <?php endif; ?>
 
-    <form method="POST">
+    <form method="POST" action="profile.php?from=<?php echo htmlspecialchars($from_source); ?>">
         <label style="font-size: 13px; font-weight: bold;">Current Password:</label>
         <input type="password" name="old_password" required placeholder="Enter current password">
         
         <label style="font-size: 13px; font-weight: bold;">New Password:</label>
         <input type="password" name="new_password" required placeholder="Min 6 characters">
         
-        <button type="submit" name="change_password">Update My Password</button>
+        <button type="submit" name="change_password">Update Password</button>
     </form>
 </div>
 

@@ -189,7 +189,7 @@ function fmtDateDisplay($d) {
         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
             <a href="admin.php" class="mode-switch-btn">⚙️ Switch to Admin</a>
         <?php endif; ?>
-        <a href="profile.php">👤 Profile</a>
+        <a href="profile.php?from=index">👤 Profile</a>
         <a href="login.php?action=logout" class="logout-btn">Logout</a>
     </div>
 </div>
