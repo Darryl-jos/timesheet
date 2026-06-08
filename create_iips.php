@@ -65,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$tgt_sd)          $errors[] = "Target Start Date is required.";
     if (!$tgt_ed)          $errors[] = "Target End Date is required.";
     if (!$tgt_bd)          $errors[] = "Target Billing Date is required.";
+    if ($tgt_sd && $tgt_ed && $tgt_ed < $tgt_sd)  $errors[] = "Target End Date must be on or after Target Start Date.";
+    if ($tgt_ed && $tgt_bd && $tgt_bd < $tgt_ed)  $errors[] = "Target Billing Date must be on or after Target End Date.";
 
 
     if (empty($errors)) {
@@ -267,7 +269,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 <div class="form-group">
                     <label>Target Billing Date <span class="req">*</span></label>
                     <div style="position:relative; height:38px; width:100%; display:flex;">
-                        <input type="text" id="tbd_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_billing_date'])) ?>" class="<?= in_array('Target Billing Date is required.',$errors)?'err':'' ?>">
+                        <input type="text" id="tbd_display" placeholder="DD-MMM-YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_billing_date'])) ?>" class="<?= in_array('Target Billing Date is required.',$errors)?'err':'' ?>">
                         <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('tbd_val').showPicker()">📅</div>
                         <input type="date" name="target_billing_date" id="tbd_val" value="<?= htmlspecialchars($v['target_billing_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('tbd')">
                     </div>
@@ -275,7 +277,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 <div class="form-group">
                     <label>Target Start Date <span class="req">*</span></label>
                     <div style="position:relative; height:38px; width:100%; display:flex;">
-                        <input type="text" id="tsd_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_start_date'])) ?>" class="<?= in_array('Target Start Date is required.',$errors)?'err':'' ?>">
+                        <input type="text" id="tsd_display" placeholder="DD-MMM-YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_start_date'])) ?>" class="<?= in_array('Target Start Date is required.',$errors)?'err':'' ?>">
                         <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('tsd_val').showPicker()">📅</div>
                         <input type="date" name="target_start_date" id="tsd_val" value="<?= htmlspecialchars($v['target_start_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('tsd')">
                     </div>
@@ -283,7 +285,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 <div class="form-group">
                     <label>Target End Date <span class="req">*</span></label>
                     <div style="position:relative; height:38px; width:100%; display:flex;">
-                        <input type="text" id="ted_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_end_date'])) ?>" class="<?= in_array('Target End Date is required.',$errors)?'err':'' ?>">
+                        <input type="text" id="ted_display" placeholder="DD-MMM-YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_end_date'])) ?>" class="<?= in_array('Target End Date is required.',$errors)?'err':'' ?>">
                         <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('ted_val').showPicker()">📅</div>
                         <input type="date" name="target_end_date" id="ted_val" value="<?= htmlspecialchars($v['target_end_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('ted')">
                     </div>
@@ -371,6 +373,55 @@ function syncDate(prefix) {
     } else {
         display.value = '';
     }
+    validateDateOrder();
+}
+
+function validateDateOrder() {
+    const sd  = document.getElementById('tsd_val').value;
+    const ed  = document.getElementById('ted_val').value;
+    const bd  = document.getElementById('tbd_val').value;
+
+    const tedDisplay = document.getElementById('ted_display');
+    const tbdDisplay = document.getElementById('tbd_display');
+
+    // Target End must be >= Target Start
+    if (sd && ed && ed < sd) {
+        tedDisplay.style.borderColor = '#dc3545';
+        tedDisplay.style.background  = '#fff5f5';
+        showDateError('ted', '⚠ End Date must be on or after Start Date');
+    } else {
+        tedDisplay.style.borderColor = '';
+        tedDisplay.style.background  = '';
+        clearDateError('ted');
+    }
+
+    // Target Billing must be >= Target End
+    if (ed && bd && bd < ed) {
+        tbdDisplay.style.borderColor = '#dc3545';
+        tbdDisplay.style.background  = '#fff5f5';
+        showDateError('tbd', '⚠ Billing Date must be on or after End Date');
+    } else {
+        tbdDisplay.style.borderColor = '';
+        tbdDisplay.style.background  = '';
+        clearDateError('tbd');
+    }
+}
+
+function showDateError(prefix, msg) {
+    let err = document.getElementById('err-' + prefix);
+    if (!err) {
+        err = document.createElement('div');
+        err.id = 'err-' + prefix;
+        err.style.cssText = 'color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;';
+        const field = document.getElementById(prefix + '_val');
+        field.parentNode.parentNode.appendChild(err);
+    }
+    err.textContent = msg;
+}
+
+function clearDateError(prefix) {
+    const err = document.getElementById('err-' + prefix);
+    if (err) err.textContent = '';
 }
 
 function parseDateInput(str) {
@@ -420,6 +471,24 @@ document.addEventListener('DOMContentLoaded', function() {
     ['tbd','tsd','ted'].forEach(function(p) {
         syncDate(p);
         bindDateField(p);
+    });
+
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const sd = document.getElementById('tsd_val').value;
+        const ed = document.getElementById('ted_val').value;
+        const bd = document.getElementById('tbd_val').value;
+        if (sd && ed && ed < sd) {
+            e.preventDefault();
+            showDateError('ted', '⚠ End Date must be on or after Start Date');
+            document.getElementById('ted_display').scrollIntoView({behavior:'smooth', block:'center'});
+            return;
+        }
+        if (ed && bd && bd < ed) {
+            e.preventDefault();
+            showDateError('tbd', '⚠ Billing Date must be on or after End Date');
+            document.getElementById('tbd_display').scrollIntoView({behavior:'smooth', block:'center'});
+            return;
+        }
     });
 });
 </script>
