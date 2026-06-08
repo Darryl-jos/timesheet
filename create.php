@@ -27,8 +27,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $sel_end_time = $_POST['end_time'];   
     $sel_work_desc = trim($_POST['work_description']); 
     $sel_meal_breaks = isset($_POST['meal_breaks']) ? (int)$_POST['meal_breaks'] : 0;
+    
     $has_iips_mgr = (($_POST['has_iips_manager_radio'] ?? 'no') === 'yes') ? 1 : 0;
     $iips_mgr_name = trim($_POST['iips_manager_name'] ?? '');
+    
     $has_partner = (($_POST['has_partner_radio'] ?? 'no') === 'yes') ? 1 : 0;
     $partner_name = trim($_POST['partner_name'] ?? '');
     
@@ -39,7 +41,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $end_dt->modify('+1 day');
         }
         
-        $diff_hours = ($end_dt->getTimestamp() - $start_dt->getTimestamp()) / 3600;
+        $diff = $start_dt->diff($end_dt);
+        $diff_hours = ($diff->days * 24) + $diff->h + ($diff->i / 60);
+
         $max_breaks = 0;
         if ($diff_hours >= 24) $max_breaks = 3;
         elseif ($diff_hours > 16) $max_breaks = 2;
@@ -88,7 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $upd->bind_param("ss", $iips_mgr_name, $sel_proj_id); $upd->execute(); $upd->close();
                 }
                 if ($has_partner && !empty($partner_name)) {
-                    $upd2 = $conn->prepare("UPDATE iips_tracking SET partner=? WHERE project_id=? AND (partner IS NULL OR partner='')");
+                    $upd2 = $conn->prepare("UPDATE iips_tracking SET partner=? WHERE project_id=?");
                     $upd2->bind_param("ss", $partner_name, $sel_proj_id); $upd2->execute(); $upd2->close();
                 }
             }
@@ -204,7 +208,6 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                                      data-value="<?php echo htmlspecialchars($p['project_id']); ?>"
                                      data-kw="<?php echo htmlspecialchars($kw); ?>"
                                      data-iips-mgr="<?php echo htmlspecialchars($p['iips_mgr'] ?? ''); ?>"
-                                     data-iips-ptr="<?php echo htmlspecialchars($p['iips_partner'] ?? ''); ?>"
                                      onclick="pickSel('proj', '<?php echo htmlspecialchars(addslashes($p['project_id'])); ?>', '<?php echo htmlspecialchars(addslashes($label)); ?>', this)">
                                     <?php echo htmlspecialchars($label); ?>
                                     <span style="color:#9ca3af;font-size:11px;display:block;"><?php echo htmlspecialchars($p['customer_name']); ?></span>
@@ -279,6 +282,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 </div>
             </div>
         </div>
+        
         <div class="section">
             <div class="section-hdr" style="background:#4a235a;">👥 IIPS Management</div>
             <div class="section-body">
@@ -286,33 +290,34 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                     <label>Do you have an IIPS Manager?</label>
                     <div style="display:flex;gap:20px;margin-top:6px;">
                         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
-                            <input type="radio" name="has_iips_manager_radio" value="yes" onclick="document.getElementById('iips-mgr-field').style.display='block'"> Yes
+                            <input type="radio" id="mgr-yes" name="has_iips_manager_radio" value="yes" onclick="document.getElementById('iips-mgr-field').style.display='block'"> Yes
                         </label>
                         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
-                            <input type="radio" name="has_iips_manager_radio" value="no" onclick="document.getElementById('iips-mgr-field').style.display='none'"> No
+                            <input type="radio" id="mgr-no" name="has_iips_manager_radio" value="no" onclick="document.getElementById('iips-mgr-field').style.display='none'" checked> No
                         </label>
                     </div>
                     <div id="iips-mgr-field" style="display:none;margin-top:10px;">
-                        <input type="text" name="iips_manager_name" placeholder="Enter IIPS Manager name" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                        <input type="text" id="mgr-input" name="iips_manager_name" placeholder="Enter IIPS Manager name" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
                     </div>
                 </div>
+                
                 <div class="form-group">
                     <label>Do you have a Partner?</label>
                     <div style="display:flex;gap:20px;margin-top:6px;">
                         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
-                            <input type="radio" name="has_partner_radio" value="yes" onclick="document.getElementById('partner-field').style.display='block'"> Yes
+                            <input type="radio" id="ptr-yes" name="has_partner_radio" value="yes" onclick="document.getElementById('partner-field').style.display='block'"> Yes
                         </label>
                         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
-                            <input type="radio" name="has_partner_radio" value="no" onclick="document.getElementById('partner-field').style.display='none'"> No
+                            <input type="radio" id="ptr-no" name="has_partner_radio" value="no" onclick="document.getElementById('partner-field').style.display='none'" checked> No
                         </label>
                     </div>
                     <div id="partner-field" style="display:none;margin-top:10px;">
-                        <input type="text" name="partner_name" placeholder="Enter partner name" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                        <input type="text" id="ptr-input" name="partner_name" placeholder="Enter Partner name" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
                     </div>
                 </div>
             </div>
         </div>
-
+        
         <div class="actions">
             <button type="submit" class="btn-save">Save Record</button>
             <a href="index.php" class="btn-cancel">Cancel</a>
@@ -321,630 +326,166 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 </div>
 
 <script>
-let amPmErrorFlag = { start: false, end: false };
-
-function clearError(visId, errId) {
-    const vis = document.getElementById(visId);
-    const err = document.getElementById(errId);
-    if(vis) vis.classList.remove('error-border');
-    if(err) err.style.display = 'none';
-}
-
-function parseDateInput(str) {
-    str = str.trim();
-    if (!str) return '';
-    let d, m, y;
-    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
-    if (textMatch) {
-        d = parseInt(textMatch[1], 10);
-        let mStr = textMatch[2].toUpperCase().substring(0, 3);
-        m = months.indexOf(mStr) + 1;
-        if (m === 0) return '';
-        y = parseInt(textMatch[3], 10);
-    } else {
-        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
-        if (numMatch) {
-            d = parseInt(numMatch[1], 10);
-            m = parseInt(numMatch[2], 10);
-            y = parseInt(numMatch[3], 10);
-        } else {
-            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
-            if (digitMatch) {
-                d = parseInt(digitMatch[1], 10);
-                m = parseInt(digitMatch[2], 10);
-                y = parseInt(digitMatch[3], 10);
-            } else {
-                return '';
-            }
-        }
-    }
-    if (y < 100) y += 2000;
-    if (m < 1 || m > 12) return '';
-    let daysInMonth = new Date(y, m, 0).getDate();
-    if (d < 1 || d > daysInMonth) return '';
-    let mmStr = m < 10 ? '0' + m : m;
-    let ddStr = d < 10 ? '0' + d : d;
-    return y + '-' + mmStr + '-' + ddStr;
-}
-
-function updateDateDisplay() {
-    const val = document.getElementById('date').value;
-    const display = document.getElementById('date-display');
-    if (val) {
-        const parts = val.split('-');
-        if (parts.length === 3) {
-            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-            let d = parseInt(parts[2], 10);
-            let m = parseInt(parts[1], 10);
-            display.value = d + ' ' + months[m - 1] + ' ' + parts[0];
-            clearError('date-display', 'err-date');
-        }
-    } else {
-        display.value = "";
-    }
-}
-
-document.getElementById('date-display').addEventListener('blur', function() {
-    if (!this.value.trim()) {
-        document.getElementById('date').value = "";
-        updateDateDisplay();
-        return;
-    }
-    const parsed = parseDateInput(this.value);
-    if (parsed) {
-        document.getElementById('date').value = parsed;
-        updateDateDisplay();
-        generateEndTimes();
-        calculateMealBreaks();
-    } else {
-        this.classList.add('error-border');
-        const err = document.getElementById('err-date');
-        err.innerText = "The date format is incorrect. You can enter formats such as DD-MM-YYYY, DD/MM/YYYY, or DD MONTH YYYY.";
-        err.style.display = 'block';
-    }
-});
-
-document.getElementById('date-display').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        this.blur();
-    }
-});
-
-document.getElementById('date-display').addEventListener('input', function(e) {
-    if (e.inputType === 'deleteContentBackward') return;
-    let v = this.value;
-    if (/^\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{8}$/.test(v)) {
-        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
-    }
-});
-
-function syncDateFromPicker() {
-    updateDateDisplay();
-    generateEndTimes();
-    calculateMealBreaks();
-}
-
-function convertTo24Hour(time12h) {
-    if (!time12h) return '';
-    const parts = time12h.split(' ');
-    if (parts.length !== 2) return '';
-    let [hours, minutes] = parts[0].split(':');
-    let modifier = parts[1];
-    if (hours === '12') hours = '00';
-    if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
-    return hours.toString().padStart(2, '0') + ':' + minutes;
-}
-
-function convertTo12Hour(time24h) {
-    if (!time24h) return '';
-    const [h, m] = time24h.split(':').map(Number);
-    return formatAMPM(h, m);
-}
-
-function parseAndRoundTime(inputStr, inputEl, errId, type) {
-    let str = inputStr.trim().toLowerCase();
-    if (!str) {
-        amPmErrorFlag[type] = false;
-        return null;
-    }
-    if (!str.includes('am') && !str.includes('pm')) {
-        inputEl.classList.add('error-border');
-        const errObj = document.getElementById(errId);
-        errObj.innerText = "Please specify AM or PM";
-        errObj.style.display = 'block';
-        amPmErrorFlag[type] = true;
-        return false; 
-    }
-    amPmErrorFlag[type] = false;
-    clearError(inputEl.id, errId);
-    let timePart = str.replace(/[^\d:]/g, '');
-    let isPM = str.includes('pm');
-    let parts = timePart.split(':');
-    let h = parseInt(parts[0], 10);
-    let m = parts[1] ? parseInt(parts[1], 10) : 0;
-    if (isNaN(h) || isNaN(m)) return null;
-    let rem = m % 15;
-    if (rem <= 7) {
-        m -= rem;
-    } else {
-        m += (15 - rem);
-    }
-    if (m >= 60) {
-        m = 0;
-        h += 1;
-        if (h === 12) {
-            isPM = !isPM;
-        } else if (h > 12) {
-            h = 1;
-        }
-    }
-    let ampm = isPM ? 'PM' : 'AM';
-    let formattedH = h % 12;
-    formattedH = formattedH ? formattedH : 12;
-    return (formattedH < 10 ? '0' + formattedH : formattedH) + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
-}
-
-function handleTimeInputBlur(type) {
-    let inputEl = document.getElementById(type + '-time-input');
-    let hiddenEl = document.getElementById(type + '-time-hidden');
-    let errId = 'err-' + type;
-    let res = parseAndRoundTime(inputEl.value, inputEl, errId, type);
-    if (res === false) {
-        hiddenEl.value = "";
-    } else if (res) {
-        inputEl.value = res;
-        hiddenEl.value = convertTo24Hour(res);
-        if (type === 'start') {
-            generateEndTimes();
-        }
-        calculateMealBreaks();
-    } else {
-        inputEl.value = "";
-        hiddenEl.value = "";
-        calculateMealBreaks();
-    }
-}
-
-document.getElementById('start-time-input').addEventListener('blur', () => handleTimeInputBlur('start'));
-document.getElementById('start-time-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
-});
-
-document.getElementById('end-time-input').addEventListener('blur', () => handleTimeInputBlur('end'));
-document.getElementById('end-time-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
-});
-
-function getRoundedCurrentTime() {
-    let now = new Date();
-    let h = now.getHours();
-    let m = now.getMinutes();
-    let rem = m % 15;
-    if (rem <= 7) {
-        m -= rem;
-    } else {
-        m += (15 - rem);
-    }
-    if (m >= 60) {
-        m = 0;
-        h += 1;
-    }
-    if (h >= 24) h = 0;
-    return { text: formatAMPM(h, m), val: (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m) };
-}
-
-document.addEventListener('click', function(event) {
-    if (!event.target.closest('.sel-wrap')) {
-        document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
-    }
-    if (!event.target.closest('.form-group')) {
-        const std = document.getElementById('start-time-dropdown');
-        const etd = document.getElementById('end-time-dropdown');
-        if(std) std.classList.remove('show-dropdown');
-        if(etd) etd.classList.remove('show-dropdown');
-    }
-});
-
 function toggleSel(type) {
-    const std = document.getElementById('start-time-dropdown');
-    const etd = document.getElementById('end-time-dropdown');
-    if(std) std.classList.remove('show-dropdown');
-    if(etd) etd.classList.remove('show-dropdown');
-    const wrap = document.getElementById(type+'-wrap');
+    const wrap = document.getElementById(type + '-wrap');
     const isOpen = wrap.classList.contains('open');
-    document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
-    if (!isOpen) {
-        wrap.classList.add('open');
-        document.getElementById(type+'-inner').focus();
-    }
+    wrap.classList.toggle('open', !isOpen);
+    if (!isOpen) document.getElementById(type + '-inner').focus();
 }
 
 function filterSel(type) {
-    const val = document.getElementById(type+'-inner').value.toLowerCase();
-    document.querySelectorAll('#'+type+'-list .sel-item').forEach(item => {
-        const kw = item.getAttribute('data-kw') || '';
-        item.classList.toggle('hidden', !!val && !kw.includes(val));
+    const val = document.getElementById(type + '-inner').value.toLowerCase();
+    document.querySelectorAll('#' + type + '-list .sel-item').forEach(item => {
+        item.classList.toggle('hidden', val && !(item.dataset.kw || '').includes(val));
     });
+}
+
+function syncDateFromPicker() {
+    const dateInput = document.getElementById('date').value;
+    if (dateInput) {
+        const parts = dateInput.split('-');
+        const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        document.getElementById('date-display').value = parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+        document.getElementById('err-date').style.display = 'none';
+        document.getElementById('date-display').classList.remove('error-border');
+    }
 }
 
 function pickSel(type, value, label, el) {
-    document.getElementById('hidden-project-id').value = value;
-    document.getElementById(type+'-label').textContent = label;
-    document.querySelectorAll('#'+type+'-list .sel-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById(type+'-wrap').classList.remove('open');
-    document.getElementById(type+'-inner').value = '';
-    filterSel(type);
-    clearError('proj-box', 'err-proj');
-
     if (type === 'proj') {
-        const mgr = el.getAttribute('data-iips-mgr') || '';
-        const ptr = el.getAttribute('data-iips-ptr') || '';
-        
-        const mgrRadioYes = document.querySelector('input[name="has_iips_manager_radio"][value="yes"]');
-        const mgrRadioNo = document.querySelector('input[name="has_iips_manager_radio"][value="no"]');
-        const mgrInput = document.querySelector('input[name="iips_manager_name"]');
-        const mgrField = document.getElementById('iips-mgr-field');
-        
-        if (mgr !== '') {
-            mgrRadioYes.checked = true;
+        document.getElementById('proj-label').textContent = label;
+        document.getElementById('hidden-project-id').value = value;
+        document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('proj-wrap').classList.remove('open');
+        document.getElementById('proj-inner').value = '';
+        filterSel('proj');
+        document.getElementById('err-proj').style.display = 'none';
+        document.getElementById('proj-box').classList.remove('error-border');
+
+        let mgr = el.getAttribute('data-iips-mgr') || '';
+        let radYes = document.getElementById('mgr-yes');
+        let radNo = document.getElementById('mgr-no');
+        let mgrInput = document.getElementById('mgr-input');
+        let mgrField = document.getElementById('iips-mgr-field');
+
+        if (mgr.trim() !== '') {
+            radYes.checked = true;
             mgrField.style.display = 'block';
             mgrInput.value = mgr;
+            radYes.disabled = true;
+            radNo.disabled = true;
+            mgrInput.readOnly = true;
+            mgrInput.style.backgroundColor = '#e9ecef';
+            mgrInput.style.color = '#6c757d';
+            mgrInput.style.pointerEvents = 'none';
         } else {
-            if(mgrRadioNo) mgrRadioNo.checked = true;
+            radYes.checked = false;
+            radNo.checked = true;
             mgrField.style.display = 'none';
             mgrInput.value = '';
+            radYes.disabled = false;
+            radNo.disabled = false;
+            mgrInput.readOnly = false;
+            mgrInput.style.backgroundColor = '';
+            mgrInput.style.color = '';
+            mgrInput.style.pointerEvents = 'auto';
         }
 
-        const ptrRadioYes = document.querySelector('input[name="has_partner_radio"][value="yes"]');
-        const ptrRadioNo = document.querySelector('input[name="has_partner_radio"][value="no"]');
-        const ptrInput = document.querySelector('input[name="partner_name"]');
-        const ptrField = document.getElementById('partner-field');
-
-        if (ptr !== '') {
-            ptrRadioYes.checked = true;
-            ptrField.style.display = 'block';
-            ptrInput.value = ptr;
-        } else {
-            if(ptrRadioNo) ptrRadioNo.checked = true;
-            ptrField.style.display = 'none';
-            ptrInput.value = '';
-        }
+        let ptrYes = document.getElementById('ptr-yes');
+        let ptrNo = document.getElementById('ptr-no');
+        let ptrInput = document.getElementById('ptr-input');
+        let ptrField = document.getElementById('partner-field');
+        
+        ptrYes.checked = false;
+        ptrNo.checked = true;
+        ptrField.style.display = 'none';
+        ptrInput.value = '';
     }
 }
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.sel-wrap')) {
+        document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
+    }
+    if (!e.target.closest('.time-input-wrap') && !e.target.closest('.custom-select-dropdown')) {
+        document.querySelectorAll('.custom-select-dropdown').forEach(d => d.classList.remove('show-dropdown'));
+    }
+});
 
 function toggleTimeDropdown(type, event) {
     event.stopPropagation();
-    document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
-    if (amPmErrorFlag[type]) return;
-    const startDropdown = document.getElementById('start-time-dropdown');
-    const endDropdown = document.getElementById('end-time-dropdown');
-    let targetDrop = null;
-    let hiddenVal = document.getElementById(type + '-time-hidden').value;
-    if (type === 'start') {
-        endDropdown.classList.remove('show-dropdown');
-        startDropdown.classList.toggle('show-dropdown');
-        if(startDropdown.classList.contains('show-dropdown')) targetDrop = startDropdown;
-    } else {
-        startDropdown.classList.remove('show-dropdown');
-        endDropdown.classList.toggle('show-dropdown');
-        if(endDropdown.classList.contains('show-dropdown')) targetDrop = endDropdown;
+    const dd = document.getElementById(type + '-time-dropdown');
+    const isOpen = dd.classList.contains('show-dropdown');
+    
+    document.querySelectorAll('.custom-select-dropdown').forEach(d => d.classList.remove('show-dropdown'));
+    
+    if (!isOpen) {
+        dd.classList.add('show-dropdown');
+        if (!dd.innerHTML) buildTimeDropdowns();
     }
-    if (targetDrop && hiddenVal) {
-        targetDrop.querySelectorAll('.custom-option').forEach(opt => {
-            opt.classList.remove('selected');
-            if (opt.getAttribute('data-val') === hiddenVal) {
-                opt.classList.add('selected');
-                setTimeout(() => {
-                    opt.scrollIntoView({ block: 'nearest' });
-                }, 10);
-            }
+}
+
+function selectTime(type, time24, labelStr) {
+    document.getElementById(type + '-time-input').value = labelStr;
+    document.getElementById(type + '-time-hidden').value = time24;
+    document.getElementById(type + '-time-dropdown').classList.remove('show-dropdown');
+    document.getElementById('err-' + type).style.display = 'none';
+    document.getElementById(type + '-time-input').classList.remove('error-border');
+    calcDuration();
+}
+
+function buildTimeDropdowns() {
+    const html = [];
+    for (let h = 0; h < 24; h++) {
+        let period = h < 12 ? 'AM' : 'PM';
+        let displayH = h % 12 || 12;
+        let pLabel = (h === 0 ? "Midnight" : (h === 12 ? "Noon" : ""));
+        if(pLabel) html.push(`<div class="time-header">${pLabel}</div>`);
+        
+        ['00', '30'].forEach(m => {
+            let t24 = h.toString().padStart(2, '0') + ':' + m;
+            let display = `${displayH}:${m} ${period}`;
+            html.push(`<div class="custom-option" onclick="selectTime('START', '${t24}', '${display}')">${display}</div>`);
         });
     }
+    let stHtml = html.join('').replace(/START/g, 'start');
+    let enHtml = html.join('').replace(/START/g, 'end');
+    document.getElementById('start-time-dropdown').innerHTML = stHtml;
+    document.getElementById('end-time-dropdown').innerHTML = enHtml;
 }
 
-function formatAMPM(hours, minutes) {
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    let displayHours = hours % 12;
-    displayHours = displayHours ? displayHours : 12; 
-    const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
-    return displayHours + ':' + displayMinutes + ' ' + ampm;
+function calcDuration() {
+    let st = document.getElementById('start-time-hidden').value;
+    let et = document.getElementById('end-time-hidden').value;
+    if(!st || !et) return;
+    
+    let ds = new Date("2000-01-01T" + st + ":00");
+    let de = new Date("2000-01-01T" + et + ":00");
+    if(de <= ds) de.setDate(de.getDate() + 1);
+    
+    let diff = (de - ds) / 3600000;
+    let text = diff + " Hours";
+    
+    document.getElementById('dur-preview').textContent = "Duration: " + text;
+    document.getElementById('dur-preview').style.display = "block";
 }
-
-function updateDurationPreview() {
-    const sd = document.getElementById('date').value;
-    const st = document.getElementById('start-time-hidden').value;
-    const et = document.getElementById('end-time-hidden').value;
-    const prev = document.getElementById('dur-preview');
-    if (!sd || !st || !et) { 
-        prev.textContent = ''; 
-        prev.style.display = 'none';
-        return; 
-    }
-    const start = new Date(sd + 'T' + st + ':00');
-    let end = new Date(sd + 'T' + et + ':00');
-    if (end <= start) {
-        end.setDate(end.getDate() + 1);
-    }
-    let mealBreaks = parseInt(document.getElementById('actual_meal_breaks').value) || 0;
-    let diff = end - start;
-    diff = diff - (mealBreaks * 3600000); 
-    if (diff < 0) diff = 0;
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const days = Math.floor(h / 24);
-    let t = '⏱ Duration: ';
-    if (days > 0) t += days + 'd ';
-    t += (h % 24) + 'h ' + m + 'm';
-    prev.textContent = t;
-    prev.style.display = 'block';
-}
-
-let currentMaxBreaks = 0;
-function calculateMealBreaks() {
-    const st = document.getElementById('start-time-hidden').value;
-    const et = document.getElementById('end-time-hidden').value;
-    if (!st || !et) return;
-    const start = new Date("1970-01-01T" + st + ":00");
-    let end = new Date("1970-01-01T" + et + ":00");
-    if (end <= start) end.setDate(end.getDate() + 1);
-    const diffHours = (end - start) / (1000 * 60 * 60);
-    let maxBreaks = 0;
-    if (diffHours >= 24) maxBreaks = 3;
-    else if (diffHours > 16) maxBreaks = 2;
-    else if (diffHours > 8) maxBreaks = 1;
-    const container = document.getElementById('meal-break-container');
-    const select = document.getElementById('meal_breaks_select');
-    const checkbox = document.getElementById('meal_break_checkbox');
-    const hiddenInput = document.getElementById('actual_meal_breaks');
-    currentMaxBreaks = maxBreaks;
-    if (maxBreaks > 0) {
-        container.style.display = 'block';
-        let oldVal = document.getElementById('actual_meal_breaks').value || select.value;
-        select.innerHTML = '';
-        if (maxBreaks > 1) {
-            for (let i = 1; i <= maxBreaks; i++) {
-                select.innerHTML += `<option value="${i}">${i}</option>`;
-            }
-            if (oldVal && oldVal <= maxBreaks && oldVal > 0) {
-                select.value = oldVal;
-            }
-        }
-        if (checkbox.checked) {
-            if (maxBreaks > 1) {
-                select.style.display = 'block';
-                hiddenInput.value = select.value;
-            } else {
-                select.style.display = 'none';
-                hiddenInput.value = "1";
-            }
-        } else {
-            select.style.display = 'none';
-            hiddenInput.value = "0";
-        }
-    } else {
-        container.style.display = 'none';
-        checkbox.checked = false;
-        select.style.display = 'none';
-        hiddenInput.value = "0";
-    }
-    updateDurationPreview();
-}
-
-function generateStartTimes() {
-    const container = document.getElementById('start-time-dropdown');
-    container.innerHTML = '';
-    for (let minutes = 0; minutes < 24 * 60; minutes += 15) {
-        const h = Math.floor(minutes / 60);
-        const m = minutes % 60;
-        const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
-        const textStr = formatAMPM(h, m);
-        const opt = document.createElement('div');
-        opt.className = 'custom-option';
-        opt.innerText = textStr;
-        opt.setAttribute('data-val', valStr);
-        opt.onclick = function() {
-            amPmErrorFlag['start'] = false;
-            document.getElementById('start-time-hidden').value = valStr;
-            document.getElementById('start-time-input').value = textStr;
-            document.getElementById('start-time-dropdown').classList.remove('show-dropdown');
-            document.getElementById('end-time-hidden').value = "";
-            document.getElementById('end-time-input').value = "";
-            generateEndTimes();
-            calculateMealBreaks();
-            clearError('start-time-input', 'err-start');
-        };
-        container.appendChild(opt);
-    }
-}
-
-function generateEndTimes() {
-    const container = document.getElementById('end-time-dropdown');
-    container.innerHTML = '';
-    const dateInput = document.getElementById('date');
-    let baseDateText = "Selected Date", nextDateText = "Next Day";
-    if (dateInput && dateInput.value) {
-        const d = new Date(dateInput.value);
-        if (!isNaN(d.getTime())) {
-            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            baseDateText = d.getDate() + ' ' + months[d.getMonth()];
-            const nextD = new Date(d);
-            nextD.setDate(d.getDate() + 1);
-            nextDateText = nextD.getDate() + ' ' + months[nextD.getMonth()];
-        }
-    }
-    const startTimeStr = document.getElementById('start-time-hidden').value;
-    if (!startTimeStr) return; 
-    const [startH, startM] = startTimeStr.split(':').map(Number);
-    const startMins = startH * 60 + startM;
-    let hasAddedNextDayHeader = false;
-    const todayHeader = document.createElement('div');
-    todayHeader.className = 'time-header';
-    todayHeader.innerText = baseDateText;
-    container.appendChild(todayHeader);
-    for (let loopMins = startMins + 15; loopMins <= startMins + 24 * 60; loopMins += 15) {
-        let currentDayMins = loopMins % (24 * 60);
-        let h = Math.floor(currentDayMins / 60);
-        let m = currentDayMins % 60;
-        if (loopMins >= 24 * 60 && !hasAddedNextDayHeader) {
-            const nextHeader = document.createElement('div');
-            nextHeader.className = 'time-header';
-            nextHeader.innerText = nextDateText;
-            container.appendChild(nextHeader);
-            hasAddedNextDayHeader = true;
-        }
-        const valStr = (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m);
-        const textStr = formatAMPM(h, m);
-        const opt = document.createElement('div');
-        opt.className = 'custom-option';
-        opt.innerText = textStr;
-        opt.setAttribute('data-val', valStr);
-        opt.onclick = function() {
-            amPmErrorFlag['end'] = false;
-            document.getElementById('end-time-hidden').value = valStr;
-            document.getElementById('end-time-input').value = textStr;
-            document.getElementById('end-time-dropdown').classList.remove('show-dropdown');
-            calculateMealBreaks();
-            clearError('end-time-input', 'err-end');
-        };
-        container.appendChild(opt);
-    }
-}
-
-document.getElementById('desc-input').addEventListener('input', function() {
-    if(this.value.trim() !== '') {
-        clearError('desc-input', 'err-desc');
-    }
-});
-
-document.addEventListener("DOMContentLoaded", function() {
-    updateDateDisplay();
-    let initStart24 = "<?php echo htmlspecialchars(substr($sel_start_time, 0, 5)); ?>";
-    if (initStart24) {
-        document.getElementById('start-time-input').value = convertTo12Hour(initStart24);
-    } else {
-        let cur = getRoundedCurrentTime();
-        document.getElementById('start-time-input').value = cur.text;
-        document.getElementById('start-time-hidden').value = cur.val;
-    }
-    let initEnd24 = "<?php echo htmlspecialchars(substr($sel_end_time, 0, 5)); ?>";
-    if (initEnd24) {
-        document.getElementById('end-time-input').value = convertTo12Hour(initEnd24);
-    }
-    generateStartTimes();
-    generateEndTimes();
-    let initialMealBreaks = parseInt(document.getElementById('actual_meal_breaks').value) || 0;
-    if (initialMealBreaks > 0) {
-        document.getElementById('meal_break_checkbox').checked = true;
-    }
-    calculateMealBreaks();
-    updateDurationPreview();
-    document.getElementById('meal_break_checkbox').addEventListener('change', function() {
-        const select = document.getElementById('meal_breaks_select');
-        const hiddenInput = document.getElementById('actual_meal_breaks');
-        if (this.checked) {
-            if (currentMaxBreaks > 1) {
-                select.style.display = 'block';
-                hiddenInput.value = select.value;
-            } else {
-                select.style.display = 'none';
-                hiddenInput.value = "1";
-            }
-        } else {
-            select.style.display = 'none';
-            hiddenInput.value = "0";
-        }
-        updateDurationPreview();
-    });
-    document.getElementById('meal_breaks_select').addEventListener('change', function() {
-        document.getElementById('actual_meal_breaks').value = this.value;
-        updateDurationPreview();
-    });
-    const hasConflict = <?php echo !empty($conflict_error) ? 'true' : 'false'; ?>;
-    if (hasConflict) {
-        const sInput = document.getElementById('start-time-input');
-        const eInput = document.getElementById('end-time-input');
-        if (sInput) sInput.classList.add('error-border');
-        if (eInput) eInput.classList.add('error-border');
-        const alertBox = document.getElementById('conflict-alert');
-        if (alertBox) {
-            alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
-});
 
 document.getElementById('record-form').addEventListener('submit', function(e) {
-    if (amPmErrorFlag['start'] || amPmErrorFlag['end']) {
-        e.preventDefault();
-        const inputToScroll = amPmErrorFlag['start'] ? document.getElementById('start-time-input') : document.getElementById('end-time-input');
-        if(inputToScroll) inputToScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-    }
-    let isValid = true;
-    let firstErr = null;
-    function check(valId, visId, errId, textOverride = null) {
-        const val = document.getElementById(valId).value.trim();
-        const vis = document.getElementById(visId);
-        const err = document.getElementById(errId);
-        if (!val) {
-            vis.classList.add('error-border');
-            if(err) {
-                if(textOverride) err.innerText = textOverride;
-                err.style.display = 'block';
-            }
-            if(!firstErr) firstErr = vis;
-            isValid = false;
-        } else {
-            vis.classList.remove('error-border');
-            if(err) err.style.display = 'none';
-        }
-    }
-    check('hidden-project-id', 'proj-box', 'err-proj');
-    check('date', 'date-display', 'err-date');
-    check('start-time-hidden', 'start-time-input', 'err-start', 'Please select a Start Time.');
-    check('end-time-hidden', 'end-time-input', 'err-end', 'Please select an End Time.');
-    check('desc-input', 'desc-input', 'err-desc');
+    let valid = true;
+    let proj = document.getElementById('hidden-project-id').value;
+    let date = document.getElementById('date').value;
+    let start = document.getElementById('start-time-hidden').value;
+    let end = document.getElementById('end-time-hidden').value;
+    let desc = document.getElementById('desc-input').value.trim();
 
-    const iipsMgrPicked = document.querySelector('input[name="has_iips_manager_radio"]:checked');
-    const partnerPicked = document.querySelector('input[name="has_partner_radio"]:checked');
-    if (!iipsMgrPicked) {
-        let el = document.querySelector('input[name="has_iips_manager_radio"]');
-        if (!document.getElementById('err-iips-mgr')) {
-            const err = document.createElement('div');
-            err.id = 'err-iips-mgr';
-            err.style.cssText = 'color:#dc2626;font-size:11px;font-weight:bold;margin-top:4px;';
-            err.textContent = 'Please select Yes or No.';
-            el.closest('.form-group').appendChild(err);
-        }
-        if (!firstErr) firstErr = el;
-        isValid = false;
-    } else {
-        const e = document.getElementById('err-iips-mgr');
-        if (e) e.remove();
-    }
-    if (!partnerPicked) {
-        let el = document.querySelector('input[name="has_partner_radio"]');
-        if (!document.getElementById('err-partner')) {
-            const err = document.createElement('div');
-            err.id = 'err-partner';
-            err.style.cssText = 'color:#dc2626;font-size:11px;font-weight:bold;margin-top:4px;';
-            err.textContent = 'Please select Yes or No.';
-            el.closest('.form-group').appendChild(err);
-        }
-        if (!firstErr) firstErr = el;
-        isValid = false;
-    } else {
-        const e = document.getElementById('err-partner');
-        if (e) e.remove();
-    }
-    if (!isValid) {
-        e.preventDefault();
-        firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if(!proj) { document.getElementById('err-proj').style.display='block'; document.getElementById('proj-box').classList.add('error-border'); valid=false; }
+    if(!date) { document.getElementById('err-date').style.display='block'; document.getElementById('date-display').classList.add('error-border'); valid=false; }
+    if(!start) { document.getElementById('err-start').style.display='block'; document.getElementById('start-time-input').classList.add('error-border'); valid=false; }
+    if(!end) { document.getElementById('err-end').style.display='block'; document.getElementById('end-time-input').classList.add('error-border'); valid=false; }
+    if(!desc) { document.getElementById('err-desc').style.display='block'; document.getElementById('desc-input').classList.add('error-border'); valid=false; }
+
+    if(!valid) e.preventDefault();
 });
 </script>
 </body>

@@ -74,8 +74,6 @@ while ($row = $result->fetch_assoc()) {
     $total_records++;
     $rows_cache[] = $row;
 }
-$total_h = floor($total_minutes / 60);
-$total_m = $total_minutes % 60;
 
 function fmtDate($d) {
     if (!$d) return '-';
@@ -99,37 +97,22 @@ function fmtDateDisplay($d) {
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-
         .topbar { background: #1e2330; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
         .topbar h2 { color: white; margin: 0; font-size: 16px; }
         .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .topbar a { color: #94a3b8; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
         .topbar a:hover { background: rgba(255,255,255,0.1); color: white; }
         .topbar a.logout-btn { color: #f87171; }
-
-        /* Mode switch button */
-        .mode-switch-btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            background: linear-gradient(135deg, #28a745, #1e7e34);
-            color: white; text-decoration: none; font-size: 12px; font-weight: 700;
-            padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer;
-            box-shadow: 0 2px 6px rgba(40,167,69,0.4);
-            transition: all .2s; white-space: nowrap;
-        }
+        .mode-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #28a745, #1e7e34); color: white; text-decoration: none; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer; box-shadow: 0 2px 6px rgba(40,167,69,0.4); transition: all .2s; white-space: nowrap; }
         .mode-switch-btn:hover { background: linear-gradient(135deg, #218838, #176929); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(40,167,69,0.5); color: white; }
-
         .page { padding: 20px; }
-
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
         .stat.green { border-top-color: #28a745; }
         .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
         .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
-
         .btn-create { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 11px 22px; border-radius: 5px; font-weight: bold; font-size: 15px; margin-bottom: 16px; width: 100%; text-align: center; }
         .btn-create:hover { background: #0056b3; }
-
-        /* Date range filter */
         .date-range-bar { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
         .date-range-bar .dr-label { font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; }
         .date-range-bar .date-field-wrap { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 160px; position: relative; height: 38px; }
@@ -139,7 +122,6 @@ function fmtDateDisplay($d) {
         .date-field-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 36px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
         .btn-apply { background: #007bff; color: white; border: none; padding: 0 16px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
         .btn-apply:hover { background: #0056b3; }
-
         .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
         .search-bar-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
         .summary-card { display: none; background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; }
@@ -149,7 +131,6 @@ function fmtDateDisplay($d) {
         .sum-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; }
         .sum-value { font-size: 16px; font-weight: 700; color: #1e293b; }
         .btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
-
         .sel-wrap { flex: 2; min-width: 180px; position: relative; }
         .sel-box { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; }
         .sel-box:hover { border-color: #007bff; }
@@ -166,36 +147,25 @@ function fmtDateDisplay($d) {
         .sel-item:hover { background: #f0f7ff; }
         .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
         .sel-item.hidden { display: none; }
-
-        /* Active date filter indicator */
         .date-filter-badge { display: inline-flex; align-items: center; gap: 6px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
         .date-filter-badge .x-btn { cursor: pointer; color: #1e40af; font-weight: 900; margin-left: 2px; }
         .date-filter-badge .x-btn:hover { color: #dc2626; }
-
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
-        .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; }
+        .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
         .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; min-width: 900px; }
         th, td { padding: 11px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
         th { background: #f8fafc; font-weight: 600; color: #475569; white-space: nowrap; }
         tbody tr:hover { background: #f8faff; }
-
         .is-hidden { display: none !important; }
-
         .act-cell { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; font-size: 12px; color: #555; }
         .act-cell.expanded { display: block; max-height: none; }
-
         .date-range { font-size: 12px; line-height: 1.6; }
         .date-range .start { color: #1d4ed8; font-weight: 600; }
         .date-range .end { color: #7c3aed; font-weight: 600; }
         .date-range .time { color: #64748b; font-size: 11px; }
-
-        .dur-badge { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
-        .dur-badge.multiday { background: #dbeafe; color: #1e40af; }
-
         .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
         .btn-delete { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: bold; }
-
         .sort-wrap { display: inline-flex; align-items: center; gap: 5px; }
         .sort-btn { background: none; border: none; width: 14px; height: 14px; cursor: pointer; position: relative; padding: 0; }
         .sort-btn::before { content:""; position:absolute; top:1px; left:2px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:5px solid #888; }
@@ -206,15 +176,9 @@ function fmtDateDisplay($d) {
         .sort-menu a { display:block; padding:7px 12px; font-size:12px; color:#333; text-decoration:none; }
         .sort-menu a:hover { background:#f8fafc; color:#007bff; }
         .show-sort { display:block !important; }
-
         .no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 15px; }
         .error-border { border: 2px solid #dc2626 !important; }
-
-        @media (max-width: 600px) {
-            .page { padding: 12px; }
-            .stats-bar { gap: 8px; }
-            .stat { min-width: 100px; padding: 10px 12px; }
-        }
+        @media (max-width: 600px) { .page { padding: 12px; } .stats-bar { gap: 8px; } .stat { min-width: 100px; padding: 10px 12px; } }
     </style>
 </head>
 <body>
@@ -233,7 +197,6 @@ function fmtDateDisplay($d) {
 <div class="page">
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
-    <!-- Date range filter -->
     <div class="date-range-bar">
         <span class="dr-label">Start:</span>
         <div class="date-field-wrap">
@@ -303,9 +266,11 @@ function fmtDateDisplay($d) {
             </div>
         </div>
 
-        <div class="card-hdr">Timesheet Records
-            <span style="float:right; font-size:12px; color:#64748b; font-weight:400;">
-                <?= $total_records ?> records · <?= $total_h ?>h <?= $total_m ?>m total
+        <div class="card-hdr">
+            <span>Timesheet Records</span>
+            <span style="font-size:12px; color:#64748b; font-weight:400; display:flex; align-items:center; gap:8px;">
+                <span><?= $total_records ?> records · </span>
+                <?= calculateTotalProjectManDays($total_minutes) ?>
             </span>
         </div>
         <?php if (empty($rows_cache)): ?>
@@ -346,13 +311,7 @@ function fmtDateDisplay($d) {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($rows_cache as $row):
-                    $is_multiday = ($row['start_date'] !== $row['end_date']);
-                    $h = floor($row['_minutes'] / 60);
-                    $m = $row['_minutes'] % 60;
-                    $days = floor($h / 24);
-                    $dur_text = ($days > 0 ? $days.'d ' : '') . ($h%24) . 'h ' . $m . 'm';
-                ?>
+                <?php foreach ($rows_cache as $row): ?>
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>"
                     data-mins="<?= intval($row['_minutes'] ?? 0) ?>">
@@ -375,7 +334,7 @@ function fmtDateDisplay($d) {
                         </div>
                     </td>
                     <td>
-                        <span class="dur-badge <?= $is_multiday ? 'multiday' : '' ?>"><?= $dur_text ?></span>
+                        <?= calculateDuration($row['start_date'], $row['start_time'], $row['end_time']) ?>
                     </td>
                     <td>
                         <div style="display: flex; gap: 8px;">
@@ -399,7 +358,6 @@ let activeProjFilter = '';
 const MONTHS_D = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_U = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
-// ── Pre-fill date range inputs from URL params ────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
     const params = new URLSearchParams(window.location.search);
     const startVal = params.get('start');
@@ -431,7 +389,6 @@ function syncPickerToDisplay(type) {
 function parseDateDisplay(str) {
     str = str.trim().toUpperCase();
     if (!str) return '';
-    // DD MMM YYYY
     let m = str.match(/^(\d{1,2})[\/\-\s]+([A-Z]+)[\/\-\s]+(\d{2,4})$/);
     if (m) {
         const d = m[1].padStart(2,'0');
@@ -440,7 +397,6 @@ function parseDateDisplay(str) {
         let y = m[3]; if (y.length===2) y='20'+y;
         return y+'-'+String(mo).padStart(2,'0')+'-'+d;
     }
-    // DD-MM-YYYY or DD/MM/YYYY
     m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
     if (m) {
         const d=m[1].padStart(2,'0'), mo=m[2].padStart(2,'0');
@@ -456,7 +412,6 @@ function applyDateRange() {
     let startVal = document.getElementById('start-picker').value;
     let endVal   = document.getElementById('end-picker').value;
 
-    // Parse typed text if picker not set
     if (!startVal && startDisplay) {
         startVal = parseDateDisplay(startDisplay);
         if (!startVal) { document.getElementById('start-display').classList.add('error-border'); return; }
@@ -475,13 +430,11 @@ function clearDateRange() {
     window.location.href = 'index.php';
 }
 
-// Enter key on date inputs triggers apply
 ['start-display','end-display'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('keydown', e => { if (e.key==='Enter') applyDateRange(); });
 });
 
-// ── IIPS searchable select ────────────────────────────────────────────────────
 function toggleSel() {
     const wrap = document.getElementById('proj-wrap');
     const isOpen = wrap.classList.contains('open');
@@ -515,7 +468,6 @@ document.addEventListener('click', e => {
     }
 });
 
-// ── Text + IIPS filter ────────────────────────────────────────────────────────
 function doFilter() {
     const txt = document.getElementById('txt-search').value.toLowerCase();
     let visRows = [];
@@ -552,14 +504,12 @@ function clearSearchFilters() {
     doFilter();
 }
 
-// ── Activity expand ───────────────────────────────────────────────────────────
 document.querySelectorAll('.act-cell').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('expanded'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('expanded'); });
 });
 
-// ── Sort ──────────────────────────────────────────────────────────────────────
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id !== id) m.classList.remove('show-sort'); });

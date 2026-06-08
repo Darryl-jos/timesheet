@@ -12,7 +12,7 @@ $msg_type = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_engineer'])) {
     $uname  = strtolower(trim($_POST['username_id']));
     $ename  = trim($_POST['engineer_name']);
-    $is_adm = isset($_POST['is_admin']) ? 1 : 0;
+    $is_adm = isset($_POST['is_admin']) ? 2 : 0;
     $pwd    = trim($_POST['password'] ?? '');
 
     if (empty($uname) || empty($ename)) {
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_engineer'])) {
     $edit_id = intval($_POST['edit_id']);
     $ename   = trim($_POST['engineer_name']);
     $uname   = strtolower(trim($_POST['username_id']));
-    $is_adm  = isset($_POST['is_admin']) ? 1 : 0;
+    $is_adm  = isset($_POST['is_admin']) ? 2 : 0;
     $new_pwd = trim($_POST['password'] ?? '');
 
     if (empty($ename) || empty($uname)) {
