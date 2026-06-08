@@ -234,7 +234,7 @@ function fmtMins($m) {
                 <th class="s-timeline" colspan="3">Timeline — Target</th>
                 <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
                 <th class="s-status"   colspan="3">Status</th>
-                <th class="s-res"      colspan="7">IIPS Management</th>
+                <th class="s-res"      colspan="7">IIPS Resources</th>
             </tr>
             <!-- Column header row -->
             <tr>

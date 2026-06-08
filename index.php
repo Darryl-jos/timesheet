@@ -18,26 +18,33 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-$filter_date = isset($_GET['date']) ? trim($_GET['date']) : '';
-$filter_month = isset($_GET['month']) ? trim($_GET['month']) : '';
+$filter_start = isset($_GET['start']) ? trim($_GET['start']) : '';
+$filter_end   = isset($_GET['end'])   ? trim($_GET['end'])   : '';
 
-if (!empty($filter_date)) {
+if (!empty($filter_start) && !empty($filter_end)) {
     $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
             FROM timesheets t
             JOIN projects p ON t.project_id = p.project_id
-            WHERE t.engineer_id = ? AND t.start_date = ?
+            WHERE t.engineer_id = ? AND t.start_date >= ? AND t.start_date <= ?
             ORDER BY t.id DESC";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("is", $current_user_id, $filter_date);
-} elseif (!empty($filter_month)) {
+    $stmt->bind_param("iss", $current_user_id, $filter_start, $filter_end);
+} elseif (!empty($filter_start)) {
     $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
             FROM timesheets t
             JOIN projects p ON t.project_id = p.project_id
-            WHERE t.engineer_id = ? AND t.start_date LIKE ?
+            WHERE t.engineer_id = ? AND t.start_date >= ?
             ORDER BY t.id DESC";
-    $month_like = $filter_month . '%';
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("is", $current_user_id, $month_like);
+    $stmt->bind_param("is", $current_user_id, $filter_start);
+} elseif (!empty($filter_end)) {
+    $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
+            FROM timesheets t
+            JOIN projects p ON t.project_id = p.project_id
+            WHERE t.engineer_id = ? AND t.start_date <= ?
+            ORDER BY t.id DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("is", $current_user_id, $filter_end);
 } else {
     $sql = "SELECT t.*, p.project_name, p.customer_name, p.estimate_time
             FROM timesheets t
@@ -75,6 +82,13 @@ function fmtDate($d) {
     $dt = DateTime::createFromFormat('Y-m-d', $d);
     return $dt ? $dt->format('d M Y') : $d;
 }
+function fmtDateDisplay($d) {
+    if (!$d) return '';
+    $dt = DateTime::createFromFormat('Y-m-d', $d);
+    if (!$dt) return '';
+    $months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return intval($dt->format('d')) . ' ' . $months[intval($dt->format('m'))-1] . ' ' . $dt->format('Y');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -91,8 +105,18 @@ function fmtDate($d) {
         .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .topbar a { color: #94a3b8; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
         .topbar a:hover { background: rgba(255,255,255,0.1); color: white; }
-        .topbar a.admin-btn { background: #166534; color: #d1fae5; }
         .topbar a.logout-btn { color: #f87171; }
+
+        /* Mode switch button */
+        .mode-switch-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+            color: white; text-decoration: none; font-size: 12px; font-weight: 700;
+            padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer;
+            box-shadow: 0 2px 6px rgba(40,167,69,0.4);
+            transition: all .2s; white-space: nowrap;
+        }
+        .mode-switch-btn:hover { background: linear-gradient(135deg, #218838, #176929); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(40,167,69,0.5); color: white; }
 
         .page { padding: 20px; }
 
@@ -105,9 +129,19 @@ function fmtDate($d) {
         .btn-create { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 11px 22px; border-radius: 5px; font-weight: bold; font-size: 15px; margin-bottom: 16px; width: 100%; text-align: center; }
         .btn-create:hover { background: #0056b3; }
 
+        /* Date range filter */
+        .date-range-bar { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+        .date-range-bar .dr-label { font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; }
+        .date-range-bar .date-field-wrap { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 160px; position: relative; height: 38px; }
+        .date-field-wrap input[type="text"] { flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background: #fff; color: #333; }
+        .date-field-wrap input[type="text"]:focus { border-color: #007bff; outline: none; }
+        .date-field-wrap .cal-icon { position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; font-size: 14px; }
+        .date-field-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 36px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+        .btn-apply { background: #007bff; color: white; border: none; padding: 0 16px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        .btn-apply:hover { background: #0056b3; }
+
         .search-bar-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
         .search-bar-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-        /* Filter dashboard */
         .summary-card { display: none; background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; }
         .summary-card h4 { margin: 0 0 10px; font-size: 13px; color: #1e40af; font-weight: 700; }
         .sum-grid { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -115,7 +149,7 @@ function fmtDate($d) {
         .sum-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; }
         .sum-value { font-size: 16px; font-weight: 700; color: #1e293b; }
         .btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
-        
+
         .sel-wrap { flex: 2; min-width: 180px; position: relative; }
         .sel-box { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; }
         .sel-box:hover { border-color: #007bff; }
@@ -132,6 +166,11 @@ function fmtDate($d) {
         .sel-item:hover { background: #f0f7ff; }
         .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
         .sel-item.hidden { display: none; }
+
+        /* Active date filter indicator */
+        .date-filter-badge { display: inline-flex; align-items: center; gap: 6px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+        .date-filter-badge .x-btn { cursor: pointer; color: #1e40af; font-weight: 900; margin-left: 2px; }
+        .date-filter-badge .x-btn:hover { color: #dc2626; }
 
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
         .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; }
@@ -169,7 +208,6 @@ function fmtDate($d) {
         .show-sort { display:block !important; }
 
         .no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 15px; }
-        
         .error-border { border: 2px solid #dc2626 !important; }
 
         @media (max-width: 600px) {
@@ -185,7 +223,7 @@ function fmtDate($d) {
     <h2>👷 <?= htmlspecialchars($current_user_name) ?></h2>
     <div class="nav">
         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
-            <a href="admin.php" class="admin-btn">⚙️ Admin</a>
+            <a href="admin.php" class="mode-switch-btn">⚙️ Switch to Admin</a>
         <?php endif; ?>
         <a href="profile.php">👤 Profile</a>
         <a href="login.php?action=logout" class="logout-btn">Logout</a>
@@ -193,20 +231,39 @@ function fmtDate($d) {
 </div>
 
 <div class="page">
-    <!-- Month filter -->
-    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-        <form id="month-form" method="GET" style="margin:0; width:180px; height:38px;">
-            <div style="position:relative; width:100%; height:100%; display:flex;">
-                <input type="text" id="month-display" placeholder="ALL MONTHS" autocomplete="off" style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;background:#fff;color:#333;box-sizing:border-box;z-index:1;">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;z-index:5;">
-                    <span style="position:absolute;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;">📅</span>
-                    <input type="month" name="month" id="month-filter" value="<?= htmlspecialchars($filter_month) ?>" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;" onchange="syncMonth()">
-                </div>
-            </div>
-        </form>
+    <a href="create.php" class="btn-create">+ Create New Record</a>
+
+    <!-- Date range filter -->
+    <div class="date-range-bar">
+        <span class="dr-label">Start:</span>
+        <div class="date-field-wrap">
+            <input type="text" id="start-display" placeholder="DD MMM YYYY" autocomplete="off">
+            <span class="cal-icon">📅</span>
+            <input type="date" id="start-picker" onchange="syncPickerToDisplay('start')">
+        </div>
+        <span class="dr-label">End:</span>
+        <div class="date-field-wrap">
+            <input type="text" id="end-display" placeholder="DD MMM YYYY" autocomplete="off">
+            <span class="cal-icon">📅</span>
+            <input type="date" id="end-picker" onchange="syncPickerToDisplay('end')">
+        </div>
+        <button class="btn-apply" onclick="applyDateRange()">Apply</button>
+        <button class="btn-clear" onclick="clearDateRange()">Clear</button>
     </div>
 
-    <a href="create.php" class="btn-create">+ Create New Record</a>
+    <?php if (!empty($filter_start) || !empty($filter_end)): ?>
+    <div class="date-filter-badge">
+        📅 Showing:
+        <?php if ($filter_start && $filter_end): ?>
+            <?= fmtDateDisplay($filter_start) ?> → <?= fmtDateDisplay($filter_end) ?>
+        <?php elseif ($filter_start): ?>
+            From <?= fmtDateDisplay($filter_start) ?>
+        <?php else: ?>
+            Until <?= fmtDateDisplay($filter_end) ?>
+        <?php endif; ?>
+        <span class="x-btn" onclick="clearDateRange()">✕</span>
+    </div>
+    <?php endif; ?>
 
     <div class="search-bar-wrap">
         <input type="text" id="txt-search" placeholder="🔍 Search activity, iips, customer..." oninput="doFilter()">
@@ -234,33 +291,25 @@ function fmtDate($d) {
                 </div>
             </div>
         </div>
-
-        <form id="date-form" method="GET" style="margin: 0; display: flex; flex: 1; min-width: 140px; height: 38px;">
-            <div style="position: relative; width: 100%; height: 38px; display: flex;">
-                <input type="text" id="date-display" placeholder="DD MMM YYYY" autocomplete="off" style="flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-transform: uppercase; background-color: #fff; color: #333; box-sizing: border-box; z-index: 1;">
-                <div style="position: absolute; right: 0; top: 0; width: 36px; height: 100%; z-index: 5;">
-                    <span style="position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none;">📅</span>
-                    <input type="date" name="date" id="date-filter" value="<?= htmlspecialchars($filter_date) ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;" onchange="syncDate()">
-                </div>
-            </div>
-        </form>
-
-        <button class="btn-clear" onclick="clearFilters()">Clear</button>
+        <button class="btn-clear" onclick="clearSearchFilters()">Clear</button>
     </div>
 
     <div class="card">
-    <!-- Filter Dashboard -->
-    <div class="summary-card" id="sum-card">
-        <h4>📊 Filter Results Dashboard</h4>
-        <div class="sum-grid">
-            <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
-            <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
+        <div class="summary-card" id="sum-card">
+            <h4>📊 Filter Results Dashboard</h4>
+            <div class="sum-grid">
+                <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
+                <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
+            </div>
         </div>
-    </div>
 
-        <div class="card-hdr">Timesheet Records</div>
+        <div class="card-hdr">Timesheet Records
+            <span style="float:right; font-size:12px; color:#64748b; font-weight:400;">
+                <?= $total_records ?> records · <?= $total_h ?>h <?= $total_m ?>m total
+            </span>
+        </div>
         <?php if (empty($rows_cache)): ?>
-            <div class="no-data">No records found. Click "Create New Record" to add an entry.</div>
+            <div class="no-data">No records found. Click "+ Create New Record" to add an entry.</div>
         <?php else: ?>
         <div class="tbl-wrap">
         <table id="main-table">
@@ -347,6 +396,92 @@ function fmtDate($d) {
 let origRows = null;
 let activeProjFilter = '';
 
+const MONTHS_D = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_U = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+// ── Pre-fill date range inputs from URL params ────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const startVal = params.get('start');
+    const endVal   = params.get('end');
+    if (startVal) {
+        document.getElementById('start-picker').value = startVal;
+        document.getElementById('start-display').value = formatDateDisplay(startVal);
+    }
+    if (endVal) {
+        document.getElementById('end-picker').value = endVal;
+        document.getElementById('end-display').value = formatDateDisplay(endVal);
+    }
+});
+
+function formatDateDisplay(ymd) {
+    if (!ymd) return '';
+    const p = ymd.split('-');
+    if (p.length !== 3) return '';
+    return parseInt(p[2]) + ' ' + MONTHS_U[parseInt(p[1])-1] + ' ' + p[0];
+}
+
+function syncPickerToDisplay(type) {
+    const picker  = document.getElementById(type + '-picker');
+    const display = document.getElementById(type + '-display');
+    display.value = formatDateDisplay(picker.value);
+    display.classList.remove('error-border');
+}
+
+function parseDateDisplay(str) {
+    str = str.trim().toUpperCase();
+    if (!str) return '';
+    // DD MMM YYYY
+    let m = str.match(/^(\d{1,2})[\/\-\s]+([A-Z]+)[\/\-\s]+(\d{2,4})$/);
+    if (m) {
+        const d = m[1].padStart(2,'0');
+        const mo = MONTHS_U.findIndex(x => x === m[2].substring(0,3)) + 1;
+        if (mo < 1) return '';
+        let y = m[3]; if (y.length===2) y='20'+y;
+        return y+'-'+String(mo).padStart(2,'0')+'-'+d;
+    }
+    // DD-MM-YYYY or DD/MM/YYYY
+    m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+        const d=m[1].padStart(2,'0'), mo=m[2].padStart(2,'0');
+        let y=m[3]; if(y.length===2) y='20'+y;
+        return y+'-'+mo+'-'+d;
+    }
+    return '';
+}
+
+function applyDateRange() {
+    const startDisplay = document.getElementById('start-display').value.trim();
+    const endDisplay   = document.getElementById('end-display').value.trim();
+    let startVal = document.getElementById('start-picker').value;
+    let endVal   = document.getElementById('end-picker').value;
+
+    // Parse typed text if picker not set
+    if (!startVal && startDisplay) {
+        startVal = parseDateDisplay(startDisplay);
+        if (!startVal) { document.getElementById('start-display').classList.add('error-border'); return; }
+    }
+    if (!endVal && endDisplay) {
+        endVal = parseDateDisplay(endDisplay);
+        if (!endVal) { document.getElementById('end-display').classList.add('error-border'); return; }
+    }
+    let url = 'index.php?';
+    if (startVal) url += 'start=' + startVal + '&';
+    if (endVal)   url += 'end='   + endVal   + '&';
+    window.location.href = url.replace(/&$/, '');
+}
+
+function clearDateRange() {
+    window.location.href = 'index.php';
+}
+
+// Enter key on date inputs triggers apply
+['start-display','end-display'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => { if (e.key==='Enter') applyDateRange(); });
+});
+
+// ── IIPS searchable select ────────────────────────────────────────────────────
 function toggleSel() {
     const wrap = document.getElementById('proj-wrap');
     const isOpen = wrap.classList.contains('open');
@@ -375,18 +510,12 @@ function pickProj(el, value, label) {
 
 document.addEventListener('click', e => {
     if (!e.target.closest('#proj-wrap')) {
-        const pwrap = document.getElementById('proj-wrap');
-        if(pwrap) pwrap.classList.remove('open');
+        const p = document.getElementById('proj-wrap');
+        if (p) p.classList.remove('open');
     }
 });
 
-const MONTHS_D = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmtD(ymd) {
-    if (!ymd) return '-';
-    const p = ymd.split('-');
-    return parseInt(p[2])+'-'+MONTHS_D[parseInt(p[1])-1]+'-'+p[0];
-}
-
+// ── Text + IIPS filter ────────────────────────────────────────────────────────
 function doFilter() {
     const txt = document.getElementById('txt-search').value.toLowerCase();
     let visRows = [];
@@ -412,32 +541,30 @@ function updateSummary(visRows, txt) {
     card.style.display = 'block';
 }
 
-function clearFilters() {
-    document.getElementById('txt-search').value  = '';
+function clearSearchFilters() {
+    document.getElementById('txt-search').value = '';
     activeProjFilter = '';
     document.getElementById('proj-label').textContent = 'All IIPS';
     document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
-    document.querySelector('#proj-list .sel-item[data-value=""]').classList.add('active');
+    const allItem = document.querySelector('#proj-list .sel-item[data-value=""]');
+    if (allItem) allItem.classList.add('active');
     document.getElementById('sum-card').style.display = 'none';
-    if (document.getElementById('date-filter').value !== '' || document.getElementById('month-filter').value !== '') {
-        window.location.href = 'index.php';
-    } else {
-        doFilter();
-    }
+    doFilter();
 }
 
+// ── Activity expand ───────────────────────────────────────────────────────────
 document.querySelectorAll('.act-cell').forEach(c => {
     let t;
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('expanded'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('expanded'); });
 });
 
+// ── Sort ──────────────────────────────────────────────────────────────────────
 function toggleSort(e, id) {
     e.stopPropagation();
     document.querySelectorAll('.sort-menu').forEach(m => { if (m.id !== id) m.classList.remove('show-sort'); });
     document.getElementById(id).classList.toggle('show-sort');
 }
-
 window.addEventListener('click', () => document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')));
 
 function sortTable(col, type, dir) {
@@ -459,203 +586,6 @@ function sortTable(col, type, dir) {
     });
     rows.forEach(r => tbody.appendChild(r));
 }
-
-function parseMonthInput(str) {
-    str = str.trim();
-    if (!str) return '';
-    let m, y;
-    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-    
-    let textMatch = str.match(/^([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
-    if (textMatch) {
-        let mStr = textMatch[1].toUpperCase().substring(0, 3);
-        m = months.indexOf(mStr) + 1;
-        if (m === 0) return '';
-        y = parseInt(textMatch[2], 10);
-    } else {
-        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{2,4})$/);
-        if (numMatch) {
-            m = parseInt(numMatch[1], 10);
-            y = parseInt(numMatch[2], 10);
-        } else {
-            let digitMatch = str.match(/^(\d{2})(\d{4})$/);
-            if (digitMatch) {
-                m = parseInt(digitMatch[1], 10);
-                y = parseInt(digitMatch[2], 10);
-            } else {
-                let shortMatch = str.match(/^(\d{2})(\d{2})$/);
-                if (shortMatch) {
-                    m = parseInt(shortMatch[1], 10);
-                    y = parseInt(shortMatch[2], 10);
-                } else {
-                    return '';
-                }
-            }
-        }
-    }
-    if (y < 100) y += 2000;
-    if (m < 1 || m > 12) return '';
-    let mmStr = m < 10 ? '0' + m : m;
-    return y + '-' + mmStr;
-}
-
-function parseDateInput(str) {
-    str = str.trim();
-    if (!str) return '';
-    let d, m, y;
-    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-    let textMatch = str.match(/^(\d{1,2})[\s\/\-]*([a-zA-Z]+)[\s\/\-]*(\d{2,4})$/);
-    if (textMatch) {
-        d = parseInt(textMatch[1], 10);
-        let mStr = textMatch[2].toUpperCase().substring(0, 3);
-        m = months.indexOf(mStr) + 1;
-        if (m === 0) return '';
-        y = parseInt(textMatch[3], 10);
-    } else {
-        let numMatch = str.match(/^(\d{1,2})[\s\/\-]+(\d{1,2})[\s\/\-]+(\d{2,4})$/);
-        if (numMatch) {
-            d = parseInt(numMatch[1], 10);
-            m = parseInt(numMatch[2], 10);
-            y = parseInt(numMatch[3], 10);
-        } else {
-            let digitMatch = str.match(/^(\d{2})(\d{2})(\d{4})$/);
-            if (digitMatch) {
-                d = parseInt(digitMatch[1], 10);
-                m = parseInt(digitMatch[2], 10);
-                y = parseInt(digitMatch[3], 10);
-            } else {
-                return '';
-            }
-        }
-    }
-    if (y < 100) y += 2000;
-    if (m < 1 || m > 12) return '';
-    let daysInMonth = new Date(y, m, 0).getDate();
-    if (d < 1 || d > daysInMonth) return '';
-    let mmStr = m < 10 ? '0' + m : m;
-    let ddStr = d < 10 ? '0' + d : d;
-    return y + '-' + mmStr + '-' + ddStr;
-}
-
-function formatMonthDisplay(val) {
-    if (!val) return '';
-    const parts = val.split('-');
-    if (parts.length === 2) {
-        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-        return months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
-    }
-    return '';
-}
-
-function formatDateDisplay(val) {
-    if (!val) return '';
-    const parts = val.split('-');
-    if (parts.length === 3) {
-        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-        let d = parseInt(parts[2], 10);
-        let m = parseInt(parts[1], 10);
-        return d + ' ' + months[m - 1] + ' ' + parts[0];
-    }
-    return '';
-}
-
-function submitMonth(val) {
-    if (val) {
-        window.location.href = 'index.php?month=' + val;
-    } else {
-        window.location.href = 'index.php';
-    }
-}
-
-function submitDate(val) {
-    if (val) {
-        window.location.href = 'index.php?date=' + val;
-    } else {
-        window.location.href = 'index.php';
-    }
-}
-
-const mDisp = document.getElementById('month-display');
-const mFilt = document.getElementById('month-filter');
-const dDisp = document.getElementById('date-display');
-const dFilt = document.getElementById('date-filter');
-
-mDisp.addEventListener('blur', function() {
-    if (!this.value.trim()) {
-        if (mFilt.value) submitMonth(''); 
-        return;
-    }
-    const p = parseMonthInput(this.value);
-    if (p) {
-        this.classList.remove('error-border');
-        if (p !== mFilt.value) {
-            submitMonth(p);
-        } else {
-            this.value = formatMonthDisplay(p);
-        }
-    } else {
-        this.classList.add('error-border');
-    }
-});
-mDisp.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
-});
-mDisp.addEventListener('input', function(e) {
-    if (e.inputType === 'deleteContentBackward') return;
-    let v = this.value;
-    if (/^\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{6}$/.test(v)) this.value = v.substring(0,2) + '-' + v.substring(2,6);
-});
-
-dDisp.addEventListener('blur', function() {
-    if (!this.value.trim()) {
-        this.placeholder = "DD MMM YYYY";
-        if (dFilt.value) submitDate('');
-        return;
-    }
-    const p = parseDateInput(this.value);
-    if (p) {
-        this.classList.remove('error-border');
-        if (p !== dFilt.value) {
-            submitDate(p);
-        } else {
-            this.value = formatDateDisplay(p);
-        }
-    } else {
-        this.classList.add('error-border');
-    }
-});
-dDisp.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
-});
-dDisp.addEventListener('input', function(e) {
-    if (e.inputType === 'deleteContentBackward') return;
-    let v = this.value;
-    if (/^\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{2}-\d{2}$/.test(v)) this.value = v + '-';
-    if (/^\d{8}$/.test(v)) {
-        this.value = v.substring(0,2) + '-' + v.substring(2,4) + '-' + v.substring(4,8);
-    }
-});
-
-function syncMonth() {
-    if (mFilt.value) submitMonth(mFilt.value);
-}
-
-function syncDate() {
-    if (dFilt.value) submitDate(dFilt.value);
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    if (mFilt.value) {
-        mDisp.value = formatMonthDisplay(mFilt.value);
-    }
-    if (dFilt.value) {
-        dDisp.value = formatDateDisplay(dFilt.value);
-    } else {
-        dDisp.placeholder = "DD MMM YYYY";
-    }
-});
 </script>
 </body>
 </html>

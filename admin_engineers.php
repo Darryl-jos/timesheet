@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_engineer'])) {
             $msg = "Username <strong>$uname</strong> already exists."; $msg_type = "error";
         } else {
             $hashed = password_hash($pwd, PASSWORD_DEFAULT);
-            $ins = $conn->prepare("INSERT INTO engineers (username_id, engineer_name, password, is_admin, is_verified) VALUES (?, ?, ?, ?, 1)");
+            $ins = $conn->prepare("INSERT INTO engineers (username_id, engineer_name, password, is_admin) VALUES (?, ?, ?, ?)");
             $ins->bind_param("sssi", $uname, $ename, $hashed, $is_adm); $ins->execute(); $ins->close();
             $msg = "Engineer <strong>$ename</strong> added successfully."; $msg_type = "success";
         }

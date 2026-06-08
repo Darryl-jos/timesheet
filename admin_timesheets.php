@@ -54,32 +54,12 @@ while ($row = $ts_result->fetch_assoc()) {
     $rows_cache[] = $row;
 }
 
-// Per-project aggregates (for summary card)
-$proj_agg = [];
-foreach ($rows_cache as $r) {
-    $pid = $r['project_id'];
-    if (!isset($proj_agg[$pid])) {
-        $proj_agg[$pid] = [
-            'project_name'  => $r['project_name'],
-            'customer_name' => $r['customer_name'],
-            'estimate_time' => $r['estimate_time'],
-            'total_minutes' => 0,
-            'engineers'     => [],
-            'min_start'     => $r['start_date'],
-            'max_end'       => $r['end_date'],
-        ];
-    }
-    $proj_agg[$pid]['total_minutes'] += $r['_minutes'];
-    $proj_agg[$pid]['engineers'][$r['engineer_name']] = true;
-    if ($r['start_date'] < $proj_agg[$pid]['min_start']) $proj_agg[$pid]['min_start'] = $r['start_date'];
-    if ($r['end_date']   > $proj_agg[$pid]['max_end'])   $proj_agg[$pid]['max_end']   = $r['end_date'];
-}
-$proj_agg_json = json_encode($proj_agg);
+$proj_agg_json = json_encode([]);
 
 function fmtDate($d) {
     if (!$d) return '-';
     $dt = DateTime::createFromFormat('Y-m-d', $d);
-    return $dt ? $dt->format('d-M-Y') : $d;
+    return $dt ? $dt->format('d M Y') : $d;
 }
 ?>
 <!DOCTYPE html>
@@ -101,13 +81,30 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 /* ── Page ── */
 .page { padding: 20px; }
 
-/* ── Stats ── */
-.stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.stat { background: white; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 120px; border-top: 3px solid #007bff; }
-.stat.green { border-top-color: #28a745; }
-.stat.orange{ border-top-color: #fd7e14; }
-.stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
-.stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+/* ── Live Search Dashboard ── */
+.live-dashboard {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    border-left: 5px solid #007bff;
+    display: none;
+}
+.live-dashboard h4 { margin: 0 0 12px; font-size: 14px; color: #1e40af; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.live-dashboard h4 .pulse { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.dash-item { background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0; }
+.dash-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 3px; }
+.dash-value { font-size: 18px; font-weight: 700; color: #1e293b; }
+.dash-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+/* Filter tag strip */
+.filter-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ftag { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+.ftag.eng  { background: #dcfce7; color: #166534; }
+.ftag.date { background: #fef9c3; color: #854d0e; }
 
 /* ── Search bar ── */
 .search-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
@@ -130,28 +127,7 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 .sel-item:hover { background: #f0f7ff; }
 .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
 .sel-item.hidden { display: none; }
-.btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; }
-.proj-wrap { flex: 3; min-width: 140px; position: relative; }
-.sel-trigger { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
-.sel-trigger::after { content:""; border-left:4px solid transparent; border-right:4px solid transparent; border-top:4px solid #666; }
-.sel-drop { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 999; margin-top: 2px; padding: 6px; }
-.sel-drop input { height: 30px; margin-bottom: 5px; font-size: 12px; width: 100%; padding: 0 8px; border: 1px solid #ddd; border-radius: 3px; }
-.sel-opts { max-height: 160px; overflow-y: auto; }
-.sel-opt { padding: 6px 8px; cursor: pointer; font-size: 12px; border-radius: 3px; }
-.sel-opt:hover { background: #f0f7ff; color: #007bff; }
-.sel-opt.active { background: #e6f0ff; color: #007bff; font-weight: bold; }
-.show-drop { display: block !important; }
-
-/* Engineer filter */
-.btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
-
-/* ── Project Summary Card ── */
-.summary-card { display: none; background: white; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); border-left: 5px solid #007bff; margin-bottom: 14px; }
-.summary-card h4 { margin: 0 0 12px 0; color: #007bff; font-size: 15px; }
-.sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.sum-item { background: #f8fafc; padding: 10px 12px; border-radius: 5px; border: 1px solid #e2e8f0; }
-.sum-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 3px; }
-.sum-value { font-size: 14px; font-weight: 700; color: #1e293b; }
+.btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
 
 /* ── Bulk Toolbar ── */
 #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -185,13 +161,8 @@ tbody tr:hover { background: #f8faff; }
 .dur { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 7px; border-radius: 10px; font-size: 11px; white-space: nowrap; }
 .dur.multi { background: #dbeafe; color: #1e40af; }
 
-/* Mandays badge */
-.md-badge { font-size: 11px; font-weight: bold; }
-.md-target { color: #1e40af; }
-.md-actual { color: #065f46; }
-
 /* Gap badge */
-.gap-over { color: #dc3545; font-weight: bold; font-size: 11px; }
+.gap-over  { color: #dc3545; font-weight: bold; font-size: 11px; }
 .gap-under { color: #28a745; font-weight: bold; font-size: 11px; }
 .gap-ok    { color: #6c757d; font-weight: bold; font-size: 11px; }
 
@@ -217,8 +188,6 @@ tbody tr:hover { background: #f8faff; }
 
 @media (max-width: 600px) {
     .page { padding: 10px; }
-    .stats-bar { gap: 8px; }
-    .stat { min-width: 100px; }
 }
 </style>
 </head>
@@ -230,12 +199,6 @@ tbody tr:hover { background: #f8faff; }
 </div>
 
 <div class="page">
-
-    <!-- Stats -->
-    <?php
-    $total_recs = count($rows_cache);
-    $total_mins_all = array_sum(array_column($rows_cache, '_minutes'));
-    ?>
 
     <!-- Bulk Toolbar -->
     <div id="bulk-toolbar">
@@ -302,30 +265,35 @@ tbody tr:hover { background: #f8faff; }
             </div>
         </div>
 
-        <div style="position:relative; flex:1; min-width:130px; height:38px; display:flex;">
-            <input type="text" id="date-display" placeholder="DD-MM-YYYY"
-                style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;"
-                autocomplete="off"
-                oninput="liveDateSearch(this)"
-                onblur="parseDateSearch()"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-            <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;"
-                onclick="document.getElementById('date-search').showPicker()">📅</div>
-            <input type="date" id="date-search"
-                style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:10;"
-                onchange="syncDateSearch()">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">Start:</span>
+            <input type="date" id="date-start" onchange="doFilter()" style="height:38px;padding:0 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+            <span style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">to End:</span>
+            <input type="date" id="date-end" onchange="doFilter()" style="height:38px;padding:0 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
         </div>
         <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
 
-    <!-- Live Filter Dashboard — only shows when filtering -->
-    <div class="summary-card" id="sum-card">
-        <h4>📊 Filter Results Dashboard</h4>
-        <div class="sum-grid">
-            <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
-            <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
-            <div class="sum-item"><span class="sum-label">Engineers</span><span class="sum-value" id="sum-engs">-</span></div>
-            <div class="sum-item"><span class="sum-label">Date Range</span><span class="sum-value" id="sum-dates">-</span></div>
+    <!-- Live Search Dashboard -->
+    <div class="live-dashboard" id="live-dashboard">
+        <div class="dash-grid">
+            <div class="dash-item">
+                <span class="dash-label">Matching Logs</span>
+                <div class="dash-value" id="dash-logs">—</div>
+            </div>
+            <div class="dash-item">
+                <span class="dash-label">Total Hours</span>
+                <div class="dash-value" id="dash-hours">—</div>
+            </div>
+            <div class="dash-item">
+                <span class="dash-label">Engineers</span>
+                <div class="dash-value" id="dash-engs">—</div>
+            </div>
+            <div class="dash-item">
+                <span class="dash-label">Date Range</span>
+                <div class="dash-value" style="font-size:13px;" id="dash-dates">—</div>
+                <div class="dash-sub" id="dash-days"></div>
+            </div>
         </div>
     </div>
 
@@ -420,6 +388,7 @@ tbody tr:hover { background: #f8faff; }
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-eng="<?= htmlspecialchars($row['engineer_name']) ?>"
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>"
+                    data-ed="<?= htmlspecialchars($row['end_date']) ?>"
                     data-mins="<?= $mins ?>">
                     <td><input type="checkbox" class="ts-chk" name="selected_ts[]" value="<?= $row['id'] ?>" onchange="onChkChange()"></td>
                     <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
@@ -445,7 +414,7 @@ tbody tr:hover { background: #f8faff; }
                         <span class="dur <?= $is_multi ? 'multi' : '' ?>"><?= $dur_text ?></span>
                     </td>
                     <td>
-                        <span class="md-target"><?= intval($row['estimate_time']) ?>h</span><br>
+                        <span style="font-weight:700;color:#1e40af;"><?= intval($row['estimate_time']) ?>h</span><br>
                         <span style="font-size:10px; color:#94a3b8;">(<?= round($row['estimate_time']/8, 1) ?> days)</span>
                     </td>
                     <td><?= $gap_html ?></td>
@@ -463,63 +432,14 @@ tbody tr:hover { background: #f8faff; }
 </div>
 
 <script>
-const projAgg = <?= $proj_agg_json ?>;
 let activeProjFilter = '';
 let activeEngFilter  = '';
 let origRows = null;
-
-const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function liveDateSearch(inp) {
-    let digits = inp.value.replace(/\D/g,'');
-    let result = '';
-    if (digits.length > 0) {
-        let d = digits.substring(0,2);
-        if (digits.length >= 2) { let n=parseInt(d); if(n<1)d='01'; if(n>31)d='31'; }
-        result += d;
-    }
-    if (digits.length >= 3) {
-        let m = digits.substring(2,4);
-        if (digits.length >= 4) { let n=parseInt(m); if(n<1)m='01'; if(n>12)m='12'; }
-        result += '-' + m;
-    }
-    if (digits.length >= 5) result += '-' + digits.substring(4,8);
-    inp.value = result;
-}
-
-function parseDateSearch() {
-    const disp = document.getElementById('date-display');
-    const hidden = document.getElementById('date-search');
-    const str = disp.value.trim();
-    if (!str) { hidden.value = ''; doFilter(); return; }
-    const parts = str.split('-');
-    if (parts.length === 3 && parts[2].length === 4) {
-        const d = parts[0].padStart(2,'0');
-        const m = parts[1].padStart(2,'0');
-        const y = parts[2];
-        hidden.value = y+'-'+m+'-'+d;
-        disp.value = parseInt(d)+'-'+MON[parseInt(m)-1]+'-'+y;
-    }
-    doFilter();
-}
-
-function syncDateSearch() {
-    const val = document.getElementById('date-search').value;
-    const disp = document.getElementById('date-display');
-    if (val) {
-        const p = val.split('-');
-        disp.value = parseInt(p[2])+'-'+MON[parseInt(p[1])-1]+'-'+p[0];
-    } else {
-        disp.value = '';
-    }
-    doFilter();
-}
 
 // ── Searchable select ─────────────────────────────────────────────────────────
 function toggleSel(type) {
     const wrap = document.getElementById(type+'-wrap');
     const isOpen = wrap.classList.contains('open');
-    // close all
     document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
     if (!isOpen) {
         wrap.classList.add('open');
@@ -529,7 +449,7 @@ function toggleSel(type) {
 function filterSel(type) {
     const val = document.getElementById(type+'-inner').value.toLowerCase();
     document.querySelectorAll('#'+type+'-list .sel-item').forEach(item => {
-        if (!item.dataset.value) { item.classList.remove('hidden'); return; } // always show "All"
+        if (!item.dataset.value) { item.classList.remove('hidden'); return; }
         item.classList.toggle('hidden', !!val && !(item.dataset.kw||'').includes(val));
     });
 }
@@ -540,21 +460,22 @@ function pickSel(type, value, label, el) {
     el.classList.add('active');
     document.getElementById(type+'-wrap').classList.remove('open');
     document.getElementById(type+'-inner').value = '';
-    filterSel(type); // reset filter display
+    filterSel(type);
     doFilter();
 }
-// Close on outside click
 document.addEventListener('click', e => {
     if (!e.target.closest('.sel-wrap')) {
         document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
     }
 });
 
-// ── Filter ────────────────────────────────────────────────────────────────────
+// ── Filter + Live Dashboard ───────────────────────────────────────────────────
 function doFilter() {
-    const txt  = document.getElementById('txt-search').value.toLowerCase();
-    const date = document.getElementById('date-search').value;
+    const txt       = document.getElementById('txt-search').value.toLowerCase();
+    const dateStart = document.getElementById('date-start').value;
+    const dateEnd   = document.getElementById('date-end').value;
     let visRows = [];
+
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
         const rPid = tr.dataset.pid || '';
         const rEng = tr.dataset.eng || '';
@@ -563,69 +484,79 @@ function doFilter() {
         const ok = (!txt              || rTxt.includes(txt))
                 && (!activeProjFilter || rPid === activeProjFilter)
                 && (!activeEngFilter  || rEng === activeEngFilter)
-                && (!date             || rSd  === date);
+                && (!dateStart        || rSd  >= dateStart)
+                && (!dateEnd          || rSd  <= dateEnd);
         tr.classList.toggle('is-hidden', !ok);
         if (ok) visRows.push(tr);
     });
-    updateSummary(visRows, txt, date);
+
+    updateLiveDashboard(visRows, txt, dateStart, dateEnd);
 }
 
-function updateSummary(visRows, txt, date) {
-    const card = document.getElementById('sum-card');
-    const hasFilter = txt || activeProjFilter || activeEngFilter || date;
+function fmtDateJS(ymd) {
+    if (!ymd) return '';
+    const p = ymd.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return parseInt(p[2]) + ' ' + months[parseInt(p[1])-1] + ' ' + p[0];
+}
 
-    // Hide when no filter active
-    if (!hasFilter || visRows.length === 0) { card.style.display = 'none'; return; }
+function updateLiveDashboard(visRows, txt, dateStart, dateEnd) {
+    const dash = document.getElementById('live-dashboard');
+    const hasFilter = txt || activeProjFilter || activeEngFilter || dateStart || dateEnd;
 
-    // Calculate stats from visible rows only
+    if (!hasFilter) { dash.style.display = 'none'; return; }
+
     let totalMins = 0;
     const engSet  = new Set();
-    const projSet = new Set();
     let minDate = '', maxDate = '';
 
     visRows.forEach(tr => {
         totalMins += parseInt(tr.dataset.mins) || 0;
-        if (tr.dataset.eng)  engSet.add(tr.dataset.eng);
-        if (tr.dataset.pid)  projSet.add(tr.dataset.pid);
+        if (tr.dataset.eng) engSet.add(tr.dataset.eng);
         const sd = tr.dataset.sd || '';
+        const ed = tr.dataset.ed || '';
         if (sd) {
             if (!minDate || sd < minDate) minDate = sd;
             if (!maxDate || sd > maxDate) maxDate = sd;
         }
     });
 
-    const h   = Math.floor(totalMins / 60);
-    const m   = totalMins % 60;
-    const avg = visRows.length > 0 ? Math.round(totalMins / visRows.length) : 0;
-    const avgH = Math.floor(avg/60), avgM = avg%60;
+    const h = Math.floor(totalMins/60), m = totalMins%60;
+    document.getElementById('dash-logs').textContent  = visRows.length;
+    document.getElementById('dash-hours').textContent = h+'h '+m+'m';
+    document.getElementById('dash-engs').textContent  = engSet.size;
 
-    const MONTHS_JS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    function fmtDateJS(ymd) {
-        if (!ymd) return '-';
-        const p = ymd.split('-');
-        if (p.length !== 3) return ymd;
-        return parseInt(p[2]) + '-' + MONTHS_JS[parseInt(p[1])-1] + '-' + p[0];
+    if (minDate && maxDate) {
+        document.getElementById('dash-dates').textContent = minDate === maxDate
+            ? fmtDateJS(minDate)
+            : fmtDateJS(minDate) + ' → ' + fmtDateJS(maxDate);
+        // days span
+        const diff = Math.round((new Date(maxDate) - new Date(minDate)) / 86400000) + 1;
+        document.getElementById('dash-days').textContent = diff + ' day' + (diff !== 1 ? 's' : '') + ' span';
+    } else {
+        document.getElementById('dash-dates').textContent = '—';
+        document.getElementById('dash-days').textContent  = '';
     }
 
-    document.getElementById('sum-logs').textContent  = visRows.length;
-    document.getElementById('sum-hours').textContent = h + 'h ' + m + 'm';
-    document.getElementById('sum-engs').textContent  = engSet.size;
-    document.getElementById('sum-dates').textContent = minDate && maxDate
-        ? (minDate === maxDate ? fmtDateJS(minDate) : fmtDateJS(minDate) + ' → ' + fmtDateJS(maxDate)) : '-';
+    if (activeProjFilter) tags.innerHTML += `<span class="ftag">📁 ${document.getElementById('proj-label').textContent}</span>`;
+    if (activeEngFilter)  tags.innerHTML += `<span class="ftag eng">👷 ${activeEngFilter}</span>`;
+    if (dateStart)        tags.innerHTML += `<span class="ftag date">📅 From ${fmtDateJS(dateStart)}</span>`;
+    if (dateEnd)          tags.innerHTML += `<span class="ftag date">📅 To ${fmtDateJS(dateEnd)}</span>`;
 
-    card.style.display = 'block';
+    dash.style.display = 'block';
 }
 
 function clearAllFilters() {
-    document.getElementById('txt-search').value   = '';
-    document.getElementById('date-search').value  = '';
-    document.getElementById('date-display').value = '';
+    document.getElementById('txt-search').value  = '';
+    document.getElementById('date-start').value  = '';
+    document.getElementById('date-end').value    = '';
     activeProjFilter = '';
     activeEngFilter  = '';
     document.getElementById('proj-label').textContent = 'All Projects';
     document.getElementById('eng-label').textContent  = 'All Engineers';
     document.querySelectorAll('.sel-item').forEach(i => i.classList.remove('active'));
     document.querySelectorAll('.sel-item[data-value=""]').forEach(i => i.classList.add('active'));
+    document.getElementById('live-dashboard').style.display = 'none';
     doFilter();
 }
 
