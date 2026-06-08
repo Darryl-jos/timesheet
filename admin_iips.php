@@ -223,25 +223,46 @@ sort($actual_end_years);
             <a href="create_iips.php" class="btn-create-iips">+ Create IIPS</a>
         </div>
         <div class="filter-date-row">
-            <label>Actual Start:</label>
+            <label>Target Start:</label>
+            <div style="position:relative;height:34px;display:flex;min-width:150px;">
+                <input type="text" id="filter-target-start-display" placeholder="DD MMM YYYY"
+                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+                       oninput="this.value=this.value.toUpperCase()"
+                       onblur="parseFilerDate('target-start')" onkeydown="if(event.key==='Enter'){this.blur()}"
+                       autocomplete="off">
+                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-target-start-hidden').showPicker()">📅</div>
+                <input type="date" id="filter-target-start-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('target-start')">
+            </div>
+            <label style="margin-left:8px;">Target End:</label>
+            <div style="position:relative;height:34px;display:flex;min-width:150px;">
+                <input type="text" id="filter-target-end-display" placeholder="DD MMM YYYY"
+                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+                       oninput="this.value=this.value.toUpperCase()"
+                       onblur="parseFilerDate('target-end')" onkeydown="if(event.key==='Enter'){this.blur()}"
+                       autocomplete="off">
+                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-target-end-hidden').showPicker()">📅</div>
+                <input type="date" id="filter-target-end-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('target-end')">
+            </div>
+
+            <label style="margin-left:8px;">Actual Start:</label>
             <div style="position:relative;height:34px;display:flex;min-width:150px;">
                 <input type="text" id="filter-actual-start-display" placeholder="DD MMM YYYY"
                        style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('start')" onkeydown="if(event.key==='Enter'){this.blur()}"
+                       onblur="parseFilerDate('actual-start')" onkeydown="if(event.key==='Enter'){this.blur()}"
                        autocomplete="off">
                 <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-actual-start-hidden').showPicker()">📅</div>
-                <input type="date" id="filter-actual-start-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('start')">
+                <input type="date" id="filter-actual-start-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('actual-start')">
             </div>
             <label style="margin-left:8px;">Actual End:</label>
             <div style="position:relative;height:34px;display:flex;min-width:150px;">
                 <input type="text" id="filter-actual-end-display" placeholder="DD MMM YYYY"
                        style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('end')" onkeydown="if(event.key==='Enter'){this.blur()}"
+                       onblur="parseFilerDate('actual-end')" onkeydown="if(event.key==='Enter'){this.blur()}"
                        autocomplete="off">
                 <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-actual-end-hidden').showPicker()">📅</div>
-                <input type="date" id="filter-actual-end-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('end')">
+                <input type="date" id="filter-actual-end-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('actual-end')">
             </div>
             <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear</button>
         </div>
@@ -269,7 +290,7 @@ sort($actual_end_years);
         <div class="filter-cats" style="margin-top:6px;">
             <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Costing:</span>
             <label><input type="checkbox" value="has_selling"  onchange="applyFilters()"> Has Selling Price</label>
-            <label><input type="checkbox" value="has_gp"       onchange="applyFilters()"> Positive GP</label>
+            <label><input type="checkbox" value="has_gp"       onchange="applyFilters()"> Has GP</label>
         </div>
         <div class="filter-cats" style="margin-top:6px;">
             <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timeline:</span>
@@ -342,6 +363,8 @@ sort($actual_end_years);
                 data-has-pm="<?= intval($r['has_project_mgmt'] ?? 0) ?>"
                 data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
                 data-ts-end="<?= htmlspecialchars($r['ts_end'] ?? '') ?>"
+                data-target-start="<?= htmlspecialchars($r['target_start_date'] ?? '') ?>"
+                data-target-end="<?= htmlspecialchars($r['target_end_date'] ?? '') ?>"
                 data-has-ts="<?= $r['ts_minutes'] > 0 ? '1' : '0' ?>"
                 data-tbd-year="<?= $r['target_billing_date'] ? date('Y', strtotime($r['target_billing_date'])) : '' ?>"
                 data-tsd-year="<?= $r['target_start_date']   ? date('Y', strtotime($r['target_start_date']))   : '' ?>"
@@ -410,6 +433,8 @@ document.getElementById('search-input').addEventListener('input', applyFilters);
 
 function applyFilters() {
     const txt      = document.getElementById('search-input').value.toLowerCase();
+    const tgtStart = document.getElementById('filter-target-start-hidden').value;
+    const tgtEnd   = document.getElementById('filter-target-end-hidden').value;
     const actStart = document.getElementById('filter-actual-start-hidden').value;
     const actEnd   = document.getElementById('filter-actual-end-hidden').value;
     const checks   = Array.from(document.querySelectorAll('.filter-cats input[type="checkbox"]:checked')).map(c => c.value);
@@ -431,15 +456,19 @@ function applyFilters() {
     const resFilters = ['has_pm','has_acc_mgr','has_partner'].filter(v => checks.includes(v));
 
     document.querySelectorAll('#main-table tbody tr').forEach(tr => {
-        const d       = tr.dataset;
-        const text    = tr.textContent.toLowerCase();
-        const tsStart = d.tsStart || '';
-        const tsEnd   = d.tsEnd   || '';
+        const d        = tr.dataset;
+        const text     = tr.textContent.toLowerCase();
+        const tsStart  = d.tsStart || '';
+        const tsEnd    = d.tsEnd   || '';
+        const tarStart = d.targetStart || '';
+        const tarEnd   = d.targetEnd || '';
 
         let ok = true;
-        if (txt      && !text.includes(txt))    ok = false;
+        if (txt      && !text.includes(txt))     ok = false;
         if (actStart && tsStart < actStart)      ok = false;
         if (actEnd   && tsEnd   > actEnd)        ok = false;
+        if (tgtStart && tarStart < tgtStart)     ok = false;
+        if (tgtEnd   && tarEnd   > tgtEnd)       ok = false;
 
         if (ok && Object.keys(activeGroups).length > 0) {
             Object.entries(activeGroups).forEach(([grp, active]) => {
@@ -480,6 +509,10 @@ function applyFilters() {
 
 function clearAllFilters() {
     document.getElementById('search-input').value = '';
+    document.getElementById('filter-target-start-display').value = '';
+    document.getElementById('filter-target-start-hidden').value = '';
+    document.getElementById('filter-target-end-display').value = '';
+    document.getElementById('filter-target-end-hidden').value = '';
     document.getElementById('filter-actual-start-display').value = '';
     document.getElementById('filter-actual-start-hidden').value = '';
     document.getElementById('filter-actual-end-display').value = '';
@@ -494,8 +527,8 @@ const F_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','N
 const F_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function syncFilterDate(type) {
-    const hidden  = document.getElementById('filter-actual-' + type + '-hidden');
-    const display = document.getElementById('filter-actual-' + type + '-display');
+    const hidden  = document.getElementById('filter-' + type + '-hidden');
+    const display = document.getElementById('filter-' + type + '-display');
     if (hidden.value) {
         const p = hidden.value.split('-');
         display.value = p[2] + '-' + F_MONTHS_SHORT[parseInt(p[1],10)-1].toUpperCase() + '-' + p[0];
@@ -504,8 +537,8 @@ function syncFilterDate(type) {
 }
 
 function parseFilerDate(type) {
-    const display = document.getElementById('filter-actual-' + type + '-display');
-    const hidden  = document.getElementById('filter-actual-' + type + '-hidden');
+    const display = document.getElementById('filter-' + type + '-display');
+    const hidden  = document.getElementById('filter-' + type + '-hidden');
     const str = display.value.trim().toUpperCase();
     if (!str) { hidden.value = ''; applyFilters(); return; }
     const parts = str.split(/[\-\/\. ]+/);
