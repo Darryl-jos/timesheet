@@ -7,6 +7,30 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
 
 $error = "";
 
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['bulk_action']) && $_POST['bulk_action'] === 'delete') {
+    if (isset($_POST['selected_iips']) && is_array($_POST['selected_iips'])) {
+        $err_projs = [];
+        foreach ($_POST['selected_iips'] as $del_id) {
+            $chk = $conn->prepare("SELECT COUNT(*) as total FROM timesheets WHERE project_id=?");
+            $chk->bind_param("s", $del_id); $chk->execute();
+            $cnt = $chk->get_result()->fetch_assoc(); $chk->close();
+            if ($cnt['total'] > 0) {
+                $err_projs[] = $del_id;
+            } else {
+                $d1 = $conn->prepare("DELETE FROM iips_tracking WHERE project_id=?");
+                $d1->bind_param("s", $del_id); $d1->execute(); $d1->close();
+                $d2 = $conn->prepare("DELETE FROM projects WHERE project_id=?");
+                $d2->bind_param("s", $del_id); $d2->execute(); $d2->close();
+            }
+        }
+        if (!empty($err_projs)) {
+            $error = "Could not delete: <code>" . implode(', ', array_map('htmlspecialchars', $err_projs)) . "</code> because they have linked timesheet logs. Other selected items were deleted.";
+        } else {
+            header("Location: admin_iips.php"); exit;
+        }
+    }
+}
+
 if (isset($_GET['delete_proj'])) {
     $del_id = $_GET['delete_proj'];
     $chk = $conn->prepare("SELECT COUNT(*) as total FROM timesheets WHERE project_id=?");
@@ -123,12 +147,14 @@ sort($actual_end_years);
 <style>
     .is-hidden { display: none !important; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; color: white; flex-wrap: wrap; gap: 10px; }
+    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
     .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
     .page { padding: 20px; }
-    .card { background: white; padding: 20px 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 0; }
+    .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 0; }
+    .card-hdr { padding: 16px 25px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: white; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+    .card-hdr h3 { margin: 0; font-size: 16px; color: #1f2937; }
     .filter-bar { background: white; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .filter-bar-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
     .filter-bar-top input[type="text"] { flex: 1; min-width: 200px; height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
@@ -144,18 +170,35 @@ sort($actual_end_years);
     .filter-cats label.active-cat { background: #1d4ed8; color: white; border-color: #1d4ed8; }
     .btn-clear-filter { background: #6c757d; color: white; border: none; height: 34px; padding: 0 14px; border-radius: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
     .alert-err { background:#f8d7da; color:#721c24; padding:12px; border-radius:4px; margin-bottom:15px; border:1px solid #f5c6cb; font-size:13px; }
-    .tbl-outer { position: relative; }
+    
+    #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    #bulk-toolbar span { font-size: 13px; font-weight: 600; color: #1e40af; flex: 1; }
+    .btn-bulk { border: none; padding: 7px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
+    .btn-export { background: #28a745; color: white; }
+    .btn-bulk-del { background: #dc3545; color: white; }
+    .btn-desel { background: #e2e8f0; color: #374151; }
+    .btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    .btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
+
+    .tbl-outer { position: relative; padding: 0 25px 25px 25px; }
     .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
     .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
     .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    table { width: 100%; border-collapse: collapse; min-width: 1800px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1850px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
     th { font-weight: bold; color: #495057; background: #f8f9fa; }
     tbody tr:hover { background: #f8faff; }
     .sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); position: sticky; top: 0; z-index: 22; }
     thead tr:last-child th { position: sticky; top: 27px; z-index: 21; background: #f8f9fa; box-shadow: 0 2px 0 #dee2e6; }
+    
+    .chk-col { width: 36px; position: sticky; left: 0; z-index: 23; background: #ffffff; border-right: 1px solid #dee2e6; }
+    tbody tr:hover td.chk-col { background: #f8faff; }
+    tbody tr td.chk-col { background: #ffffff; }
+    thead tr:last-child th.chk-col { z-index: 25; background: #f8f9fa; }
+    thead tr.sec-row th.chk-col { z-index: 26; background: #343a40; }
+
     .s-base    { background: #343a40; }
     .s-costing { background: #155724; }
     .s-timeline{ background: #1a237e; }
@@ -202,7 +245,7 @@ sort($actual_end_years);
     .show-sort { display:block !important; }
     .auto-val { font-size: 12px; color: #065f46; white-space: nowrap; }
     .dash { color: #9ca3af; }
-    @media (max-width: 768px) { body { margin: 0; } .page { padding: 10px; } .header { padding: 10px; } .card { padding: 12px; } }
+    @media (max-width: 768px) { body { margin: 0; } .page { padding: 10px; } .header { padding: 10px; } .card { padding: 0; } .card-hdr, .tbl-outer { padding: 12px; } }
 </style>
 </head>
 <body>
@@ -264,7 +307,6 @@ sort($actual_end_years);
                 <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-actual-end-hidden').showPicker()">📅</div>
                 <input type="date" id="filter-actual-end-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('actual-end')">
             </div>
-            <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear</button>
         </div>
         <div class="filter-cats">
             <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">IIPS Status:</span>
@@ -283,142 +325,265 @@ sort($actual_end_years);
             <label><input type="checkbox" value="billing_done"   onchange="applyFilters()"> Billing Completed</label>
         </div>
         <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timesheet:</span>
-            <label><input type="checkbox" value="has_data"  onchange="applyFilters()"> Has Timesheet Data</label>
-            <label><input type="checkbox" value="no_data"   onchange="applyFilters()"> No Timesheet Data</label>
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timesheet Data:</span>
+            <label><input type="checkbox" value="has_data"  onchange="applyFilters()"> Yes</label>
+            <label><input type="checkbox" value="no_data"   onchange="applyFilters()"> No</label>
         </div>
         <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Costing:</span>
-            <label><input type="checkbox" value="has_selling"  onchange="applyFilters()"> Has Selling Price</label>
-            <label><input type="checkbox" value="has_gp"       onchange="applyFilters()"> Has GP</label>
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">IIPS Costing:</span>
+            <label><input type="checkbox" value="cost_sp_only" onchange="applyFilters()"> Selling Price Only</label>
+            <label><input type="checkbox" value="cost_pc_only" onchange="applyFilters()"> Partner Cost Only</label>
+            <label><input type="checkbox" value="cost_empty"   onchange="applyFilters()"> Empty</label>
         </div>
         <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timeline:</span>
-            <label><input type="checkbox" value="has_target"   onchange="applyFilters()"> Has Target Dates</label>
-            <label><input type="checkbox" value="has_mandays"  onchange="applyFilters()"> Has Target Man-Days</label>
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Target Timeline Data:</span>
+            <label><input type="checkbox" value="tgt_yes"     onchange="applyFilters()"> Yes</label>
+            <label><input type="checkbox" value="tgt_partial" onchange="applyFilters()"> Partial</label>
+            <label><input type="checkbox" value="tgt_no"      onchange="applyFilters()"> No</label>
         </div>
         <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Resources:</span>
-            <label><input type="checkbox" value="has_pm"       onchange="applyFilters()"> Project Mgmt: Yes</label>
-            <label><input type="checkbox" value="has_acc_mgr"  onchange="applyFilters()"> Has Account Manager</label>
-            <label><input type="checkbox" value="has_partner"  onchange="applyFilters()"> Has Partner</label>
+            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Actual Timeline Data:</span>
+            <label><input type="checkbox" value="act_yes"     onchange="applyFilters()"> Yes</label>
+            <label><input type="checkbox" value="act_partial" onchange="applyFilters()"> Partial</label>
+            <label><input type="checkbox" value="act_no"      onchange="applyFilters()"> No</label>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+            <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear</button>
         </div>
     </div>
 
-    <div class="card">
-    <div class="tbl-outer" id="tbl-outer">
-        <div class="tbl-wrap" id="tbl-wrap">
-        <table id="main-table">
-            <thead>
-                <tr class="sec-row">
-                    <th class="s-base"    colspan="3">IIPS Details</th>
-                    <th class="s-costing" colspan="4">IIPS Costing</th>
-                    <th class="s-timeline" colspan="3">Timeline — Target</th>
-                    <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
-                    <th class="s-status"   colspan="3">Status</th>
-                    <th class="s-res"      colspan="6">Resources</th>
-                    <th class="s-act" rowspan="2">Actions</th>
-                </tr>
-                <tr>
-                    <th><div class="sort-wrap">IIPS ID<button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(0,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(0,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(0,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">IIPS Name<button class="sort-btn" onclick="toggleSort(event,'s-name')"></button><div id="s-name" class="sort-menu"><a href="#" onclick="sortT(1,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(1,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(1,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">Customer Name<button class="sort-btn" onclick="toggleSort(event,'s-cust')"></button><div id="s-cust" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">Selling Price (RM)<button class="sort-btn" onclick="toggleSort(event,'s-sp')"></button><div id="s-sp" class="sort-menu"><a href="#" onclick="sortT(3,'num',0);return false;">Default</a><a href="#" onclick="sortT(3,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(3,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Partner Cost (RM)<button class="sort-btn" onclick="toggleSort(event,'s-pc')"></button><div id="s-pc" class="sort-menu"><a href="#" onclick="sortT(4,'num',0);return false;">Default</a><a href="#" onclick="sortT(4,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(4,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Gross Profit (RM)<button class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(5,'num',0);return false;">Default</a><a href="#" onclick="sortT(5,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(5,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Project Mgmt<button class="sort-btn" onclick="toggleSort(event,'s-pm')"></button><div id="s-pm" class="sort-menu"><a href="#" onclick="filterCol('pm','');return false;">Default (All)</a><a href="#" onclick="filterCol('pm','1');return false;">Yes</a><a href="#" onclick="filterCol('pm','0');return false;">No</a></div></div></th>
-                    <th><div class="sort-wrap">Target Man-Days (hr)<button class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(7,'num',0);return false;">Default</a><a href="#" onclick="sortT(7,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(7,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Target Start<button class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu"><a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a><?php foreach ($target_start_years as $y): ?><a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                    <th><div class="sort-wrap">Target End<button class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu"><a href="#" onclick="filterCol('ted-year','');return false;">All Years</a><?php foreach ($target_end_years as $y): ?><a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                    <th><div class="sort-wrap">Actual Man-Days (hr)<button class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(10,'num',0);return false;">Default</a><a href="#" onclick="sortT(10,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(10,'num',2);return false;">High → Low</a></div></div></th>
-                    <th><div class="sort-wrap">Actual Start<button class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu"><a href="#" onclick="filterCol('asd-year','');return false;">All Years</a><?php foreach ($actual_start_years as $y): ?><a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                    <th><div class="sort-wrap">Actual End<button class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu"><a href="#" onclick="filterCol('aed-year','');return false;">All Years</a><?php foreach ($actual_end_years as $y): ?><a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                    <th><div class="sort-wrap">IIPS Status<button class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
-                    <th><div class="sort-wrap">Target Billing Date<button class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
-                    <th><div class="sort-wrap">Billing Status<button class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
-                    <th><div class="sort-wrap">Account Manager<button class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(16,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(16,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(16,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">Account Leader<button class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(17,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(17,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(17,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">Pre-Sales / SDM<button class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(18,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(18,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(18,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">IIPS Manager<button class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(19,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(19,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(19,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">Engineers<button class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
-                    <th><div class="sort-wrap">Partner<button class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php if (empty($rows)): ?>
-                <tr><td colspan="23" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "+ Create IIPS" to add one.</td></tr>
-            <?php else: foreach ($rows as $r):
-                $pid_display = fmtPid($r['project_id']);
-                $gp  = floatval($r['gross_profit'] ?? 0);
-                $gp_color = $gp > 0 ? '#166534' : ($gp < 0 ? '#dc2626' : '#6b7280');
+    <div id="bulk-toolbar">
+        <span id="bulk-count">0 selected</span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-bulk btn-export" onclick="submitBulkExport()">📥 Export Selected</button>
+            <button type="button" class="btn-bulk btn-bulk-del" onclick="submitBulkDelete()">🗑 Delete Selected</button>
+            <button type="button" class="btn-bulk btn-desel" onclick="deselectAll()">✕ Deselect All</button>
+        </div>
+    </div>
 
-                $status_badge = ['Not Quoted'=>'b-nq','Quoted'=>'b-q','Not Started'=>'b-ns','In Progress'=>'b-ip','Completed'=>'b-done','Cancelled'=>'b-can'][$r['iips_status'] ?? 'Not Quoted'] ?? 'b-nq';
-                $billing_badge = ['Not Forecasted'=>'b-nf','Forecasted'=>'b-fc','Pending'=>'b-pend','Completed'=>'b-bdc'][$r['billing_status'] ?? 'Not Forecasted'] ?? 'b-nf';
+    <form id="bulk-form" method="POST" action="admin_iips.php">
+        <input type="hidden" name="bulk_action" id="bulk-action-field" value="">
+        
+        <div class="card">
+            <div class="card-hdr">
+                <h3>IIPS Database</h3>
+                <button type="button" id="btn-export-all" class="btn-export-all" onclick="exportFilteredOrAll()">📥 Export All</button>
+            </div>
+            
+            <div class="tbl-outer" id="tbl-outer">
+                <div class="tbl-wrap" id="tbl-wrap">
+                <table id="main-table">
+                    <thead>
+                        <tr class="sec-row">
+                            <th class="chk-col s-base" rowspan="2" style="z-index:25;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+                            <th class="s-base"    colspan="3">IIPS Details</th>
+                            <th class="s-costing" colspan="4">IIPS Costing</th>
+                            <th class="s-timeline" colspan="3">Timeline — Target</th>
+                            <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
+                            <th class="s-status"   colspan="3">Status</th>
+                            <th class="s-res"      colspan="6">Resources</th>
+                            <th class="s-act" rowspan="2">Actions</th>
+                        </tr>
+                        <tr>
+                            <th><div class="sort-wrap">IIPS ID<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(1,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(1,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(1,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">IIPS Name<button type="button" class="sort-btn" onclick="toggleSort(event,'s-name')"></button><div id="s-name" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Customer Name<button type="button" class="sort-btn" onclick="toggleSort(event,'s-cust')"></button><div id="s-cust" class="sort-menu"><a href="#" onclick="sortT(3,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(3,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(3,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Selling Price (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-sp')"></button><div id="s-sp" class="sort-menu"><a href="#" onclick="sortT(4,'num',0);return false;">Default</a><a href="#" onclick="sortT(4,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(4,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Partner Cost (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pc')"></button><div id="s-pc" class="sort-menu"><a href="#" onclick="sortT(5,'num',0);return false;">Default</a><a href="#" onclick="sortT(5,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(5,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Gross Profit (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(6,'num',0);return false;">Default</a><a href="#" onclick="sortT(6,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(6,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Project Mgmt<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pm')"></button><div id="s-pm" class="sort-menu"><a href="#" onclick="filterCol('pm','');return false;">Default (All)</a><a href="#" onclick="filterCol('pm','1');return false;">Yes</a><a href="#" onclick="filterCol('pm','0');return false;">No</a></div></div></th>
+                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(8,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Target Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu"><a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a><?php foreach ($target_start_years as $y): ?><a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                            <th><div class="sort-wrap">Target End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu"><a href="#" onclick="filterCol('ted-year','');return false;">All Years</a><?php foreach ($target_end_years as $y): ?><a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(11,'num',0);return false;">Default</a><a href="#" onclick="sortT(11,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(11,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Actual Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu"><a href="#" onclick="filterCol('asd-year','');return false;">All Years</a><?php foreach ($actual_start_years as $y): ?><a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                            <th><div class="sort-wrap">Actual End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu"><a href="#" onclick="filterCol('aed-year','');return false;">All Years</a><?php foreach ($actual_end_years as $y): ?><a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
+                            <th><div class="sort-wrap">IIPS Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
+                            <th><div class="sort-wrap">Target Billing Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
+                            <th><div class="sort-wrap">Billing Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
+                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(17,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(17,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(17,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(18,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(18,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(18,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(19,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(19,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(19,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">IIPS Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (empty($rows)): ?>
+                        <tr><td colspan="24" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "+ Create IIPS" to add one.</td></tr>
+                    <?php else: foreach ($rows as $r):
+                        $pid_display = fmtPid($r['project_id']);
+                        $gp  = floatval($r['gross_profit'] ?? 0);
+                        $gp_color = $gp > 0 ? '#166534' : ($gp < 0 ? '#dc2626' : '#6b7280');
 
-                $pm_display = $r['project_manager'] ?: null;
-                $partner_display = $r['partner'] ?: null;
-            ?>
-            <tr data-iips-status="<?= htmlspecialchars($r['iips_status'] ?? '') ?>"
-                data-billing-status="<?= htmlspecialchars($r['billing_status'] ?? '') ?>"
-                data-has-pm="<?= intval($r['has_project_mgmt'] ?? 0) ?>"
-                data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
-                data-ts-end="<?= htmlspecialchars($r['ts_end'] ?? '') ?>"
-                data-target-start="<?= htmlspecialchars($r['target_start_date'] ?? '') ?>"
-                data-target-end="<?= htmlspecialchars($r['target_end_date'] ?? '') ?>"
-                data-has-ts="<?= $r['ts_minutes'] > 0 ? '1' : '0' ?>"
-                data-tbd-year="<?= $r['target_billing_date'] ? date('Y', strtotime($r['target_billing_date'])) : '' ?>"
-                data-tsd-year="<?= $r['target_start_date']   ? date('Y', strtotime($r['target_start_date']))   : '' ?>"
-                data-ted-year="<?= $r['target_end_date']     ? date('Y', strtotime($r['target_end_date']))     : '' ?>"
-                data-asd-year="<?= $r['ts_start']            ? date('Y', strtotime($r['ts_start']))            : '' ?>"
-                data-aed-year="<?= $r['ts_end']              ? date('Y', strtotime($r['ts_end']))              : '' ?>"
-                data-has-selling="<?= ($r['selling_price'] !== null && $r['selling_price'] > 0) ? '1' : '0' ?>"
-                data-has-target="<?= (!empty($r['target_start_date']) || !empty($r['target_end_date'])) ? '1' : '0' ?>"
-                data-has-gp="<?= ($r['gross_profit'] !== null && floatval($r['gross_profit']) > 0) ? '1' : '0' ?>"
-                data-has-acc-mgr="<?= !empty($r['account_manager']) ? '1' : '0' ?>"
-                data-has-partner="<?= !empty($r['partner']) ? '1' : '0' ?>"
-                data-has-mandays="<?= (!empty($r['target_mandays']) && $r['target_mandays'] > 0) ? '1' : '0' ?>"
-                data-not-quoted="<?= ($r['iips_status'] ?? '') === 'Not Quoted' ? '1' : '0' ?>"
-                data-cancelled="<?= ($r['iips_status'] ?? '') === 'Cancelled' ? '1' : '0' ?>"
-                data-not-started="<?= ($r['iips_status'] ?? '') === 'Not Started' ? '1' : '0' ?>"
-                data-quoted="<?= ($r['iips_status'] ?? '') === 'Quoted' ? '1' : '0' ?>"
-                data-billing-fc="<?= ($r['billing_status'] ?? '') === 'Forecasted' ? '1' : '0' ?>"
-                data-billing-nf="<?= ($r['billing_status'] ?? '') === 'Not Forecasted' ? '1' : '0' ?>">
-                <td><code style="font-size:12px;"><?= $pid_display ?></code></td>
-                <td><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
-                <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
-                <td class="bg-manual"><?= $r['selling_price'] !== null ? 'RM '.number_format($r['selling_price'],2) : '<span class="dash">—</span>' ?></td>
-                <td class="bg-manual"><?= $r['partner_cost']  !== null ? 'RM '.number_format($r['partner_cost'],2)  : '<span class="dash">—</span>' ?></td>
-                <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= ($r['selling_price'] !== null && $r['partner_cost'] !== null) ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
-                <td class="bg-manual">
-                    <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
-                    <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
-                </td>
-                <td class="bg-manual"><?php if ($r['target_mandays']) { $td_total_mins = round(floatval($r['target_mandays']) * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m'; } else { echo '<span class="dash">—</span>'; } ?></td>
-                <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
-                <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
-                <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
-                <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['ts_start'] ? fmtDate($r['ts_start']) : '<span class="dash">—</span>' ?></span></td>
-                <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?php if (($r['iips_status'] ?? '') === 'Completed'): ?><?= $r['ts_end'] ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?><?php else: ?><span class="dash">—</span><?php endif; ?></span></td>
-                <td class="bg-dropdown"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
-                <td class="bg-manual"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
-                <td class="bg-dropdown"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
-                <td><?= $r['account_manager'] ? htmlspecialchars($r['account_manager']) : '<span class="dash">—</span>' ?></td>
-                <td><?= $r['account_leader']  ? htmlspecialchars($r['account_leader'])  : '<span class="dash">—</span>' ?></td>
-                <td><?= $r['presales_sdm']    ? htmlspecialchars($r['presales_sdm'])    : '<span class="dash">—</span>' ?></td>
-                <td><?= $pm_display           ? htmlspecialchars($pm_display)           : '<span class="dash">—</span>' ?></td>
-                <td class="bg-auto"><?php if ($r['ts_engineers']): ?><ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;"><?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?><li><?= htmlspecialchars(trim($eng)) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                <td><?= $partner_display      ? htmlspecialchars($partner_display)      : '<span class="dash">—</span>' ?></td>
-                <td><a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a><a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a></td>
-            </tr>
-            <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-    </div>
-    </div>
+                        $status_badge = ['Not Quoted'=>'b-nq','Quoted'=>'b-q','Not Started'=>'b-ns','In Progress'=>'b-ip','Completed'=>'b-done','Cancelled'=>'b-can'][$r['iips_status'] ?? 'Not Quoted'] ?? 'b-nq';
+                        $billing_badge = ['Not Forecasted'=>'b-nf','Forecasted'=>'b-fc','Pending'=>'b-pend','Completed'=>'b-bdc'][$r['billing_status'] ?? 'Not Forecasted'] ?? 'b-nf';
+
+                        $pm_display = $r['project_manager'] ?: null;
+                        $partner_display = $r['partner'] ?: null;
+
+                        $sp = floatval($r['selling_price'] ?? 0);
+                        $pc = floatval($r['partner_cost'] ?? 0);
+                        $cost_state = 'both';
+                        if ($sp > 0 && $pc <= 0) $cost_state = 'cost_sp_only';
+                        elseif ($pc > 0 && $sp <= 0) $cost_state = 'cost_pc_only';
+                        elseif ($sp <= 0 && $pc <= 0) $cost_state = 'cost_empty';
+
+                        $has_t_start = !empty($r['target_start_date']);
+                        $has_t_end = !empty($r['target_end_date']);
+                        $tgt_state = 'tgt_no';
+                        if ($has_t_start && $has_t_end) $tgt_state = 'tgt_yes';
+                        elseif ($has_t_start || $has_t_end) $tgt_state = 'tgt_partial';
+
+                        $has_a_start = !empty($r['ts_start']);
+                        $has_a_end = !empty($r['ts_end']);
+                        $act_state = 'act_no';
+                        if ($has_a_start && $has_a_end) $act_state = 'act_yes';
+                        elseif ($has_a_start || $has_a_end) $act_state = 'act_partial';
+                    ?>
+                    <tr data-pid="<?= htmlspecialchars($r['project_id']) ?>"
+                        data-iips-status="<?= htmlspecialchars($r['iips_status'] ?? '') ?>"
+                        data-billing-status="<?= htmlspecialchars($r['billing_status'] ?? '') ?>"
+                        data-has-pm="<?= intval($r['has_project_mgmt'] ?? 0) ?>"
+                        data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
+                        data-ts-end="<?= htmlspecialchars($r['ts_end'] ?? '') ?>"
+                        data-target-start="<?= htmlspecialchars($r['target_start_date'] ?? '') ?>"
+                        data-target-end="<?= htmlspecialchars($r['target_end_date'] ?? '') ?>"
+                        data-has-ts="<?= $r['ts_minutes'] > 0 ? '1' : '0' ?>"
+                        data-tbd-year="<?= $r['target_billing_date'] ? date('Y', strtotime($r['target_billing_date'])) : '' ?>"
+                        data-tsd-year="<?= $r['target_start_date']   ? date('Y', strtotime($r['target_start_date']))   : '' ?>"
+                        data-ted-year="<?= $r['target_end_date']     ? date('Y', strtotime($r['target_end_date']))     : '' ?>"
+                        data-asd-year="<?= $r['ts_start']            ? date('Y', strtotime($r['ts_start']))            : '' ?>"
+                        data-aed-year="<?= $r['ts_end']              ? date('Y', strtotime($r['ts_end']))              : '' ?>"
+                        data-cost-state="<?= $cost_state ?>"
+                        data-tgt-state="<?= $tgt_state ?>"
+                        data-act-state="<?= $act_state ?>"
+                        data-has-acc-mgr="<?= !empty($r['account_manager']) ? '1' : '0' ?>"
+                        data-has-partner="<?= !empty($r['partner']) ? '1' : '0' ?>"
+                        data-not-quoted="<?= ($r['iips_status'] ?? '') === 'Not Quoted' ? '1' : '0' ?>"
+                        data-cancelled="<?= ($r['iips_status'] ?? '') === 'Cancelled' ? '1' : '0' ?>"
+                        data-not-started="<?= ($r['iips_status'] ?? '') === 'Not Started' ? '1' : '0' ?>"
+                        data-quoted="<?= ($r['iips_status'] ?? '') === 'Quoted' ? '1' : '0' ?>"
+                        data-billing-fc="<?= ($r['billing_status'] ?? '') === 'Forecasted' ? '1' : '0' ?>"
+                        data-billing-nf="<?= ($r['billing_status'] ?? '') === 'Not Forecasted' ? '1' : '0' ?>">
+                        <td class="chk-col"><input type="checkbox" class="iips-chk" name="selected_iips[]" value="<?= htmlspecialchars($r['project_id']) ?>" onchange="onChkChange()"></td>
+                        <td><code style="font-size:12px;"><?= $pid_display ?></code></td>
+                        <td><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
+                        <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
+                        <td class="bg-manual"><?= $r['selling_price'] !== null ? 'RM '.number_format($r['selling_price'],2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-manual"><?= $r['partner_cost']  !== null ? 'RM '.number_format($r['partner_cost'],2)  : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= ($r['selling_price'] !== null && $r['partner_cost'] !== null) ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-manual">
+                            <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
+                            <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
+                        </td>
+                        <td class="bg-manual"><?php if ($r['target_mandays']) { $td_total_mins = round(floatval($r['target_mandays']) * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m'; } else { echo '<span class="dash">—</span>'; } ?></td>
+                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['ts_start'] ? fmtDate($r['ts_start']) : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?php if (($r['iips_status'] ?? '') === 'Completed'): ?><?= $r['ts_end'] ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?><?php else: ?><span class="dash">—</span><?php endif; ?></span></td>
+                        <td class="bg-dropdown"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
+                        <td class="bg-manual"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-dropdown"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
+                        <td><?php
+                            $names = array_filter(array_map('trim', explode(',', $r['account_manager'] ?? '')));
+                            if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td><?php
+                            $names = array_filter(array_map('trim', explode(',', $r['account_leader'] ?? '')));
+                            if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td><?php
+                            $names = array_filter(array_map('trim', explode(',', $r['presales_sdm'] ?? '')));
+                            if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td><?php
+                            $names = array_filter(array_map('trim', explode(',', $pm_display ?? '')));
+                            if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td class="bg-auto"><?php if ($r['ts_engineers']): ?><ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;"><?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?><li><?= htmlspecialchars(trim($eng)) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td><?php
+                            $names = array_filter(array_map('trim', explode(',', $partner_display ?? '')));
+                            if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td><a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a><a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a></td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
 
 <script>
+// ---------- bulk UI logic ----------
+function onChkChange() {
+    const checked = document.querySelectorAll('.iips-chk:checked').length;
+    const toolbar = document.getElementById('bulk-toolbar');
+    toolbar.style.display = checked > 0 ? 'flex' : 'none';
+    document.getElementById('bulk-count').textContent = checked + ' selected';
+    
+    const visibleCheckboxes = document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .iips-chk');
+    let visibleCheckedCount = 0;
+    visibleCheckboxes.forEach(c => { if(c.checked) visibleCheckedCount++; });
+    
+    document.getElementById('chk-all').indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleCheckboxes.length;
+    document.getElementById('chk-all').checked = visibleCheckedCount > 0 && visibleCheckedCount === visibleCheckboxes.length;
+}
+
+function toggleAll(cb) {
+    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .iips-chk').forEach(c => c.checked = cb.checked);
+    onChkChange();
+}
+
+function deselectAll() {
+    document.querySelectorAll('.iips-chk').forEach(c => c.checked = false);
+    document.getElementById('chk-all').checked = false;
+    document.getElementById('bulk-toolbar').style.display = 'none';
+}
+
+function submitBulkDelete() {
+    if (confirm('⚠️ Permanently delete selected IIPS?\n(Projects with linked timesheets will be skipped automatically)')) {
+        document.getElementById('bulk-action-field').value = 'delete';
+        const form = document.getElementById('bulk-form');
+        form.action = 'admin_iips.php';
+        form.submit();
+    }
+}
+
+function submitBulkExport() {
+    const form = document.getElementById('bulk-form');
+    form.action = 'export_iips.php';
+    document.getElementById('bulk-action-field').value = 'export_selected';
+    form.submit();
+    form.action = 'admin_iips.php';
+}
+
+function exportFilteredOrAll() {
+    const form = document.getElementById('bulk-form');
+    form.action = 'export_iips.php';
+    document.getElementById('bulk-action-field').value = 'export_filtered';
+    
+    document.querySelectorAll('.dyn-iips').forEach(e => e.remove());
+
+    document.querySelectorAll('#main-table tbody tr:not(.is-hidden)').forEach(tr => {
+        const pid = tr.dataset.pid;
+        if (pid) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected_iips[]';
+            input.value = pid;
+            input.className = 'dyn-iips';
+            form.appendChild(input);
+        }
+    });
+    
+    form.submit();
+    form.action = 'admin_iips.php';
+    document.querySelectorAll('.dyn-iips').forEach(e => e.remove());
+}
+
+
+// ---------- Table logic ----------
 function fixStickyHeaders() {
     const secRow = document.querySelector('#main-table thead tr.sec-row');
     const colRow = document.querySelector('#main-table thead tr:last-child');
@@ -431,6 +596,8 @@ window.addEventListener('DOMContentLoaded', fixStickyHeaders);
 window.addEventListener('resize', fixStickyHeaders);
 document.getElementById('search-input').addEventListener('input', applyFilters);
 
+let colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
+
 function applyFilters() {
     const txt      = document.getElementById('search-input').value.toLowerCase();
     const tgtStart = document.getElementById('filter-target-start-hidden').value;
@@ -440,11 +607,12 @@ function applyFilters() {
     const checks   = Array.from(document.querySelectorAll('.filter-cats input[type="checkbox"]:checked')).map(c => c.value);
 
     const groups = {
-        iips_status: ['not_quoted','quoted','not_started','in_progress','completed','cancelled'],
-        billing:     ['billing_nf','billing_fc','billing_pending','billing_done'],
-        timesheet:   ['has_data','no_data'],
-        costing:     ['has_selling','has_gp','gp_neg'],
-        timeline:    ['has_target','has_mandays'],
+        iips_status:     ['not_quoted','quoted','not_started','in_progress','completed','cancelled'],
+        billing:         ['billing_nf','billing_fc','billing_pending','billing_done'],
+        timesheet:       ['has_data','no_data'],
+        costing:         ['cost_sp_only','cost_pc_only','cost_empty'],
+        target_timeline: ['tgt_yes','tgt_partial','tgt_no'],
+        actual_timeline: ['act_yes','act_partial','act_no']
     };
 
     const activeGroups = {};
@@ -486,11 +654,18 @@ function applyFilters() {
                     if (chk === 'billing_done'   && (d.billingStatus||'').toLowerCase() === 'completed') groupMatch = true;
                     if (chk === 'has_data'       && d.hasTs        === '1') groupMatch = true;
                     if (chk === 'no_data'        && d.hasTs        === '0') groupMatch = true;
-                    if (chk === 'has_selling'    && d.hasSelling   === '1') groupMatch = true;
-                    if (chk === 'has_gp'         && d.hasGp        === '1') groupMatch = true;
-                    if (chk === 'gp_neg'         && d.gpNeg        === '1') groupMatch = true;
-                    if (chk === 'has_target'     && d.hasTarget    === '1') groupMatch = true;
-                    if (chk === 'has_mandays'    && d.hasMandays   === '1') groupMatch = true;
+
+                    if (chk === 'cost_sp_only'   && d.costState    === 'cost_sp_only') groupMatch = true;
+                    if (chk === 'cost_pc_only'   && d.costState    === 'cost_pc_only') groupMatch = true;
+                    if (chk === 'cost_empty'     && d.costState    === 'cost_empty')   groupMatch = true;
+                    
+                    if (chk === 'tgt_yes'        && d.tgtState     === 'tgt_yes')      groupMatch = true;
+                    if (chk === 'tgt_partial'    && d.tgtState     === 'tgt_partial')  groupMatch = true;
+                    if (chk === 'tgt_no'         && d.tgtState     === 'tgt_no')       groupMatch = true;
+                    
+                    if (chk === 'act_yes'        && d.actState     === 'act_yes')      groupMatch = true;
+                    if (chk === 'act_partial'    && d.actState     === 'act_partial')  groupMatch = true;
+                    if (chk === 'act_no'         && d.actState     === 'act_no')       groupMatch = true;
                 });
                 if (!groupMatch) ok = false;
             });
@@ -502,9 +677,36 @@ function applyFilters() {
                 if (chk === 'has_partner' && d.hasPartner !== '1') ok = false;
             });
         }
+
+        if (ok) {
+            if (colFilters.pm      !== '' && d.hasPm         !== colFilters.pm)                      ok = false;
+            if (colFilters.iips    !== '' && (d.iipsStatus    || '') !== colFilters.iips)             ok = false;
+            if (colFilters.billing !== '' && (d.billingStatus || '') !== colFilters.billing)          ok = false;
+            if (colFilters['tbd-year'] !== '' && (d.tbdYear || '') !== colFilters['tbd-year'])        ok = false;
+            if (colFilters['tsd-year'] !== '' && (d.tsdYear || '') !== colFilters['tsd-year'])        ok = false;
+            if (colFilters['ted-year'] !== '' && (d.tedYear || '') !== colFilters['ted-year'])        ok = false;
+            if (colFilters['asd-year'] !== '' && (d.asdYear || '') !== colFilters['asd-year'])        ok = false;
+            if (colFilters['aed-year'] !== '' && (d.aedYear || '') !== colFilters['aed-year'])        ok = false;
+        }
+
         tr.classList.toggle('is-hidden', !ok);
     });
+    
     document.querySelectorAll('.filter-cats label').forEach(lbl => { lbl.classList.toggle('active-cat', lbl.querySelector('input').checked); });
+
+    // Handle "Export Filtered" Button UI
+    let hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== ''));
+    const btnExport = document.getElementById('btn-export-all');
+    if (hasFilter) {
+        btnExport.textContent = '📥 Export Filtered';
+        btnExport.classList.add('filtered');
+    } else {
+        btnExport.textContent = '📥 Export All';
+        btnExport.classList.remove('filtered');
+    }
+
+    document.getElementById('chk-all').checked = false;
+    onChkChange();
 }
 
 function clearAllFilters() {
@@ -520,7 +722,8 @@ function clearAllFilters() {
     document.querySelectorAll('.filter-cats input[type="checkbox"]').forEach(c => c.checked = false);
     document.querySelectorAll('.filter-cats label').forEach(l => l.classList.remove('active-cat'));
     colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
-    document.querySelectorAll('#main-table tbody tr').forEach(tr => tr.classList.remove('is-hidden'));
+    
+    applyFilters();
 }
 
 const F_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
@@ -560,25 +763,10 @@ function parseFilerDate(type) {
     applyFilters();
 }
 
-let colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
 function filterCol(type, value) {
     colFilters[type] = value;
     document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort'));
-    applyColFilters();
-}
-function applyColFilters() {
-    document.querySelectorAll('#main-table tbody tr').forEach(tr => {
-        let ok = true;
-        if (colFilters.pm      !== '' && tr.dataset.hasPm         !== colFilters.pm)           ok = false;
-        if (colFilters.iips    !== '' && (tr.dataset.iipsStatus    || '') !== colFilters.iips)   ok = false;
-        if (colFilters.billing !== '' && (tr.dataset.billingStatus || '') !== colFilters.billing) ok = false;
-        if (colFilters['tbd-year'] !== '' && (tr.dataset.tbdYear || '') !== colFilters['tbd-year']) ok = false;
-        if (colFilters['tsd-year'] !== '' && (tr.dataset.tsdYear || '') !== colFilters['tsd-year']) ok = false;
-        if (colFilters['ted-year'] !== '' && (tr.dataset.tedYear || '') !== colFilters['ted-year']) ok = false;
-        if (colFilters['asd-year'] !== '' && (tr.dataset.asdYear || '') !== colFilters['asd-year']) ok = false;
-        if (colFilters['aed-year'] !== '' && (tr.dataset.aedYear || '') !== colFilters['aed-year']) ok = false;
-        tr.classList.toggle('is-hidden', !ok);
-    });
+    applyFilters(); 
 }
 
 let origRows = null;

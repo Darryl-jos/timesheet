@@ -71,9 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     $return_url = isset($_POST['return_url']) ? $_POST['return_url'] : $return_url;
 
     $has_iips_mgr = (($_POST['has_iips_manager_radio'] ?? 'no') === 'yes') ? 1 : 0;
-    $iips_mgr_name = trim($_POST['iips_manager_name'] ?? '');
+    $iips_mgr_name = implode(', ', array_filter(array_map('trim', $_POST['iips_manager_multi'] ?? [])));
     $has_partner = (($_POST['has_partner_radio'] ?? 'no') === 'yes') ? 1 : 0;
-    $partner_name = trim($_POST['partner_name'] ?? '');
+    $partner_name = implode(', ', array_filter(array_map('trim', $_POST['partner_multi'] ?? [])));
 
     $db_iips_mgr = $iips_mgr_name;
     $db_iips_ptr = $partner_name;
@@ -128,12 +128,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
                     $ins2->bind_param("s", $sel_proj_id); $ins2->execute(); $ins2->close();
                 }
                 if ($has_iips_mgr && !empty($iips_mgr_name)) {
-                    $upd = $conn->prepare("UPDATE iips_tracking SET project_manager=? WHERE project_id=? AND (project_manager IS NULL OR project_manager='')");
+                    $upd = $conn->prepare("UPDATE iips_tracking SET project_manager=? WHERE project_id=?");
                     $upd->bind_param("ss", $iips_mgr_name, $sel_proj_id); $upd->execute(); $upd->close();
+                } elseif (!$has_iips_mgr) {
+                    $upd = $conn->prepare("UPDATE iips_tracking SET project_manager='' WHERE project_id=?");
+                    $upd->bind_param("s", $sel_proj_id); $upd->execute(); $upd->close();
                 }
                 if ($has_partner && !empty($partner_name)) {
-                    $upd2 = $conn->prepare("UPDATE iips_tracking SET partner=? WHERE project_id=? AND (partner IS NULL OR partner='')");
+                    $upd2 = $conn->prepare("UPDATE iips_tracking SET partner=? WHERE project_id=?");
                     $upd2->bind_param("ss", $partner_name, $sel_proj_id); $upd2->execute(); $upd2->close();
+                } elseif (!$has_partner) {
+                    $upd2 = $conn->prepare("UPDATE iips_tracking SET partner='' WHERE project_id=?");
+                    $upd2->bind_param("s", $sel_proj_id); $upd2->execute(); $upd2->close();
                 }
             }
 
@@ -340,7 +346,15 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         </label>
                     </div>
                     <div id="iips-mgr-field" style="display:<?php echo !empty($db_iips_mgr) ? 'block' : 'none'; ?>;margin-top:10px;">
-                        <input type="text" name="iips_manager_name" placeholder="Enter IIPS Manager name" value="<?php echo htmlspecialchars($db_iips_mgr); ?>" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                        <div id="iips-mgr-list">
+                            <?php $mgr_names = array_filter(array_map('trim', explode(',', $db_iips_mgr))); if(empty($mgr_names)) $mgr_names = ['']; foreach($mgr_names as $i => $n): ?>
+                            <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                                <input type="text" name="iips_manager_multi[]" value="<?php echo htmlspecialchars($n); ?>" placeholder="Enter IIPS Manager name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                                <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?php echo $i===0?'visibility:hidden':''; ?>">×</button>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <button type="button" onclick="addName('iips-mgr-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;width:100%;">+ Add another</button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -354,7 +368,15 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         </label>
                     </div>
                     <div id="partner-field" style="display:<?php echo !empty($db_iips_ptr) ? 'block' : 'none'; ?>;margin-top:10px;">
-                        <input type="text" name="partner_name" placeholder="Enter partner name" value="<?php echo htmlspecialchars($db_iips_ptr); ?>" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                        <div id="partner-list">
+                            <?php $ptr_names = array_filter(array_map('trim', explode(',', $db_iips_ptr))); if(empty($ptr_names)) $ptr_names = ['']; foreach($ptr_names as $i => $n): ?>
+                            <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                                <input type="text" name="partner_multi[]" value="<?php echo htmlspecialchars($n); ?>" placeholder="Enter partner name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                                <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?php echo $i===0?'visibility:hidden':''; ?>">×</button>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <button type="button" onclick="addName('partner-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;width:100%;">+ Add another</button>
                     </div>
                 </div>
             </div>
@@ -566,32 +588,30 @@ function pickSel(type, value, label, el) {
         
         const mgrRadioYes = document.querySelector('input[name="has_iips_manager_radio"][value="yes"]');
         const mgrRadioNo = document.querySelector('input[name="has_iips_manager_radio"][value="no"]');
-        const mgrInput = document.querySelector('input[name="iips_manager_name"]');
         const mgrField = document.getElementById('iips-mgr-field');
         
         if (mgr !== '') {
             if(mgrRadioYes) mgrRadioYes.checked = true;
             if(mgrField) mgrField.style.display = 'block';
-            if(mgrInput) mgrInput.value = mgr;
+            populateMulti('iips-mgr-list', mgr);
         } else {
             if(mgrRadioNo) mgrRadioNo.checked = true;
             if(mgrField) mgrField.style.display = 'none';
-            if(mgrInput) mgrInput.value = '';
+            populateMulti('iips-mgr-list', '');
         }
 
         const ptrRadioYes = document.querySelector('input[name="has_partner_radio"][value="yes"]');
         const ptrRadioNo = document.querySelector('input[name="has_partner_radio"][value="no"]');
-        const ptrInput = document.querySelector('input[name="partner_name"]');
         const ptrField = document.getElementById('partner-field');
 
         if (ptr !== '') {
             if(ptrRadioYes) ptrRadioYes.checked = true;
             if(ptrField) ptrField.style.display = 'block';
-            if(ptrInput) ptrInput.value = ptr;
+            populateMulti('partner-list', ptr);
         } else {
             if(ptrRadioNo) ptrRadioNo.checked = true;
             if(ptrField) ptrField.style.display = 'none';
-            if(ptrInput) ptrInput.value = '';
+            populateMulti('partner-list', '');
         }
     }
 }
@@ -932,6 +952,40 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 });
+
+function addName(listId) {
+    const list = document.getElementById(listId);
+    const div = document.createElement('div');
+    div.className = 'multi-name-row';
+    div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+    const nameMap = { 'iips-mgr-list':'iips_manager_multi[]', 'partner-list':'partner_multi[]' };
+    div.innerHTML = `<input type="text" name="${nameMap[listId]}" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;"><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;">×</button>`;
+    list.appendChild(div);
+    div.querySelector('input').focus();
+    const rows = list.querySelectorAll('.multi-name-row');
+    if (rows.length > 0) rows[0].querySelector('button').style.visibility = rows.length === 1 ? 'hidden' : 'visible';
+}
+function removeName(btn) {
+    const row = btn.closest('.multi-name-row');
+    const list = row.parentElement;
+    row.remove();
+    const rows = list.querySelectorAll('.multi-name-row');
+    if (rows.length > 0) rows[0].querySelector('button').style.visibility = rows.length === 1 ? 'hidden' : 'visible';
+}
+function populateMulti(listId, valString) {
+    const list = document.getElementById(listId);
+    list.innerHTML = '';
+    const names = valString.split(',').map(s => s.trim()).filter(s => s);
+    if (names.length === 0) names.push('');
+    const nameMap = { 'iips-mgr-list':'iips_manager_multi[]', 'partner-list':'partner_multi[]' };
+    names.forEach((n, idx) => {
+        const div = document.createElement('div');
+        div.className = 'multi-name-row';
+        div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+        div.innerHTML = `<input type="text" name="${nameMap[listId]}" value="${n.replace(/"/g, '&quot;')}" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;"><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;${idx===0 && names.length===1 ? 'visibility:hidden' : ''}">×</button>`;
+        list.appendChild(div);
+    });
+}
 
 document.getElementById('record-form').addEventListener('submit', function(e) {
     if (amPmErrorFlag['start'] || amPmErrorFlag['end']) {

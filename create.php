@@ -27,10 +27,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $sel_end_time = $_POST['end_time'];   
     $sel_work_desc = trim($_POST['work_description']); 
     $sel_meal_breaks = isset($_POST['meal_breaks']) ? (int)$_POST['meal_breaks'] : 0;
+    
     $has_iips_mgr = (($_POST['has_iips_manager_radio'] ?? 'no') === 'yes') ? 1 : 0;
-    $iips_mgr_name = trim($_POST['iips_manager_name'] ?? '');
+    $iips_mgr_name = implode(', ', array_filter(array_map('trim', $_POST['iips_manager_multi'] ?? [])));
+    
     $has_partner = (($_POST['has_partner_radio'] ?? 'no') === 'yes') ? 1 : 0;
-    $partner_name = trim($_POST['partner_name'] ?? '');
+    $partner_name = implode(', ', array_filter(array_map('trim', $_POST['partner_multi'] ?? [])));
     
     if (!empty($sel_date) && !empty($sel_start_time) && !empty($sel_end_time)) {
         $start_dt = new DateTime("$sel_date $sel_start_time");
@@ -278,6 +280,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 </div>
             </div>
         </div>
+
         <div class="section">
             <div class="section-hdr" style="background:#4a235a;">👥 IIPS Management</div>
             <div class="section-body">
@@ -292,7 +295,13 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         </label>
                     </div>
                     <div id="iips-mgr-field" style="display:none;margin-top:10px;">
-                        <input type="text" name="iips_manager_name" placeholder="Enter IIPS Manager name" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                        <div id="iips-mgr-list">
+                            <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                                <input type="text" name="iips_manager_multi[]" placeholder="Enter IIPS Manager name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                                <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;visibility:hidden;">×</button>
+                            </div>
+                        </div>
+                        <button type="button" onclick="addName('iips-mgr-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;width:100%;">+ Add another</button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -306,7 +315,13 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         </label>
                     </div>
                     <div id="partner-field" style="display:none;margin-top:10px;">
-                        <input type="text" name="partner_name" placeholder="Enter partner name" style="width:100%;height:38px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                        <div id="partner-list">
+                            <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                                <input type="text" name="partner_multi[]" placeholder="Enter partner name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                                <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;visibility:hidden;">×</button>
+                            </div>
+                        </div>
+                        <button type="button" onclick="addName('partner-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;width:100%;">+ Add another</button>
                     </div>
                 </div>
             </div>
@@ -320,6 +335,30 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 </div>
 
 <script>
+function addName(listId) {
+    const list = document.getElementById(listId);
+    const div = document.createElement('div');
+    div.className = 'multi-name-row';
+    div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+    const nameMap = { 'iips-mgr-list':'iips_manager_multi[]', 'partner-list':'partner_multi[]' };
+    div.innerHTML = `<input type="text" name="${nameMap[listId]}" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;"><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;">×</button>`;
+    list.appendChild(div);
+    div.querySelector('input').focus();
+    const rows = list.querySelectorAll('.multi-name-row');
+    if (rows.length > 0) {
+        rows[0].querySelector('button').style.visibility = rows.length === 1 ? 'hidden' : 'visible';
+    }
+}
+function removeName(btn) {
+    const row = btn.closest('.multi-name-row');
+    const list = row.parentElement;
+    row.remove();
+    const rows = list.querySelectorAll('.multi-name-row');
+    if (rows.length > 0) {
+        rows[0].querySelector('button').style.visibility = rows.length === 1 ? 'hidden' : 'visible';
+    }
+}
+
 let amPmErrorFlag = { start: false, end: false };
 
 function clearError(visId, errId) {
@@ -570,6 +609,21 @@ function filterSel(type) {
     });
 }
 
+function populateMulti(listId, valString) {
+    const list = document.getElementById(listId);
+    list.innerHTML = '';
+    const names = valString.split(',').map(s => s.trim()).filter(s => s);
+    if (names.length === 0) names.push('');
+    const nameMap = { 'iips-mgr-list':'iips_manager_multi[]', 'partner-list':'partner_multi[]' };
+    names.forEach((n, idx) => {
+        const div = document.createElement('div');
+        div.className = 'multi-name-row';
+        div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+        div.innerHTML = `<input type="text" name="${nameMap[listId]}" value="${n.replace(/"/g, '&quot;')}" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;"><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;${idx===0 && names.length===1 ? 'visibility:hidden' : ''}">×</button>`;
+        list.appendChild(div);
+    });
+}
+
 function pickSel(type, value, label, el) {
     document.getElementById('hidden-project-id').value = value;
     document.getElementById(type+'-label').textContent = label;
@@ -586,32 +640,30 @@ function pickSel(type, value, label, el) {
         
         const mgrRadioYes = document.querySelector('input[name="has_iips_manager_radio"][value="yes"]');
         const mgrRadioNo = document.querySelector('input[name="has_iips_manager_radio"][value="no"]');
-        const mgrInput = document.querySelector('input[name="iips_manager_name"]');
         const mgrField = document.getElementById('iips-mgr-field');
         
         if (mgr !== '') {
             mgrRadioYes.checked = true;
             mgrField.style.display = 'block';
-            mgrInput.value = mgr;
+            populateMulti('iips-mgr-list', mgr);
         } else {
             if(mgrRadioNo) mgrRadioNo.checked = true;
             mgrField.style.display = 'none';
-            mgrInput.value = '';
+            populateMulti('iips-mgr-list', '');
         }
 
         const ptrRadioYes = document.querySelector('input[name="has_partner_radio"][value="yes"]');
         const ptrRadioNo = document.querySelector('input[name="has_partner_radio"][value="no"]');
-        const ptrInput = document.querySelector('input[name="partner_name"]');
         const ptrField = document.getElementById('partner-field');
 
         if (ptr !== '') {
             ptrRadioYes.checked = true;
             ptrField.style.display = 'block';
-            ptrInput.value = ptr;
+            populateMulti('partner-list', ptr);
         } else {
             if(ptrRadioNo) ptrRadioNo.checked = true;
             ptrField.style.display = 'none';
-            ptrInput.value = '';
+            populateMulti('partner-list', '');
         }
     }
 }

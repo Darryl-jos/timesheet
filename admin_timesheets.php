@@ -47,13 +47,11 @@ while ($row = $ts_result->fetch_assoc()) {
     $diff  = $start->diff($end);
     $mins  = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
     
-    // --- 这里是增加的扣除 meal break 的逻辑 ---
     $mb = isset($row['meal_breaks']) ? intval($row['meal_breaks']) : 0;
     $mins -= ($mb * 60);
     if ($mins < 0) {
         $mins = 0;
     }
-    // ----------------------------------------
     
     $row['_minutes'] = $mins;
     $rows_cache[] = $row;
@@ -75,8 +73,8 @@ function fmtDate($d) {
 <title>Audit Timesheets — Admin</title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; font-size: 13px; }
-.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-radius: 8px; }
 .topbar h2 { color: white; margin: 0; font-size: 16px; }
 .topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 .topbar a:hover { color: #ffda6a; }
@@ -120,11 +118,13 @@ body { font-family: Arial, sans-serif; margin: 0; background: #f4f7f6; color: #3
 .btn-export { background: #28a745; color: white; }
 .btn-bulk-del { background: #dc3545; color: white; }
 .btn-desel { background: #e2e8f0; color: #374151; }
-.card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
+.card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
 .card-hdr { padding: 12px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .card-hdr h3 { margin: 0; font-size: 15px; }
-.btn-export-all { background: #6c757d; color: white; border: none; padding: 7px 14px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; }
+.btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+.btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
 .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tbl-scroll { overflow-y: auto; max-height: 70vh; }
 table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 th, td { padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
 th { background: #f8fafc; font-weight: 600; color: #475569; }
@@ -155,6 +155,14 @@ tbody tr:hover { background: #f8faff; }
 .sort-menu a { display:block; padding:6px 10px; font-size:12px; color:#333; text-decoration:none; }
 .sort-menu a:hover { background:#f8fafc; color:#007bff; }
 .show-sort { display:block !important; }
+.sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); position: sticky; top: 0; z-index: 22; }
+thead tr:last-child th { position: sticky; top: 27px; z-index: 21; background: #f8fafc; box-shadow: 0 2px 0 #dee2e6; }
+thead tr.sec-row th.chk-col { z-index: 26; }
+.s-base     { background: #343a40; }
+.s-timeline { background: #1a237e; }
+.s-actual   { background: #004d40; }
+.s-act      { background: #343a40; }
+.chk-col { width: 36px; position: sticky; left: 0; z-index: 23; background: #343a40; border-right: 1px solid #dee2e6; }
 @media (max-width: 600px) { .page { padding: 10px; } }
 </style>
 </head>
@@ -278,24 +286,32 @@ tbody tr:hover { background: #f8faff; }
         <div class="card">
             <div class="card-hdr">
                 <h3>Employee Work Hour Compliance Logs</h3>
-                <button type="button" class="btn-export-all" onclick="exportAll()">📥 Export All</button>
+                <button type="button" id="btn-export-all" class="btn-export-all" onclick="exportFilteredOrAll()">📥 Export All</button>
             </div>
+            <div class="tbl-scroll">
             <div class="tbl-wrap">
             <table id="main-table">
                 <thead>
+                    <tr class="sec-row">
+                        <th class="s-base" rowspan="2" style="width:36px;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+                        <th class="s-base" colspan="2">Engineer & Project</th>
+                        <th class="s-base" colspan="2">IIPS Details</th>
+                        <th class="s-base" colspan="1">Activity</th>
+                        <th class="s-timeline" colspan="2">Timeline</th>
+                        <th class="s-actual" colspan="3">Performance</th>
+                        <th class="s-act" rowspan="2">Actions</th>
+                    </tr>
                     <tr>
-                        <th style="width:36px;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
-                        <th><div class="sort-wrap">Engineer<button class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(1,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(1,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(1,'alpha',2);return false;">Z → A</a></div></div></th>
-                        <th><div class="sort-wrap">Project ID<button class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
+                        <th><div class="sort-wrap">Engineer<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(1,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(1,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(1,'alpha',2);return false;">Z → A</a></div></div></th>
+                        <th><div class="sort-wrap">Project ID<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
                         <th>Customer</th>
                         <th>Project Name</th>
                         <th>Activity</th>
-                        <th><div class="sort-wrap">Start Date<button class="sort-btn" onclick="toggleSort(event,'s-sd')"></button><div id="s-sd" class="sort-menu"><a href="#" onclick="sortT(6,'date',0);return false;">Default</a><a href="#" onclick="sortT(6,'date',1);return false;">Oldest First</a><a href="#" onclick="sortT(6,'date',2);return false;">Newest First</a></div></div></th>
+                        <th><div class="sort-wrap">Start Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-sd')"></button><div id="s-sd" class="sort-menu"><a href="#" onclick="sortT(6,'date',0);return false;">Default</a><a href="#" onclick="sortT(6,'date',1);return false;">Oldest First</a><a href="#" onclick="sortT(6,'date',2);return false;">Newest First</a></div></div></th>
                         <th>End Date</th>
-                        <th><div class="sort-wrap">Duration<button class="sort-btn" onclick="toggleSort(event,'s-dur')"></button><div id="s-dur" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Shortest First</a><a href="#" onclick="sortT(8,'num',2);return false;">Longest First</a></div></div></th>
+                        <th><div class="sort-wrap">Duration<button type="button" class="sort-btn" onclick="toggleSort(event,'s-dur')"></button><div id="s-dur" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Shortest First</a><a href="#" onclick="sortT(8,'num',2);return false;">Longest First</a></div></div></th>
                         <th>Target Mandays</th>
                         <th>Gap</th>
-                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -344,6 +360,7 @@ tbody tr:hover { background: #f8faff; }
                 <?php endforeach; endif; ?>
                 </tbody>
             </table>
+            </div>
             </div>
         </div>
     </form>
@@ -433,6 +450,20 @@ function doFilter() {
         if (ok) visRows.push(tr);
     });
     updateLiveDashboard(visRows, txt, dateStart, dateEnd);
+
+    // Export Button UI Update logic
+    const hasFilter = (txt !== '' || activeProjFilter !== '' || activeEngFilter !== '' || dateStart !== '' || dateEnd !== '');
+    const btnExport = document.getElementById('btn-export-all');
+    if (hasFilter) {
+        btnExport.textContent = '📥 Export Filtered';
+        btnExport.classList.add('filtered');
+    } else {
+        btnExport.textContent = '📥 Export All';
+        btnExport.classList.remove('filtered');
+    }
+
+    document.getElementById('chk-all').checked = false;
+    onChkChange();
 }
 
 function fmtDateJS(ymd) {
@@ -497,14 +528,80 @@ function onChkChange() {
     const toolbar = document.getElementById('bulk-toolbar');
     toolbar.style.display = checked > 0 ? 'flex' : 'none';
     document.getElementById('bulk-count').textContent = checked + ' selected';
-    document.getElementById('chk-all').indeterminate = checked > 0 && checked < document.querySelectorAll('.ts-chk').length;
-    document.getElementById('chk-all').checked = checked === document.querySelectorAll('.ts-chk').length;
+    
+    // 只计算肉眼可见的checkbox
+    const visibleCheckboxes = document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk');
+    let visibleCheckedCount = 0;
+    visibleCheckboxes.forEach(c => { if(c.checked) visibleCheckedCount++; });
+    
+    document.getElementById('chk-all').indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleCheckboxes.length;
+    document.getElementById('chk-all').checked = visibleCheckedCount > 0 && visibleCheckedCount === visibleCheckboxes.length;
 }
-function toggleAll(cb) { document.querySelectorAll('.ts-chk').forEach(c => c.checked = cb.checked); onChkChange(); }
-function deselectAll() { document.querySelectorAll('.ts-chk').forEach(c => c.checked = false); document.getElementById('chk-all').checked = false; document.getElementById('bulk-toolbar').style.display = 'none'; }
-function submitBulkExport() { const form = document.getElementById('bulk-form'); form.action = 'export.php'; form.submit(); form.action = 'admin_timesheets.php'; }
-function submitBulkDelete() { if (confirm('⚠️ Permanently delete all selected records?')) { document.getElementById('bulk-action-field').value = 'delete'; document.getElementById('bulk-form').action = 'admin_timesheets.php'; document.getElementById('bulk-form').submit(); } }
-function exportAll() { window.location.href = 'export.php'; }
+
+function toggleAll(cb) { 
+    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk').forEach(c => c.checked = cb.checked); 
+    onChkChange(); 
+}
+
+function deselectAll() { 
+    document.querySelectorAll('.ts-chk').forEach(c => c.checked = false); 
+    document.getElementById('chk-all').checked = false; 
+    document.getElementById('bulk-toolbar').style.display = 'none'; 
+}
+
+function submitBulkExport() { 
+    const form = document.getElementById('bulk-form'); 
+    form.action = 'export.php'; 
+    form.submit(); 
+    form.action = 'admin_timesheets.php'; 
+}
+
+function submitBulkDelete() { 
+    if (confirm('⚠️ Permanently delete all selected records?')) { 
+        document.getElementById('bulk-action-field').value = 'delete'; 
+        document.getElementById('bulk-form').action = 'admin_timesheets.php'; 
+        document.getElementById('bulk-form').submit(); 
+    } 
+}
+
+function exportFilteredOrAll() {
+    const form = document.getElementById('bulk-form');
+    form.action = 'export.php';
+    
+    const checkboxes = document.querySelectorAll('.ts-chk');
+    checkboxes.forEach(c => c.disabled = true);
+
+    document.querySelectorAll('.dyn-ts').forEach(e => e.remove());
+
+    const btnExport = document.getElementById('btn-export-all');
+    if (btnExport.classList.contains('filtered')) {
+        document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk').forEach(chk => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected_ts[]';
+            input.value = chk.value;
+            input.className = 'dyn-ts';
+            form.appendChild(input);
+        });
+    }
+    
+    form.submit();
+
+    form.action = 'admin_timesheets.php'; 
+    document.querySelectorAll('.dyn-ts').forEach(e => e.remove()); 
+    checkboxes.forEach(c => c.disabled = false);
+}
+
+function fixStickyHeaders() {
+    const secRow = document.querySelector('#main-table thead tr.sec-row');
+    const colRow = document.querySelector('#main-table thead tr:last-child');
+    if (secRow && colRow) {
+        const h = secRow.getBoundingClientRect().height;
+        colRow.querySelectorAll('th').forEach(th => th.style.top = h + 'px');
+    }
+}
+window.addEventListener('DOMContentLoaded', fixStickyHeaders);
+window.addEventListener('resize', fixStickyHeaders);
 
 document.querySelectorAll('.act').forEach(c => {
     let t;

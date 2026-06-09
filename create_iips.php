@@ -51,9 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bill_stat = $_POST['billing_status'] ?? '';
 
     // Resources
-    $acc_mgr   = trim($_POST['account_manager']  ?? '');
-    $acc_ldr   = trim($_POST['account_leader']   ?? '');
-    $presales  = trim($_POST['presales_sdm']     ?? '');
+    $acc_mgr   = implode(', ', array_filter(array_map('trim', $_POST['account_manager_multi']  ?? [])));
+    $acc_ldr   = implode(', ', array_filter(array_map('trim', $_POST['account_leader_multi']   ?? [])));
+    $presales  = implode(', ', array_filter(array_map('trim', $_POST['presales_sdm_multi']     ?? [])));
     $proj_mgr  = $iips_data['project_manager'] ?? '';
 
     // ── Validation ────────────────────────────────────────────────────────────
@@ -136,9 +136,9 @@ $v = [
     'target_billing_date' => $_POST['target_billing_date'] ?? ($iips_data['target_billing_date'] ?? ''),
     'iips_status'         => $_POST['iips_status']         ?? ($edit_mode ? ($iips_data['iips_status']    ?? '') : ''),
     'billing_status'      => $_POST['billing_status']      ?? ($edit_mode ? ($iips_data['billing_status'] ?? '') : ''),
-    'account_manager'     => $_POST['account_manager']     ?? ($iips_data['account_manager'] ?? ''),
-    'account_leader'      => $_POST['account_leader']      ?? ($iips_data['account_leader']  ?? ''),
-    'presales_sdm'        => $_POST['presales_sdm']        ?? ($iips_data['presales_sdm']    ?? ''),
+    'account_manager'     => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['account_manager_multi'] ?? []))) : ($iips_data['account_manager'] ?? ''),
+    'account_leader'      => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['account_leader_multi']  ?? []))) : ($iips_data['account_leader']  ?? ''),
+    'presales_sdm'        => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['presales_sdm_multi']    ?? []))) : ($iips_data['presales_sdm']    ?? ''),
     'project_manager'     => $_POST['project_manager']     ?? ($iips_data['project_manager'] ?? ''),
 ];
 ?>
@@ -324,18 +324,65 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             <div class="section-body">
                 <div class="form-group">
                     <label>Account Manager</label>
-                    <input type="text" name="account_manager" value="<?= htmlspecialchars($v['account_manager']) ?>">
+                    <div id="acc-mgr-list">
+                        <?php $am_names = array_filter(array_map('trim', explode(',', $v['account_manager']))); if(empty($am_names)) $am_names = ['']; foreach($am_names as $i => $n): ?>
+                        <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                            <input type="text" name="account_manager_multi[]" value="<?= htmlspecialchars($n) ?>" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                            <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?= $i===0?'visibility:hidden':''; ?>">×</button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="button" onclick="addName('acc-mgr-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button>
                 </div>
                 <div class="form-group">
                     <label>Account Leader</label>
-                    <input type="text" name="account_leader" value="<?= htmlspecialchars($v['account_leader']) ?>">
+                    <div id="acc-ldr-list">
+                        <?php $al_names = array_filter(array_map('trim', explode(',', $v['account_leader']))); if(empty($al_names)) $al_names = ['']; foreach($al_names as $i => $n): ?>
+                        <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                            <input type="text" name="account_leader_multi[]" value="<?= htmlspecialchars($n) ?>" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                            <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?= $i===0?'visibility:hidden':''; ?>">×</button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="button" onclick="addName('acc-ldr-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button>
                 </div>
                 <div class="form-group">
                     <label>Pre-Sales / SDM</label>
-                    <input type="text" name="presales_sdm" value="<?= htmlspecialchars($v['presales_sdm']) ?>">
+                    <div id="presales-list">
+                        <?php $ps_names = array_filter(array_map('trim', explode(',', $v['presales_sdm']))); if(empty($ps_names)) $ps_names = ['']; foreach($ps_names as $i => $n): ?>
+                        <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                            <input type="text" name="presales_sdm_multi[]" value="<?= htmlspecialchars($n) ?>" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                            <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?= $i===0?'visibility:hidden':''; ?>">×</button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="button" onclick="addName('presales-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button>
                 </div>
             </div>
         </div>
+
+        <script>
+        function addName(listId) {
+            const list = document.getElementById(listId);
+            const div = document.createElement('div');
+            div.className = 'multi-name-row';
+            div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+            const nameMap = { 'acc-mgr-list':'account_manager_multi[]', 'acc-ldr-list':'account_leader_multi[]', 'presales-list':'presales_sdm_multi[]' };
+            div.innerHTML = `<input type="text" name="${nameMap[listId]}" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;"><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;">×</button>`;
+            list.appendChild(div);
+            div.querySelector('input').focus();
+        }
+        function removeName(btn) {
+            const row = btn.closest('.multi-name-row');
+            const list = row.parentElement;
+            row.remove();
+            // Ensure first row delete button is hidden
+            const rows = list.querySelectorAll('.multi-name-row');
+            if (rows.length > 0) {
+                rows[0].querySelector('button').style.visibility = rows.length === 1 ? 'hidden' : 'visible';
+            }
+        }
+        </script>
 
         <div class="actions">
             <button type="submit" class="btn-save"><?= $edit_mode ? 'Update Project' : 'Save Project' ?></button>

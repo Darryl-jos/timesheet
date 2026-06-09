@@ -104,13 +104,13 @@ function fmtDateDisplay($d) {
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-        .topbar { background: #1e2330; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-        .topbar h2 { color: white; margin: 0; font-size: 16px; }
+        .topbar { background: #ffffff; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .topbar h2 { color: #1f2937; margin: 0; font-size: 16px; }
         .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .topbar a { color: #94a3b8; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
-        .topbar a:hover { background: rgba(255,255,255,0.1); color: white; }
+        .topbar a { color: #084d68; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
+        .topbar a:hover { background: rgba(255,255,255,0.1); color: #053346; }
         .topbar a.logout-btn { color: #f87171; }
-        .mode-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #28a745, #1e7e34); color: white; text-decoration: none; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer; box-shadow: 0 2px 6px rgba(40,167,69,0.4); transition: all .2s; white-space: nowrap; }
+        .mode-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: #73eb8f; color: white; text-decoration: none; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer; box-shadow: 0 2px 6px rgba(40,167,69,0.4); transition: all .2s; white-space: nowrap; }
         .mode-switch-btn:hover { background: linear-gradient(135deg, #218838, #176929); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(40,167,69,0.5); color: white; }
         .page { padding: 20px; }
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -184,6 +184,12 @@ function fmtDateDisplay($d) {
         .sort-menu a:hover { background:#f8fafc; color:#007bff; }
         .show-sort { display:block !important; }
         .no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 15px; }
+        .sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); }
+        thead tr:last-child th { background: #f8fafc; box-shadow: 0 2px 0 #dee2e6; }
+        .s-base     { background: #343a40; }
+        .s-timeline { background: #1a237e; }
+        .s-perf     { background: #004d40; }
+        .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
         .error-border { border: 2px solid #dc2626 !important; }
         @media (max-width: 600px) { .page { padding: 12px; } .stats-bar { gap: 8px; } .stat { min-width: 100px; padding: 10px 12px; } }
     </style>
@@ -286,6 +292,13 @@ function fmtDateDisplay($d) {
         <div class="tbl-wrap">
         <table id="main-table">
             <thead>
+                <tr class="sec-row">
+                    <th class="s-base" colspan="3">IIPS Details</th>
+                    <th class="s-base" colspan="1">Activity</th>
+                    <th class="s-timeline" colspan="2">Timeline</th>
+                    <th class="s-perf" colspan="1">Performance</th>
+                    <th class="s-base" rowspan="2">Actions</th>
+                </tr>
                 <tr>
                     <th style="width: 13%;">
                         <div class="sort-wrap" style="position:relative;">
@@ -314,7 +327,6 @@ function fmtDateDisplay($d) {
                     </th>
                     <th style="width: 12%;">End Date</th>
                     <th style="width: 10%;">Duration</th>
-                    <th style="width: 120px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -516,6 +528,17 @@ document.querySelectorAll('.act-cell').forEach(c => {
     c.addEventListener('mouseenter', () => { t = setTimeout(() => c.classList.add('expanded'), 500); });
     c.addEventListener('mouseleave', () => { clearTimeout(t); c.classList.remove('expanded'); });
 });
+
+function fixStickyHeaders() {
+    const secRow = document.querySelector('#main-table thead tr.sec-row');
+    const colRow = document.querySelector('#main-table thead tr:last-child');
+    if (secRow && colRow) {
+        const h = secRow.getBoundingClientRect().height;
+        colRow.querySelectorAll('th').forEach(th => th.style.top = h + 'px');
+    }
+}
+window.addEventListener('DOMContentLoaded', fixStickyHeaders);
+window.addEventListener('resize', fixStickyHeaders);
 
 function toggleSort(e, id) {
     e.stopPropagation();

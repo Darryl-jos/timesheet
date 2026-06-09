@@ -139,7 +139,7 @@ echo "\xEF\xBB\xBF";
             ?>
                 <tr <?php echo $row_class; ?>>
                     <td class="text-bold"><?php echo htmlspecialchars($row['engineer_name']); ?></td>
-                    <td><?php echo htmlspecialchars($row['project_id']); ?></td>
+                    <td><?php echo preg_match('/^N\/A/i', $row['project_id']) ? '' : htmlspecialchars($row['project_id']); ?></td>
                     <td><?php echo htmlspecialchars($row['customer_name']); ?></td>
                     <td><?php echo htmlspecialchars($row['project_name']); ?></td>
                     <td class="desc-box"><?php echo !empty($row['work_description']) ? htmlspecialchars($row['work_description']) : 'No description provided'; ?></td>
