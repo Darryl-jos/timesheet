@@ -103,15 +103,15 @@ function fmtDateDisplay($d) {
     <title>My Timesheet Dashboard</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+        body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
         
-        .topbar { background: #ffffff; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .topbar h2 { color: #1f2937; margin: 0; font-size: 16px; }
+        .topbar { background: #343a40; padding: 15px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .topbar h2 { color: white; margin: 0; font-size: 18px; }
         .topbar .nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-        .topbar a { color: #084d68; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: background 0.2s, color 0.2s; }
-        .topbar a:hover { background: #e6f0ff; color: #1d4ed8; }
-        .topbar a.logout-btn { color: #dc3545; }
-        .topbar a.logout-btn:hover { background: #fee2e2; color: #b91c1c; }
+        .topbar a { color: #ffc107; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: background 0.2s, color 0.2s; }
+        .topbar a:hover { background: rgba(255, 193, 7, 0.15); color: #ffda6a; }
+        .topbar a.logout-btn { color: #ef4444; }
+        .topbar a.logout-btn:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
         .page { padding: 20px; }
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
@@ -154,12 +154,9 @@ function fmtDateDisplay($d) {
         .sel-item:hover { background: #f0f7ff; }
         .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
         .sel-item.hidden { display: none; }
-        .date-filter-badge { display: inline-flex; align-items: center; gap: 6px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
-        .date-filter-badge .x-btn { cursor: pointer; color: #1e40af; font-weight: 900; margin-left: 2px; }
-        .date-filter-badge .x-btn:hover { color: #dc2626; }
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
         .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; min-width: 900px; }
         th, td { padding: 11px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
         th { background: #f8fafc; font-weight: 600; color: #475569; white-space: nowrap; }
@@ -189,9 +186,63 @@ function fmtDateDisplay($d) {
         .s-base     { background: #343a40; }
         .s-timeline { background: #1a237e; }
         .s-perf     { background: #004d40; }
-        .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
         .error-border { border: 2px solid #dc2626 !important; }
-        @media (max-width: 600px) { .page { padding: 12px; } .stats-bar { gap: 8px; } .stat { min-width: 100px; padding: 10px 12px; } }
+
+        /* ── Unified Filter Panel ── */
+        .filter-panel { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 14px; }
+        .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
+        .filter-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; white-space: nowrap; min-width: 36px; }
+        .filter-input { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff; color: #333; transition: border-color .15s; }
+        .filter-input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+        .date-wrap { position: relative; height: 38px; display: flex; flex: 0 0 155px; width: 155px; }
+        .date-wrap input[type="text"] { width: 100%; height: 100%; padding: 0 32px 0 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; text-transform: uppercase; background: #fff; color: #333; box-sizing: border-box; }
+        .date-wrap input[type="text"]:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+        .date-wrap .cal-btn { position: absolute; right: 0; top: 0; width: 32px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; z-index: 4; }
+        .date-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 32px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+        .date-sep { font-size: 12px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+        .btn-apply-filter { background: #007bff; color: white; border: none; height: 38px; padding: 0 18px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .btn-apply-filter:hover { background: #0056b3; }
+        .btn-clear-filter { background: #f1f5f9; color: #475569; border: 1px solid #d1d5db; height: 38px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .btn-clear-filter:hover { background: #e2e8f0; }
+        .sel-wrap { flex: 2; min-width: 180px; position: relative; }
+        .sel-box { height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; transition: border-color .15s; }
+        .sel-box:hover { border-color: #007bff; }
+        .sel-box span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: #333; }
+        .sel-arrow { color: #6c757d; font-size: 11px; flex-shrink: 0; transition: transform .2s; }
+        .sel-wrap.open .sel-arrow { transform: rotate(180deg); }
+        .sel-wrap.open .sel-box { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+        .sel-panel { display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 100%; min-width: 240px; background: white; border: 1px solid #007bff; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); z-index: 200; padding: 8px; }
+        .sel-wrap.open .sel-panel { display: block; }
+        .sel-panel input { width: 100%; height: 32px; padding: 0 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; margin-bottom: 5px; box-sizing: border-box; }
+        .sel-panel input:focus { border-color: #007bff; outline: none; }
+        .sel-list { max-height: 220px; overflow-y: auto; }
+        .sel-item { padding: 7px 10px; cursor: pointer; font-size: 13px; border-radius: 4px; line-height: 1.3; }
+        .sel-item:hover { background: #f0f7ff; }
+        .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
+        .sel-item.hidden { display: none; }
+        .active-badge { display: inline-flex; align-items: center; gap: 5px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; flex-wrap: wrap; }
+        .active-badge .x-btn { cursor: pointer; font-weight: 900; margin-left: 2px; }
+        .active-badge .x-btn:hover { color: #dc2626; }
+        @media (max-width: 600px) {
+            body { margin: 10px; }
+            .page { padding: 0; }
+            .topbar { border-radius: 8px; padding: 12px 14px; }
+            .topbar h2 { font-size: 15px; }
+            .stats-bar { gap: 8px; }
+            .stat { min-width: 100px; padding: 10px 12px; }
+            .btn-create { font-size: 14px; padding: 12px; }
+            .filter-panel { padding: 10px 12px; }
+            .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
+            .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
+            .filter-input { min-width: unset; width: 100%; }
+            .sel-wrap { min-width: unset; width: 100%; }
+            .date-wrap { flex: 1 1 auto; width: 100%; }
+            .date-sep { text-align: center; }
+            .btn-apply-filter { width: 100%; height: 42px; font-size: 14px; }
+            .btn-clear-filter { width: 100%; height: 42px; font-size: 14px; }
+        }
+        @media (max-width: 600px) { .page { padding: 12px; } .stats-bar { gap: 8px; } .stat { min-width: 100px; padding: 10px 12px; } .filter-row { gap: 6px; } }
     </style>
 </head>
 <body>
@@ -210,69 +261,79 @@ function fmtDateDisplay($d) {
 <div class="page">
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
-    <div class="date-range-bar">
-        <span class="dr-label">Start:</span>
-        <div class="date-field-wrap">
-            <input type="text" id="start-display" placeholder="DD MMM YYYY" autocomplete="off">
-            <span class="cal-icon">📅</span>
-            <input type="date" id="start-picker" onchange="syncPickerToDisplay('start')">
-        </div>
-        <span class="dr-label">End:</span>
-        <div class="date-field-wrap">
-            <input type="text" id="end-display" placeholder="DD MMM YYYY" autocomplete="off">
-            <span class="cal-icon">📅</span>
-            <input type="date" id="end-picker" onchange="syncPickerToDisplay('end')">
-        </div>
-        <button class="btn-apply" onclick="applyDateRange()">Apply</button>
-        <button class="btn-clear" onclick="clearDateRange()">Clear</button>
-    </div>
-
-    <?php if (!empty($filter_start) || !empty($filter_end)): ?>
-    <div class="date-filter-badge">
-        📅 Showing:
-        <?php if ($filter_start && $filter_end): ?>
-            <?= fmtDateDisplay($filter_start) ?> → <?= fmtDateDisplay($filter_end) ?>
-        <?php elseif ($filter_start): ?>
-            From <?= fmtDateDisplay($filter_start) ?>
-        <?php else: ?>
-            Until <?= fmtDateDisplay($filter_end) ?>
-        <?php endif; ?>
-        <span class="x-btn" onclick="clearDateRange()">✕</span>
-    </div>
-    <?php endif; ?>
-
-    <div class="search-bar-wrap">
-        <input type="text" id="txt-search" placeholder="🔍 Search activity, iips, customer..." oninput="doFilter()">
-        <div class="sel-wrap" id="proj-wrap">
-            <div class="sel-box" id="proj-box" onclick="toggleSel()">
-                <span id="proj-label">All IIPS</span>
-                <span class="sel-arrow">▾</span>
-            </div>
-            <div class="sel-panel" id="proj-panel">
-                <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel()" onclick="event.stopPropagation()">
-                <div class="sel-list" id="proj-list">
-                    <div class="sel-item active" data-value="" onclick="pickProj(this, '', 'All IIPS')">All IIPS</div>
-                    <?php if ($proj_list_res): while($p = $proj_list_res->fetch_assoc()):
-                        $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']);
-                        $pid_show = preg_match('/^N\/A/i', $p['project_id']) ? '' : '['.$p['project_id'].'] ';
-                    ?>
-                        <div class="sel-item"
-                             data-value="<?= htmlspecialchars($p['project_id']) ?>"
-                             data-kw="<?= htmlspecialchars($kw) ?>"
-                             onclick="pickProj(this, '<?= htmlspecialchars(addslashes($p['project_id'])) ?>', '<?= htmlspecialchars(addslashes($pid_show.$p['project_name'])) ?>')">
-                            <?= htmlspecialchars($pid_show.$p['project_name']) ?>
-                            <span style="color:#9ca3af;font-size:11px;display:block;"><?= htmlspecialchars($p['customer_name']) ?></span>
-                        </div>
-                    <?php endwhile; endif; ?>
+    <!-- ── Unified Filter Panel ── -->
+    <div class="filter-panel">
+        <!-- Row 1: Search + IIPS dropdown -->
+        <div class="filter-row">
+            <span class="filter-label">🔍</span>
+            <input type="text" class="filter-input" id="txt-search" placeholder="Search by activity, IIPS, customer..." oninput="doFilter()">
+            <div class="sel-wrap" id="proj-wrap">
+                <div class="sel-box" id="proj-box" onclick="toggleSel()">
+                    <span id="proj-label">All IIPS</span>
+                    <span class="sel-arrow">▾</span>
+                </div>
+                <div class="sel-panel" id="proj-panel">
+                    <input type="text" id="proj-inner" placeholder="Type to search..." oninput="filterSel()" onclick="event.stopPropagation()">
+                    <div class="sel-list" id="proj-list">
+                        <div class="sel-item active" data-value="" onclick="pickProj(this, '', 'All IIPS')">All IIPS</div>
+                        <?php if ($proj_list_res): while($p = $proj_list_res->fetch_assoc()):
+                            $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']);
+                            $pid_show = preg_match('/^N\/A/i', $p['project_id']) ? '' : '['.$p['project_id'].'] ';
+                        ?>
+                            <div class="sel-item"
+                                 data-value="<?= htmlspecialchars($p['project_id']) ?>"
+                                 data-kw="<?= htmlspecialchars($kw) ?>"
+                                 onclick="pickProj(this, '<?= htmlspecialchars(addslashes($p['project_id'])) ?>', '<?= htmlspecialchars(addslashes($pid_show.$p['project_name'])) ?>')">
+                                <?= htmlspecialchars($pid_show.$p['project_name']) ?>
+                                <span style="color:#9ca3af;font-size:11px;display:block;"><?= htmlspecialchars($p['customer_name']) ?></span>
+                            </div>
+                        <?php endwhile; endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
-        <button class="btn-clear" onclick="clearSearchFilters()">Clear</button>
+        <!-- Row 2: Date range + action buttons -->
+        <div class="filter-row">
+            <span class="filter-label">📅 Date</span>
+            <div class="date-wrap">
+                <input type="text" id="start-display" placeholder="DD MMM YYYY" autocomplete="off"
+                       oninput="this.value=this.value.toUpperCase()"
+                       onblur="syncTextToHidden('start')" onkeydown="if(event.key==='Enter')applyDateRange()">
+                <div class="cal-btn" onclick="document.getElementById('start-picker').showPicker()">📅</div>
+                <input type="date" id="start-picker" onchange="syncPickerToDisplay('start')">
+            </div>
+            <span class="date-sep">→</span>
+            <div class="date-wrap">
+                <input type="text" id="end-display" placeholder="DD MMM YYYY" autocomplete="off"
+                       oninput="this.value=this.value.toUpperCase()"
+                       onblur="syncTextToHidden('end')" onkeydown="if(event.key==='Enter')applyDateRange()">
+                <div class="cal-btn" onclick="document.getElementById('end-picker').showPicker()">📅</div>
+                <input type="date" id="end-picker" onchange="syncPickerToDisplay('end')">
+            </div>
+            <button class="btn-apply-filter" onclick="applyDateRange()">Apply Date</button>
+            <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear All</button>
+        </div>
+        <?php if (!empty($filter_start) || !empty($filter_end)): ?>
+        <div style="margin-top:8px;">
+            <span class="active-badge">
+                📅 Date filter active:
+                <?php if ($filter_start && $filter_end): ?>
+                    <?= fmtDateDisplay($filter_start) ?> → <?= fmtDateDisplay($filter_end) ?>
+                <?php elseif ($filter_start): ?>
+                    From <?= fmtDateDisplay($filter_start) ?>
+                <?php else: ?>
+                    Until <?= fmtDateDisplay($filter_end) ?>
+                <?php endif; ?>
+                <span class="x-btn" onclick="clearDateRange()">✕</span>
+            </span>
+        </div>
+        <?php endif; ?>
     </div>
+    <!-- ── End Filter Panel ── -->
 
     <div class="card">
         <div class="summary-card" id="sum-card">
-            <h4>📊 Filter Results Dashboard</h4>
+            <h4>📊 Filter Results</h4>
             <div class="sum-grid">
                 <div class="sum-item"><span class="sum-label">Total Logs</span><span class="sum-value" id="sum-logs">-</span></div>
                 <div class="sum-item"><span class="sum-label">Total Hours</span><span class="sum-value" id="sum-hours">-</span></div>
@@ -405,6 +466,19 @@ function syncPickerToDisplay(type) {
     display.classList.remove('error-border');
 }
 
+function syncTextToHidden(type) {
+    const display = document.getElementById(type + '-display');
+    const picker  = document.getElementById(type + '-picker');
+    const parsed  = parseDateDisplay(display.value);
+    if (parsed) {
+        picker.value = parsed;
+        display.value = formatDateDisplay(parsed);
+        display.classList.remove('error-border');
+    } else if (display.value.trim()) {
+        display.classList.add('error-border');
+    }
+}
+
 function parseDateDisplay(str) {
     str = str.trim().toUpperCase();
     if (!str) return '';
@@ -449,10 +523,23 @@ function clearDateRange() {
     window.location.href = 'index.php';
 }
 
-['start-display','end-display'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('keydown', e => { if (e.key==='Enter') applyDateRange(); });
-});
+function clearAllFilters() {
+    document.getElementById('start-display').value = '';
+    document.getElementById('end-display').value   = '';
+    document.getElementById('start-picker').value  = '';
+    document.getElementById('end-picker').value    = '';
+    document.getElementById('txt-search').value    = '';
+    activeProjFilter = '';
+    document.getElementById('proj-label').textContent = 'All IIPS';
+    document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
+    const allItem = document.querySelector('#proj-list .sel-item[data-value=""]');
+    if (allItem) allItem.classList.add('active');
+    document.getElementById('sum-card').style.display = 'none';
+    doFilter();
+    // If date filter was active server-side, navigate to clear it
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('start') || params.get('end')) window.location.href = 'index.php';
+}
 
 function toggleSel() {
     const wrap = document.getElementById('proj-wrap');
@@ -510,17 +597,6 @@ function updateSummary(visRows, txt) {
     document.getElementById('sum-logs').textContent  = visRows.length;
     document.getElementById('sum-hours').textContent = h+'h '+m+'m';
     card.style.display = 'block';
-}
-
-function clearSearchFilters() {
-    document.getElementById('txt-search').value = '';
-    activeProjFilter = '';
-    document.getElementById('proj-label').textContent = 'All IIPS';
-    document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
-    const allItem = document.querySelector('#proj-list .sel-item[data-value=""]');
-    if (allItem) allItem.classList.add('active');
-    document.getElementById('sum-card').style.display = 'none';
-    doFilter();
 }
 
 document.querySelectorAll('.act-cell').forEach(c => {

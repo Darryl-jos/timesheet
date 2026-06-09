@@ -147,29 +147,69 @@ sort($actual_end_years);
 <style>
     .is-hidden { display: none !important; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
+    body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
     .header h2 { margin: 0; font-size: 18px; }
     .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
     .page { padding: 20px; }
     .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 0; }
     .card-hdr { padding: 16px 25px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: white; border-top-left-radius: 8px; border-top-right-radius: 8px; }
     .card-hdr h3 { margin: 0; font-size: 16px; color: #1f2937; }
-    .filter-bar { background: white; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .filter-bar-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-    .filter-bar-top input[type="text"] { flex: 1; min-width: 200px; height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-    .btn-create-iips { display: inline-flex; align-items: center; gap: 6px; background: #28a745; color: white; text-decoration: none; font-size: 13px; font-weight: 700; padding: 0 16px; height: 36px; border-radius: 4px; white-space: nowrap; border: none; cursor: pointer; }
+    @media (max-width: 768px) { body { margin: 0; } .page { padding: 10px; } .header { padding: 12px 14px; border-radius: 0; } .header h2 { font-size: 15px; } .card { padding: 0; } .card-hdr, .tbl-outer { padding: 12px; } }    .btn-create-iips { display: inline-flex; align-items: center; gap: 6px; background: #28a745; color: white; text-decoration: none; font-size: 13px; font-weight: 700; padding: 0 16px; height: 38px; border-radius: 6px; white-space: nowrap; border: none; cursor: pointer; }
     .btn-create-iips:hover { background: #218838; color: white; }
-    .filter-date-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-    .filter-date-row label { font-size: 12px; font-weight: 600; color: #475569; white-space: nowrap; }
-    .filter-date-row input[type="date"] { height: 34px; padding: 0 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-    .filter-cats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    /* ── Unified Filter Panel ── */
+    .filter-panel { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 12px; }
+    .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
+    .filter-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; white-space: nowrap; }
+    .filter-input { flex: 1; min-width: 200px; height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff; color: #333; transition: border-color .15s; }
+    .filter-input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+    .date-wrap { position: relative; height: 34px; display: flex; flex: 0 0 160px; width: 160px; }
+    .iips-date-wrap { position: relative; height: 34px; display: flex; flex: 0 0 155px; width: 155px; }
+    .iips-date-wrap input[type="text"] { width: 100%; height: 100%; padding: 0 32px 0 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; text-transform: uppercase; background: #fff; color: #333; box-sizing: border-box; }
+    .iips-date-wrap input[type="text"]:focus { border-color: #007bff; outline: none; }
+    .iips-date-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 32px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+    .iips-cal-btn { position: absolute; right: 0; top: 0; width: 32px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; z-index: 4; }
+    .date-wrap input[type="text"] { flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; text-transform: uppercase; background: #fff; color: #333; }
+    .date-wrap input[type="text"]:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+    .date-wrap .cal-btn { position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; pointer-events: none; }
+    .date-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 36px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+    .date-sep { font-size: 12px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+    .btn-clear-filter { background: #f1f5f9; color: #475569; border: 1px solid #d1d5db; height: 38px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .btn-clear-filter:hover { background: #e2e8f0; }
+    .btn-adv-toggle { background: none; border: 1px solid #d1d5db; color: #475569; height: 34px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+    .btn-adv-toggle:hover { background: #f0f7ff; border-color: #007bff; color: #007bff; }
+    .btn-adv-toggle .arr { font-size: 10px; transition: transform .2s; }
+    .adv-filters { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
+    .adv-filters.open { display: block; }
+    .adv-group { margin-bottom: 10px; }
+    .adv-group-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; display: block; }
+    .filter-cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     .filter-cats label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #334155; cursor: pointer; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 3px 10px; user-select: none; }
     .filter-cats label:hover { background: #e0f2fe; border-color: #7dd3fc; }
     .filter-cats input[type="checkbox"] { width: 13px; height: 13px; cursor: pointer; }
     .filter-cats label.active-cat { background: #1d4ed8; color: white; border-color: #1d4ed8; }
-    .btn-clear-filter { background: #6c757d; color: white; border: none; height: 34px; padding: 0 14px; border-radius: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .active-filter-count { display: inline-flex; align-items: center; justify-content: center; background: #dc3545; color: white; border-radius: 10px; font-size: 10px; font-weight: 700; min-width: 17px; height: 17px; padding: 0 4px; margin-left: 2px; }
     .alert-err { background:#f8d7da; color:#721c24; padding:12px; border-radius:4px; margin-bottom:15px; border:1px solid #f5c6cb; font-size:13px; }
+
+    @media (max-width: 600px) {
+        body { margin: 10px; }
+        .page { padding: 0; }
+        .header { padding: 12px 14px; border-radius: 8px; }
+        .header h2 { font-size: 15px; }
+        .filter-panel { padding: 10px 12px; }
+        .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
+        .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
+        .filter-input { min-width: unset; width: 100%; }
+        .btn-create-iips { width: 100%; justify-content: center; }
+        .iips-date-wrap { flex: 1 1 auto; width: 100%; }
+        .date-sep { text-align: center; }
+        .filter-label { margin-left: 0 !important; }
+        div[style*="margin-left:auto"] { margin-left: 0 !important; width: 100%; }
+        .btn-adv-toggle, .btn-clear-filter { width: 100%; justify-content: center; height: 40px; font-size: 14px; }
+        .adv-filters > div { grid-template-columns: 1fr !important; }
+    }
     
     #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     #bulk-toolbar span { font-size: 13px; font-weight: 600; color: #1e40af; flex: 1; }
@@ -260,97 +300,113 @@ sort($actual_end_years);
         <div class="alert-err">⚠️ <?= $error ?></div>
     <?php endif; ?>
 
-    <div class="filter-bar">
-        <div class="filter-bar-top">
-            <input type="text" id="search-input" placeholder="🔍 Search IIPS ID, name, customer, manager, partner...">
+    <!-- ── Unified Filter Panel ── -->
+    <div class="filter-panel">
+        <!-- Row 1: Search + Create button -->
+        <div class="filter-row">
+            <span class="filter-label">🔍</span>
+            <input type="text" class="filter-input" id="search-input" placeholder="Search IIPS ID, name, customer, manager, partner..." oninput="applyFilters()">
             <a href="create_iips.php" class="btn-create-iips">+ Create IIPS</a>
         </div>
-        <div class="filter-date-row">
-            <label>Target Start:</label>
-            <div style="position:relative;height:34px;display:flex;min-width:150px;">
-                <input type="text" id="filter-target-start-display" placeholder="DD MMM YYYY"
-                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+        <!-- Row 2: Date filters -->
+        <div class="filter-row">
+            <span class="filter-label">🎯 Target</span>
+            <div class="iips-date-wrap">
+                <input type="text" id="filter-target-start-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('target-start')" onkeydown="if(event.key==='Enter'){this.blur()}"
-                       autocomplete="off">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-target-start-hidden').showPicker()">📅</div>
-                <input type="date" id="filter-target-start-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('target-start')">
+                       onblur="parseFilerDate('target-start')" onkeydown="if(event.key==='Enter'){this.blur()}">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-target-start-hidden').showPicker()">📅</div>
+                <input type="date" id="filter-target-start-hidden" onchange="syncFilterDate('target-start')">
             </div>
-            <label style="margin-left:8px;">Target End:</label>
-            <div style="position:relative;height:34px;display:flex;min-width:150px;">
-                <input type="text" id="filter-target-end-display" placeholder="DD MMM YYYY"
-                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+            <span class="date-sep">→</span>
+            <div class="iips-date-wrap">
+                <input type="text" id="filter-target-end-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('target-end')" onkeydown="if(event.key==='Enter'){this.blur()}"
-                       autocomplete="off">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-target-end-hidden').showPicker()">📅</div>
-                <input type="date" id="filter-target-end-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('target-end')">
+                       onblur="parseFilerDate('target-end')" onkeydown="if(event.key==='Enter'){this.blur()}">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-target-end-hidden').showPicker()">📅</div>
+                <input type="date" id="filter-target-end-hidden" onchange="syncFilterDate('target-end')">
             </div>
-
-            <label style="margin-left:8px;">Actual Start:</label>
-            <div style="position:relative;height:34px;display:flex;min-width:150px;">
-                <input type="text" id="filter-actual-start-display" placeholder="DD MMM YYYY"
-                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+            <span class="filter-label" style="margin-left:12px;">📌 Actual</span>
+            <div class="iips-date-wrap">
+                <input type="text" id="filter-actual-start-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('actual-start')" onkeydown="if(event.key==='Enter'){this.blur()}"
-                       autocomplete="off">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-actual-start-hidden').showPicker()">📅</div>
-                <input type="date" id="filter-actual-start-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('actual-start')">
+                       onblur="parseFilerDate('actual-start')" onkeydown="if(event.key==='Enter'){this.blur()}">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-actual-start-hidden').showPicker()">📅</div>
+                <input type="date" id="filter-actual-start-hidden" onchange="syncFilterDate('actual-start')">
             </div>
-            <label style="margin-left:8px;">Actual End:</label>
-            <div style="position:relative;height:34px;display:flex;min-width:150px;">
-                <input type="text" id="filter-actual-end-display" placeholder="DD MMM YYYY"
-                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
+            <span class="date-sep">→</span>
+            <div class="iips-date-wrap">
+                <input type="text" id="filter-actual-end-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('actual-end')" onkeydown="if(event.key==='Enter'){this.blur()}"
-                       autocomplete="off">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('filter-actual-end-hidden').showPicker()">📅</div>
-                <input type="date" id="filter-actual-end-hidden" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncFilterDate('actual-end')">
+                       onblur="parseFilerDate('actual-end')" onkeydown="if(event.key==='Enter'){this.blur()}">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-actual-end-hidden').showPicker()">📅</div>
+                <input type="date" id="filter-actual-end-hidden" onchange="syncFilterDate('actual-end')">
+            </div>
+            <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                <button type="button" class="btn-adv-toggle" id="adv-toggle-btn" onclick="toggleAdvFilters()">
+                    Advanced <span class="arr" id="adv-arr">▾</span><span class="active-filter-count" id="adv-count" style="display:none">0</span>
+                </button>
+                <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear All</button>
             </div>
         </div>
-        <div class="filter-cats">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">IIPS Status:</span>
-            <label><input type="checkbox" value="not_quoted"   onchange="applyFilters()"> Not Quoted</label>
-            <label><input type="checkbox" value="quoted"       onchange="applyFilters()"> Quoted</label>
-            <label><input type="checkbox" value="not_started"  onchange="applyFilters()"> Not Started</label>
-            <label><input type="checkbox" value="in_progress"  onchange="applyFilters()"> In Progress</label>
-            <label><input type="checkbox" value="completed"    onchange="applyFilters()"> Completed</label>
-            <label><input type="checkbox" value="cancelled"    onchange="applyFilters()"> Cancelled</label>
-        </div>
-        <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Billing Status:</span>
-            <label><input type="checkbox" value="billing_nf"     onchange="applyFilters()"> Not Forecasted</label>
-            <label><input type="checkbox" value="billing_fc"     onchange="applyFilters()"> Forecasted</label>
-            <label><input type="checkbox" value="billing_pending" onchange="applyFilters()"> Pending</label>
-            <label><input type="checkbox" value="billing_done"   onchange="applyFilters()"> Billing Completed</label>
-        </div>
-        <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Timesheet Data:</span>
-            <label><input type="checkbox" value="has_data"  onchange="applyFilters()"> Yes</label>
-            <label><input type="checkbox" value="no_data"   onchange="applyFilters()"> No</label>
-        </div>
-        <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">IIPS Costing:</span>
-            <label><input type="checkbox" value="cost_sp_only" onchange="applyFilters()"> Selling Price Only</label>
-            <label><input type="checkbox" value="cost_pc_only" onchange="applyFilters()"> Partner Cost Only</label>
-            <label><input type="checkbox" value="cost_empty"   onchange="applyFilters()"> Empty</label>
-        </div>
-        <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Target Timeline Data:</span>
-            <label><input type="checkbox" value="tgt_yes"     onchange="applyFilters()"> Yes</label>
-            <label><input type="checkbox" value="tgt_partial" onchange="applyFilters()"> Partial</label>
-            <label><input type="checkbox" value="tgt_no"      onchange="applyFilters()"> No</label>
-        </div>
-        <div class="filter-cats" style="margin-top:6px;">
-            <span style="font-size:12px;font-weight:700;color:#475569;margin-right:4px;">Actual Timeline Data:</span>
-            <label><input type="checkbox" value="act_yes"     onchange="applyFilters()"> Yes</label>
-            <label><input type="checkbox" value="act_partial" onchange="applyFilters()"> Partial</label>
-            <label><input type="checkbox" value="act_no"      onchange="applyFilters()"> No</label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-            <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear</button>
+        <!-- Advanced: Status / Billing / Timesheet / Costing / Timeline checkboxes -->
+        <div class="adv-filters" id="adv-filters">
+            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;">
+                <div class="adv-group">
+                    <span class="adv-group-label">IIPS Status</span>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="not_quoted"  onchange="applyFilters()"> Not Quoted</label>
+                        <label><input type="checkbox" value="quoted"      onchange="applyFilters()"> Quoted</label>
+                        <label><input type="checkbox" value="not_started" onchange="applyFilters()"> Not Started</label>
+                        <label><input type="checkbox" value="in_progress" onchange="applyFilters()"> In Progress</label>
+                        <label><input type="checkbox" value="completed"   onchange="applyFilters()"> Completed</label>
+                        <label><input type="checkbox" value="cancelled"   onchange="applyFilters()"> Cancelled</label>
+                    </div>
+                </div>
+                <div class="adv-group">
+                    <span class="adv-group-label">Billing Status</span>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="billing_nf"      onchange="applyFilters()"> Not Forecasted</label>
+                        <label><input type="checkbox" value="billing_fc"      onchange="applyFilters()"> Forecasted</label>
+                        <label><input type="checkbox" value="billing_pending" onchange="applyFilters()"> Pending</label>
+                        <label><input type="checkbox" value="billing_done"    onchange="applyFilters()"> Completed</label>
+                    </div>
+                </div>
+                <div class="adv-group">
+                    <span class="adv-group-label">Timesheet Data</span>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="has_data" onchange="applyFilters()"> Has Data</label>
+                        <label><input type="checkbox" value="no_data"  onchange="applyFilters()"> No Data</label>
+                    </div>
+                </div>
+                <div class="adv-group">
+                    <span class="adv-group-label">IIPS Costing</span>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="cost_sp_only" onchange="applyFilters()"> Selling Price Only</label>
+                        <label><input type="checkbox" value="cost_pc_only" onchange="applyFilters()"> Partner Cost Only</label>
+                        <label><input type="checkbox" value="cost_empty"   onchange="applyFilters()"> Empty</label>
+                    </div>
+                </div>
+                <div class="adv-group">
+                    <span class="adv-group-label">Target Timeline Data</span>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="tgt_yes"     onchange="applyFilters()"> Yes</label>
+                        <label><input type="checkbox" value="tgt_partial" onchange="applyFilters()"> Partial</label>
+                        <label><input type="checkbox" value="tgt_no"      onchange="applyFilters()"> No</label>
+                    </div>
+                </div>
+                <div class="adv-group">
+                    <span class="adv-group-label">Actual Timeline Data</span>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="act_yes"     onchange="applyFilters()"> Yes</label>
+                        <label><input type="checkbox" value="act_partial" onchange="applyFilters()"> Partial</label>
+                        <label><input type="checkbox" value="act_no"      onchange="applyFilters()"> No</label>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+    <!-- ── End Filter Panel ── -->
 
     <div id="bulk-toolbar">
         <span id="bulk-count">0 selected</span>
@@ -380,7 +436,7 @@ sort($actual_end_years);
                             <th class="s-costing" colspan="4">IIPS Costing</th>
                             <th class="s-timeline" colspan="3">Target Timeline</th>
                             <th class="s-actual"   colspan="3">Actual Timeline</th>
-                            <th class="s-status"   colspan="3">Status</th>s
+                            <th class="s-status"   colspan="3">Status</th>
                             <th class="s-res"      colspan="6">Resources</th>
                             <th class="s-act" rowspan="2">Actions</th>
                         </tr>
@@ -693,6 +749,7 @@ function applyFilters() {
     });
     
     document.querySelectorAll('.filter-cats label').forEach(lbl => { lbl.classList.toggle('active-cat', lbl.querySelector('input').checked); });
+    updateAdvCount();
 
     // Handle "Export Filtered" Button UI
     let hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== ''));
@@ -709,6 +766,24 @@ function applyFilters() {
     onChkChange();
 }
 
+function toggleAdvFilters() {
+    const panel = document.getElementById('adv-filters');
+    const arr   = document.getElementById('adv-arr');
+    panel.classList.toggle('open');
+    arr.textContent = panel.classList.contains('open') ? '▴' : '▾';
+}
+
+function updateAdvCount() {
+    const count = document.querySelectorAll('.filter-cats input[type="checkbox"]:checked').length;
+    const badge = document.getElementById('adv-count');
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+    if (count > 0 && !document.getElementById('adv-filters').classList.contains('open')) {
+        document.getElementById('adv-filters').classList.add('open');
+        document.getElementById('adv-arr').textContent = '▴';
+    }
+}
+
 function clearAllFilters() {
     document.getElementById('search-input').value = '';
     document.getElementById('filter-target-start-display').value = '';
@@ -722,7 +797,7 @@ function clearAllFilters() {
     document.querySelectorAll('.filter-cats input[type="checkbox"]').forEach(c => c.checked = false);
     document.querySelectorAll('.filter-cats label').forEach(l => l.classList.remove('active-cat'));
     colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
-    
+    updateAdvCount();
     applyFilters();
 }
 

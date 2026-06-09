@@ -73,9 +73,9 @@ function fmtDate($d) {
 <title>Audit Timesheets — Admin</title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-.topbar { background: #343a40; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-radius: 8px; }
-.topbar h2 { color: white; margin: 0; font-size: 16px; }
+body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+.topbar { background: #343a40; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.topbar h2 { color: white; margin: 0; font-size: 18px; }
 .topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
 .topbar a:hover { color: #ffda6a; }
 .page { padding: 20px; }
@@ -92,17 +92,41 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color:
 .ftag { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
 .ftag.eng  { background: #dcfce7; color: #166534; }
 .ftag.date { background: #fef9c3; color: #854d0e; }
-.search-wrap { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
-.search-wrap input[type="text"] { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-.search-wrap input[type="date"] { flex: 1; min-width: 130px; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+.filter-panel { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 12px; }
+.filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
+.filter-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; white-space: nowrap; }
+.filter-input { flex: 2; min-width: 160px; height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff; color: #333; transition: border-color .15s; }
+.filter-input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+.date-wrap { position: relative; height: 38px; display: flex; flex: 0 0 155px; width: 155px; }
+.date-wrap input[type="text"] { width: 100%; height: 100%; padding: 0 32px 0 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; text-transform: uppercase; background: #fff; color: #333; box-sizing: border-box; }
+.date-wrap input[type="text"]:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
+.date-wrap .cal-btn { position: absolute; right: 0; top: 0; width: 32px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; z-index: 4; }
+.date-sep { font-size: 12px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+.btn-clear-filter { background: #f1f5f9; color: #475569; border: 1px solid #d1d5db; height: 38px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.btn-clear-filter:hover { background: #e2e8f0; }
+@media (max-width: 600px) {
+    body { margin: 10px; }
+    .page { padding: 0; }
+    .topbar { border-radius: 8px; padding: 12px 14px; }
+    .topbar h2 { font-size: 15px; }
+    .filter-panel { padding: 10px 12px; }
+    .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
+    .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
+    .filter-input { min-width: unset; width: 100%; }
+    .sel-wrap { min-width: unset; width: 100%; }
+    .date-wrap { flex: 1 1 auto; width: 100%; }
+    .date-sep { text-align: center; }
+    .btn-clear-filter { width: 100%; height: 40px; font-size: 14px; }
+}
 .sel-wrap { flex: 2; min-width: 180px; position: relative; }
-.sel-box { height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; }
+.sel-box { height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; transition: border-color .15s; }
 .sel-box:hover { border-color: #007bff; }
 .sel-box span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: #333; }
 .sel-arrow { color: #6c757d; font-size: 11px; flex-shrink: 0; transition: transform .2s; }
 .sel-wrap.open .sel-arrow { transform: rotate(180deg); }
 .sel-wrap.open .sel-box { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,.12); }
-.sel-panel { display: none; position: absolute; top: calc(100% + 3px); left: 0; width: 100%; min-width: 220px; background: white; border: 1px solid #007bff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 200; padding: 6px; }
+.sel-panel { display: none; position: absolute; top: calc(100% + 3px); left: 0; width: 100%; min-width: 220px; background: white; border: 1px solid #007bff; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); z-index: 200; padding: 6px; }
 .sel-wrap.open .sel-panel { display: block; }
 .sel-panel input { width: 100%; height: 32px; padding: 0 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; margin-bottom: 5px; box-sizing: border-box; }
 .sel-panel input:focus { border-color: #007bff; outline: none; }
@@ -183,80 +207,84 @@ thead tr.sec-row th.chk-col { z-index: 26; }
         </div>
     </div>
 
-    <div class="search-wrap">
-        <input type="text" id="txt-search" placeholder="🔍 Search activity / keyword..." oninput="doFilter()">
+    <!-- ── Unified Filter Panel ── -->
+    <div class="filter-panel">
+        <!-- Row 1: Search + Engineer + Project dropdowns -->
+        <div class="filter-row">
+            <span class="filter-label">🔍</span>
+            <input type="text" class="filter-input" id="txt-search" placeholder="Search by activity, keyword..." oninput="doFilter()">
 
-        <div class="sel-wrap" id="proj-wrap">
-            <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
-                <span id="proj-label">All Projects</span>
-                <span class="sel-arrow">▾</span>
-            </div>
-            <div class="sel-panel" id="proj-panel">
-                <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
-                <div class="sel-list" id="proj-list">
-                    <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
-                    <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
-                        $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
-                    ?>
-                    <div class="sel-item"
-                         data-value="<?= htmlspecialchars($p['project_id']) ?>"
-                         data-kw="<?= strtolower(htmlspecialchars($p['project_id'].' '.$p['project_name'].' '.$p['customer_name'])) ?>"
-                         onclick="pickSel('proj','<?= htmlspecialchars(addslashes($p['project_id'])) ?>','<?= htmlspecialchars(addslashes($label)) ?>',this)">
-                        <?= htmlspecialchars($label) ?>
-                        <span style="color:#9ca3af;font-size:11px;display:block;"><?= htmlspecialchars($p['customer_name']) ?></span>
+            <div class="sel-wrap" id="eng-wrap">
+                <div class="sel-box" id="eng-box" onclick="toggleSel('eng')">
+                    <span id="eng-label">All Engineers</span>
+                    <span class="sel-arrow">▾</span>
+                </div>
+                <div class="sel-panel" id="eng-panel">
+                    <input type="text" id="eng-inner" placeholder="Type to search..." oninput="filterSel('eng')" onclick="event.stopPropagation()">
+                    <div class="sel-list" id="eng-list">
+                        <div class="sel-item active" data-value="" onclick="pickSel('eng','','All Engineers',this)">All Engineers</div>
+                        <?php
+                        $all_engs = $conn->query("SELECT engineer_name FROM engineers WHERE engineer_name != '' ORDER BY engineer_name ASC");
+                        while ($eng_row = $all_engs->fetch_assoc()):
+                            $eng = $eng_row['engineer_name'];
+                        ?>
+                        <div class="sel-item"
+                             data-value="<?= htmlspecialchars($eng) ?>"
+                             data-kw="<?= strtolower(htmlspecialchars($eng)) ?>"
+                             onclick="pickSel('eng','<?= htmlspecialchars(addslashes($eng)) ?>','<?= htmlspecialchars(addslashes($eng)) ?>',this)">
+                            <?= htmlspecialchars($eng) ?>
+                        </div>
+                        <?php endwhile; ?>
                     </div>
-                    <?php endwhile; endif; ?>
+                </div>
+            </div>
+
+            <div class="sel-wrap" id="proj-wrap">
+                <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
+                    <span id="proj-label">All Projects</span>
+                    <span class="sel-arrow">▾</span>
+                </div>
+                <div class="sel-panel" id="proj-panel">
+                    <input type="text" id="proj-inner" placeholder="Type to search..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
+                    <div class="sel-list" id="proj-list">
+                        <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
+                        <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
+                            $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
+                        ?>
+                        <div class="sel-item"
+                             data-value="<?= htmlspecialchars($p['project_id']) ?>"
+                             data-kw="<?= strtolower(htmlspecialchars($p['project_id'].' '.$p['project_name'].' '.$p['customer_name'])) ?>"
+                             onclick="pickSel('proj','<?= htmlspecialchars(addslashes($p['project_id'])) ?>','<?= htmlspecialchars(addslashes($label)) ?>',this)">
+                            <?= htmlspecialchars($label) ?>
+                            <span style="color:#9ca3af;font-size:11px;display:block;"><?= htmlspecialchars($p['customer_name']) ?></span>
+                        </div>
+                        <?php endwhile; endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="sel-wrap" id="eng-wrap">
-            <div class="sel-box" id="eng-box" onclick="toggleSel('eng')">
-                <span id="eng-label">All Engineers</span>
-                <span class="sel-arrow">▾</span>
-            </div>
-            <div class="sel-panel" id="eng-panel">
-                <input type="text" id="eng-inner" placeholder="🔍 Type to filter..." oninput="filterSel('eng')" onclick="event.stopPropagation()">
-                <div class="sel-list" id="eng-list">
-                    <div class="sel-item active" data-value="" onclick="pickSel('eng','','All Engineers',this)">All Engineers</div>
-                    <?php
-                    $all_engs = $conn->query("SELECT engineer_name FROM engineers WHERE engineer_name != '' ORDER BY engineer_name ASC");
-                    while ($eng_row = $all_engs->fetch_assoc()):
-                        $eng = $eng_row['engineer_name'];
-                    ?>
-                    <div class="sel-item"
-                         data-value="<?= htmlspecialchars($eng) ?>"
-                         data-kw="<?= strtolower(htmlspecialchars($eng)) ?>"
-                         onclick="pickSel('eng','<?= htmlspecialchars(addslashes($eng)) ?>','<?= htmlspecialchars(addslashes($eng)) ?>',this)">
-                        <?= htmlspecialchars($eng) ?>
-                    </div>
-                    <?php endwhile; ?>
-                </div>
-            </div>
-        </div>
-
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">Start:</span>
-            <div style="position:relative;height:38px;display:flex;min-width:150px;">
+        <!-- Row 2: Date range + Clear -->
+        <div class="filter-row">
+            <span class="filter-label">📅 Date</span>
+            <div class="date-wrap">
                 <input type="text" id="date-start-display" placeholder="DD MMM YYYY" autocomplete="off"
-                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
                        oninput="this.value=this.value.toUpperCase()"
                        onblur="parseTsDate('start')" onkeydown="if(event.key==='Enter')this.blur()">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('date-start').showPicker()">📅</div>
-                <input type="date" id="date-start" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncTsDate('start')">
+                <div class="cal-btn" onclick="document.getElementById('date-start').showPicker()">📅</div>
+                <input type="date" id="date-start" style="position:absolute;top:0;right:0;width:32px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncTsDate('start')">
             </div>
-            <span style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">to End:</span>
-            <div style="position:relative;height:38px;display:flex;min-width:150px;">
+            <span class="date-sep">→</span>
+            <div class="date-wrap">
                 <input type="text" id="date-end-display" placeholder="DD MMM YYYY" autocomplete="off"
-                       style="flex:1;height:100%;padding:0 36px 0 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-transform:uppercase;"
                        oninput="this.value=this.value.toUpperCase()"
                        onblur="parseTsDate('end')" onkeydown="if(event.key==='Enter')this.blur()">
-                <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="document.getElementById('date-end').showPicker()">📅</div>
-                <input type="date" id="date-end" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncTsDate('end')">
+                <div class="cal-btn" onclick="document.getElementById('date-end').showPicker()">📅</div>
+                <input type="date" id="date-end" style="position:absolute;top:0;right:0;width:32px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncTsDate('end')">
             </div>
+            <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear All</button>
         </div>
-        <button class="btn-clear" onclick="clearAllFilters()">Clear</button>
     </div>
+    <!-- ── End Filter Panel ── -->
 
     <div class="live-dashboard" id="live-dashboard">
         <div class="dash-grid">
