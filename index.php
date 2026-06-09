@@ -104,14 +104,14 @@ function fmtDateDisplay($d) {
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-        .topbar { background: #ffffff; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        
+        .topbar { background: #ffffff; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .topbar h2 { color: #1f2937; margin: 0; font-size: 16px; }
-        .topbar .nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .topbar a { color: #084d68; text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 4px; }
-        .topbar a:hover { background: rgba(255,255,255,0.1); color: #053346; }
-        .topbar a.logout-btn { color: #f87171; }
-        .mode-switch-btn { display: inline-flex; align-items: center; gap: 6px; background: #73eb8f; color: white; text-decoration: none; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer; box-shadow: 0 2px 6px rgba(40,167,69,0.4); transition: all .2s; white-space: nowrap; }
-        .mode-switch-btn:hover { background: linear-gradient(135deg, #218838, #176929); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(40,167,69,0.5); color: white; }
+        .topbar .nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .topbar a { color: #084d68; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: background 0.2s, color 0.2s; }
+        .topbar a:hover { background: #e6f0ff; color: #1d4ed8; }
+        .topbar a.logout-btn { color: #dc3545; }
+        .topbar a.logout-btn:hover { background: #fee2e2; color: #b91c1c; }
         .page { padding: 20px; }
         .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 130px; border-top: 3px solid #007bff; }
@@ -200,7 +200,7 @@ function fmtDateDisplay($d) {
     <h2>👷 <?= htmlspecialchars($current_user_name) ?></h2>
     <div class="nav">
         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
-            <a href="admin.php" class="mode-switch-btn">⚙️ Switch to Admin</a>
+            <a href="admin.php">⚙️ Switch to Admin</a>
         <?php endif; ?>
         <a href="profile.php?from=index">👤 Profile</a>
         <a href="login.php?action=logout" class="logout-btn">Logout</a>

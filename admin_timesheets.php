@@ -170,7 +170,7 @@ thead tr.sec-row th.chk-col { z-index: 26; }
 
 <div class="topbar">
     <h2>📊 Timesheet Audit — All Engineers</h2>
-    <a href="admin.php">← Back to Admin</a>
+    <a href="admin.php">← Back to Admin Home</a>
 </div>
 
 <div class="page">

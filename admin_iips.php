@@ -252,7 +252,7 @@ sort($actual_end_years);
 
 <div class="header">
     <h2>📋 IIPS List</h2>
-    <a href="admin.php">← Back to Admin</a>
+    <a href="admin.php">← Back to Admin Home</a>
 </div>
 
 <div class="page">
@@ -378,9 +378,9 @@ sort($actual_end_years);
                             <th class="chk-col s-base" rowspan="2" style="z-index:25;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
                             <th class="s-base"    colspan="3">IIPS Details</th>
                             <th class="s-costing" colspan="4">IIPS Costing</th>
-                            <th class="s-timeline" colspan="3">Timeline — Target</th>
-                            <th class="s-actual"   colspan="3">Timeline — Actual (Timesheet)</th>
-                            <th class="s-status"   colspan="3">Status</th>
+                            <th class="s-timeline" colspan="3">Target Timeline</th>
+                            <th class="s-actual"   colspan="3">Actual Timeline</th>
+                            <th class="s-status"   colspan="3">Status</th>s
                             <th class="s-res"      colspan="6">Resources</th>
                             <th class="s-act" rowspan="2">Actions</th>
                         </tr>

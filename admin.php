@@ -13,11 +13,19 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin Home</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .header h2 { margin: 0; font-size: 18px; width: 100%; }
-        .header div { display: flex; width: 100%; justify-content: space-between; gap: 10px; }
-        .header a { flex: 1; text-align: center; padding: 10px 5px !important; font-size: 13px !important; }
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+        
+        .topbar { background: #343a40; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .topbar h2 { color: white; margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .topbar .nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        
+        .topbar a { color: #ffc107; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: background 0.2s, color 0.2s; }
+        .topbar a:hover { background: rgba(255, 193, 7, 0.15); color: #ffda6a; }
+        
+        .topbar a.logout-btn { color: #ef4444; }
+        .topbar a.logout-btn:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
         .menu-grid { display: flex; gap: 15px; flex-direction: column; margin-top: 20px; }
         .menu-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-decoration: none; color: #333; display: flex; flex-direction: column; justify-content: space-between; border-top: 5px solid #007bff; }
         .menu-card.projects { border-top-color: #28a745; }
@@ -29,10 +37,6 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
         .timesheets .menu-btn { background: #ffc107; color: #333; }
 
         @media (min-width: 768px) {
-            body { margin: 40px; }
-            .header h2 { width: auto; font-size: 24px; }
-            .header div { width: auto; justify-content: flex-end; }
-            .header a { flex: none; }
             .menu-grid { flex-direction: row; flex-wrap: wrap; }
             .menu-card { flex: 1; min-width: 280px; padding: 30px; }
             .menu-title { font-size: 20px; }
@@ -42,15 +46,14 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
 </head>
 <body>
 
-<div class="header">
-    <h2>Admin Home</h2>
-    <div style="display: flex; gap: 15px; align-items: center;">
+<div class="topbar">
+    <h2>⚙️ Admin Home</h2>
+    <div class="nav">
         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 2): ?>
-            <a href="index.php" style="color: #28a745; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">📋 Timesheet Home</a>
+            <a href="index.php">📋 Switch to Timesheet</a>
         <?php endif; ?>
-        
-        <a href="profile.php?from=admin" style="color: #007bff; font-weight: bold; text-decoration: none; background: #ffffff; border-radius: 4px; font-size: 14px;">👤 My Profile</a>
-        <a href="login.php?action=logout" style="color: #ffc107; font-weight: bold; text-decoration: none;">Logout</a>
+        <a href="profile.php?from=admin">👤 Profile</a>
+        <a href="login.php?action=logout" class="logout-btn">Logout</a>
     </div>
 </div>
 
