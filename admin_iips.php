@@ -55,7 +55,7 @@ $result = $conn->query("
     SELECT 
         p.*,
         i.id            AS iips_id,
-        i.selling_price, i.partner_cost, i.gross_profit,
+        i.selling_price, i.partner_cost, i.internal_cost, i.gross_profit,
         i.has_project_mgmt,
         i.target_mandays, i.target_start_date, i.target_end_date,
         i.target_billing_date,
@@ -385,6 +385,8 @@ sort($actual_end_years);
                         <label><input type="checkbox" value="cost_sp_only" onchange="applyFilters()"> Selling Price Only</label>
                         <label><input type="checkbox" value="cost_pc_only" onchange="applyFilters()"> Partner Cost Only</label>
                         <label><input type="checkbox" value="cost_empty"   onchange="applyFilters()"> Empty</label>
+                        <label><input type="checkbox" value="has_ic" onchange="applyFilters()"> Has Internal Cost</label>
+                        <label><input type="checkbox" value="no_ic"  onchange="applyFilters()"> No Internal Cost</label>
                     </div>
                 </div>
                 <div class="adv-group">
@@ -433,7 +435,7 @@ sort($actual_end_years);
                         <tr class="sec-row">
                             <th class="chk-col s-base" rowspan="2" style="z-index:25;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
                             <th class="s-base"    colspan="3">IIPS Details</th>
-                            <th class="s-costing" colspan="4">IIPS Costing</th>
+                            <th class="s-costing" colspan="7">IIPS Costing</th>
                             <th class="s-timeline" colspan="3">Target Timeline</th>
                             <th class="s-actual"   colspan="3">Actual Timeline</th>
                             <th class="s-status"   colspan="3">Status</th>
@@ -446,32 +448,41 @@ sort($actual_end_years);
                             <th><div class="sort-wrap">Customer Name<button type="button" class="sort-btn" onclick="toggleSort(event,'s-cust')"></button><div id="s-cust" class="sort-menu"><a href="#" onclick="sortT(3,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(3,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(3,'alpha',2);return false;">Z → A</a></div></div></th>
                             <th><div class="sort-wrap">Selling Price (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-sp')"></button><div id="s-sp" class="sort-menu"><a href="#" onclick="sortT(4,'num',0);return false;">Default</a><a href="#" onclick="sortT(4,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(4,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Partner Cost (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pc')"></button><div id="s-pc" class="sort-menu"><a href="#" onclick="sortT(5,'num',0);return false;">Default</a><a href="#" onclick="sortT(5,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(5,'num',2);return false;">High → Low</a></div></div></th>
-                            <th><div class="sort-wrap">Gross Profit (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(6,'num',0);return false;">Default</a><a href="#" onclick="sortT(6,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(6,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">GP without Internal Cost (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gpwo')"></button><div id="s-gpwo" class="sort-menu"><a href="#" onclick="sortT(6,'num',0);return false;">Default</a><a href="#" onclick="sortT(6,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(6,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Internal Cost (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ic')"></button><div id="s-ic" class="sort-menu"><a href="#" onclick="sortT(7,'num',0);return false;">Default</a><a href="#" onclick="sortT(7,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(7,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Actual GP (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(8,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">GP %<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gppct')"></button><div id="s-gppct" class="sort-menu"><a href="#" onclick="sortT(9,'num',0);return false;">Default</a><a href="#" onclick="sortT(9,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(9,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Project Mgmt<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pm')"></button><div id="s-pm" class="sort-menu"><a href="#" onclick="filterCol('pm','');return false;">Default (All)</a><a href="#" onclick="filterCol('pm','1');return false;">Yes</a><a href="#" onclick="filterCol('pm','0');return false;">No</a></div></div></th>
-                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(8,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(11,'num',0);return false;">Default</a><a href="#" onclick="sortT(11,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(11,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Target Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu"><a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a><?php foreach ($target_start_years as $y): ?><a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Target End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu"><a href="#" onclick="filterCol('ted-year','');return false;">All Years</a><?php foreach ($target_end_years as $y): ?><a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(11,'num',0);return false;">Default</a><a href="#" onclick="sortT(11,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(11,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(14,'num',0);return false;">Default</a><a href="#" onclick="sortT(14,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(14,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Actual Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu"><a href="#" onclick="filterCol('asd-year','');return false;">All Years</a><?php foreach ($actual_start_years as $y): ?><a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Actual End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu"><a href="#" onclick="filterCol('aed-year','');return false;">All Years</a><?php foreach ($actual_end_years as $y): ?><a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">IIPS Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
                             <th><div class="sort-wrap">Target Billing Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Billing Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
-                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(17,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(17,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(17,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(18,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(18,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(18,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(19,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(19,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(19,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">IIPS Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">IIPS Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(23,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(23,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(23,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(24,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(24,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(24,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(25,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(25,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(25,'alpha',2);return false;">Z → A</a></div></div></th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php if (empty($rows)): ?>
-                        <tr><td colspan="24" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "+ Create IIPS" to add one.</td></tr>
+                        <tr><td colspan="27" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "+ Create IIPS" to add one.</td></tr>
                     <?php else: foreach ($rows as $r):
                         $pid_display = fmtPid($r['project_id']);
-                        $gp  = floatval($r['gross_profit'] ?? 0);
-                        $gp_color = $gp > 0 ? '#166534' : ($gp < 0 ? '#dc2626' : '#6b7280');
+                        $sp_raw = $r['selling_price'];
+                        $pc_raw = $r['partner_cost'];
+                        $ic_raw = $r['internal_cost'];
+                        $gp_wo  = ($sp_raw !== null && $pc_raw !== null) ? floatval($sp_raw) - floatval($pc_raw) : null;
+                        $gp     = ($gp_wo !== null) ? $gp_wo - floatval($ic_raw ?? 0) : null;
+                        $gp_pct = ($gp !== null && floatval($sp_raw) > 0) ? ($gp / floatval($sp_raw)) * 100 : null;
+                        $gp_wo_color = ($gp_wo ?? 0) > 0 ? '#166534' : (($gp_wo ?? 0) < 0 ? '#dc2626' : '#6b7280');
+                        $gp_color    = ($gp ?? 0) > 0 ? '#166534' : (($gp ?? 0) < 0 ? '#dc2626' : '#6b7280');
 
                         $status_badge = ['Not Quoted'=>'b-nq','Quoted'=>'b-q','Not Started'=>'b-ns','In Progress'=>'b-ip','Completed'=>'b-done','Cancelled'=>'b-can'][$r['iips_status'] ?? 'Not Quoted'] ?? 'b-nq';
                         $billing_badge = ['Not Forecasted'=>'b-nf','Forecasted'=>'b-fc','Pending'=>'b-pend','Completed'=>'b-bdc'][$r['billing_status'] ?? 'Not Forecasted'] ?? 'b-nf';
@@ -513,6 +524,7 @@ sort($actual_end_years);
                         data-asd-year="<?= $r['ts_start']            ? date('Y', strtotime($r['ts_start']))            : '' ?>"
                         data-aed-year="<?= $r['ts_end']              ? date('Y', strtotime($r['ts_end']))              : '' ?>"
                         data-cost-state="<?= $cost_state ?>"
+                        data-has-ic="<?= ($ic_raw !== null && floatval($ic_raw) > 0) ? '1' : '0' ?>"
                         data-tgt-state="<?= $tgt_state ?>"
                         data-act-state="<?= $act_state ?>"
                         data-has-acc-mgr="<?= !empty($r['account_manager']) ? '1' : '0' ?>"
@@ -529,7 +541,10 @@ sort($actual_end_years);
                         <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
                         <td class="bg-manual"><?= $r['selling_price'] !== null ? 'RM '.number_format($r['selling_price'],2) : '<span class="dash">—</span>' ?></td>
                         <td class="bg-manual"><?= $r['partner_cost']  !== null ? 'RM '.number_format($r['partner_cost'],2)  : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= ($r['selling_price'] !== null && $r['partner_cost'] !== null) ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_wo_color ?>"><?= $gp_wo !== null ? 'RM '.number_format($gp_wo,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-manual"><?= $ic_raw !== null ? 'RM '.number_format($ic_raw,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp !== null ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp_pct !== null ? number_format($gp_pct,1).'%' : '<span class="dash">—</span>' ?></td>
                         <td class="bg-manual">
                             <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
                             <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
@@ -666,7 +681,7 @@ function applyFilters() {
         iips_status:     ['not_quoted','quoted','not_started','in_progress','completed','cancelled'],
         billing:         ['billing_nf','billing_fc','billing_pending','billing_done'],
         timesheet:       ['has_data','no_data'],
-        costing:         ['cost_sp_only','cost_pc_only','cost_empty'],
+        costing:         ['cost_sp_only','cost_pc_only','cost_empty','has_ic','no_ic'],
         target_timeline: ['tgt_yes','tgt_partial','tgt_no'],
         actual_timeline: ['act_yes','act_partial','act_no']
     };
@@ -714,6 +729,8 @@ function applyFilters() {
                     if (chk === 'cost_sp_only'   && d.costState    === 'cost_sp_only') groupMatch = true;
                     if (chk === 'cost_pc_only'   && d.costState    === 'cost_pc_only') groupMatch = true;
                     if (chk === 'cost_empty'     && d.costState    === 'cost_empty')   groupMatch = true;
+                    if (chk === 'has_ic'         && d.hasIc        === '1')            groupMatch = true;
+                    if (chk === 'no_ic'          && d.hasIc        === '0')            groupMatch = true;
                     
                     if (chk === 'tgt_yes'        && d.tgtState     === 'tgt_yes')      groupMatch = true;
                     if (chk === 'tgt_partial'    && d.tgtState     === 'tgt_partial')  groupMatch = true;

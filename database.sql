@@ -51,6 +51,7 @@ CREATE TABLE iips_tracking (
     project_id          VARCHAR(50) NOT NULL,
     selling_price       DECIMAL(12,2) NULL DEFAULT NULL,
     partner_cost        DECIMAL(12,2) NULL DEFAULT NULL,
+    internal_cost       DECIMAL(12,2) NULL DEFAULT NULL,
     gross_profit        DECIMAL(12,2) NULL DEFAULT NULL,
     has_project_mgmt    TINYINT(1) NOT NULL DEFAULT 0,
     target_mandays      DECIMAL(8,2) NULL DEFAULT NULL,
@@ -2120,4 +2121,4 @@ INSERT INTO iips_tracking (project_id, selling_price, partner_cost, gross_profit
 ('N/A_X310', 3000.0, 0.0, 3000.0, 0, 16.0, NULL, NULL, NULL, NULL, NULL, 'Quoted', 'Forecasted', 'Angel', 'Kelvin Eng', 'Jason', NULL, NULL),
 ('N/A_X311', 25000.0, 0.0, 25000.0, 0, 296.0, NULL, NULL, NULL, NULL, NULL, 'Quoted', 'Not Forecasted', 'Carose', 'Kelvin Eng', 'Gan', NULL, NULL),
 ('N/A_X312', 30000.0, 0.0, 30000.0, 0, 336.0, NULL, NULL, NULL, NULL, NULL, 'Quoted', 'Not Forecasted', 'Carose', 'Kelvin Eng', 'Gan', NULL, NULL),
-('N/A_X313', 6000.0, 0.0, 6000.0, 0, 40.0, NULL, NULL, NULL, NULL, NULL, 'Quoted', 'Not Forecasted', 'Venus', 'Lim Wee Peng', 'Soo Mei', NULL, NULL);   
+('N/A_X313', 6000.0, 0.0, 6000.0, 0, 40.0, NULL, NULL, NULL, NULL, NULL, 'Quoted', 'Not Forecasted', 'Venus', 'Lim Wee Peng', 'Soo Mei', NULL, NULL);

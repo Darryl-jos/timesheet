@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // IIPS Costing
     $selling   = strlen(trim($_POST['selling_price'] ?? '')) > 0 ? floatval($_POST['selling_price']) : null;
     $partner   = strlen(trim($_POST['partner_cost']  ?? '')) > 0 ? floatval($_POST['partner_cost'])  : null;
+    $internal  = strlen(trim($_POST['internal_cost'] ?? '')) > 0 ? floatval($_POST['internal_cost']) : 0;
     $gross     = ($selling !== null && $partner !== null) ? $selling - $partner : null;
     $has_pm    = isset($_POST['has_project_mgmt']) ? 1 : 0;
 
@@ -94,12 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $exists = $chk->get_result()->num_rows > 0; $chk->close();
 
                 if ($exists) {
-                    $upd = $conn->prepare("UPDATE iips_tracking SET selling_price=?,partner_cost=?,gross_profit=?,has_project_mgmt=?,target_mandays=?,target_start_date=?,target_end_date=?,target_billing_date=?,iips_status=?,billing_status=?,account_manager=?,account_leader=?,presales_sdm=?,project_manager=? WHERE project_id=?");
-                    $upd->bind_param("dddidssssssssss", $selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
+                    $upd = $conn->prepare("UPDATE iips_tracking SET selling_price=?,partner_cost=?,internal_cost=?,gross_profit=?,has_project_mgmt=?,target_mandays=?,target_start_date=?,target_end_date=?,target_billing_date=?,iips_status=?,billing_status=?,account_manager=?,account_leader=?,presales_sdm=?,project_manager=? WHERE project_id=?");
+                    $upd->bind_param("ddddidssssssssss", $selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
                     $upd->execute(); $upd->close();
                 } else {
-                    $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-                    $ins->bind_param("sdddidsssssssss", $p_id,$selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
+                    $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,internal_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                    $ins->bind_param("sddddidsssssssss", $p_id,$selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
                     $ins->execute(); $ins->close();
                 }
                 $conn->commit();
@@ -114,8 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pricing = null;
             $s = $conn->prepare("INSERT INTO projects (project_id,project_name,customer_name,estimate_time,pricing) VALUES (?,?,?,?,?)");
             $s->bind_param("sssid", $p_id,$p_name,$c_name,$est_time,$pricing); $s->execute(); $s->close();
-            $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $ins->bind_param("sdddidsssssssss", $p_id,$selling,$partner,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
+            $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,internal_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $ins->bind_param("sddddidsssssssss", $p_id,$selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
             $ins->execute(); $ins->close();
             header("Location: admin_iips.php"); exit;
         }
@@ -129,6 +130,7 @@ $v = [
     'customer_name'       => $_POST['customer_name']       ?? ($edit_data['customer_name'] ?? ''),
     'selling_price'       => $_POST['selling_price']       ?? ($iips_data['selling_price']  ?? ''),
     'partner_cost'        => $_POST['partner_cost']        ?? ($iips_data['partner_cost']   ?? ''),
+    'internal_cost'       => $_POST['internal_cost']       ?? ($iips_data['internal_cost']  ?? ''),
     'has_project_mgmt'    => ($_SERVER['REQUEST_METHOD'] === 'POST') ? (isset($_POST['has_project_mgmt']) ? 1 : 0) : ($iips_data['has_project_mgmt'] ?? 0),
     'target_mandays'      => $_POST['target_mandays']      ?? ($iips_data['target_mandays']      ?? ''),
     'target_start_date'   => $_POST['target_start_date']   ?? ($iips_data['target_start_date']   ?? ''),
@@ -250,6 +252,10 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 <div class="form-group">
                     <label>Partner Cost (RM) <span class="req">*</span></label>
                     <input type="number" name="partner_cost" id="pc" step="0.01" min="0" value="<?= htmlspecialchars($v['partner_cost']) ?>" oninput="calcGP()" class="<?= in_array('Partner Cost is required.',$errors)?'err':'' ?>">
+                </div>
+                <div class="form-group">
+                    <label>Internal Cost (RM)</label>
+                    <input type="number" name="internal_cost" id="ic" step="0.01" min="0" value="<?= htmlspecialchars($v['internal_cost']) ?>">
                 </div>
                 <div class="check-group" style="align-self:center; padding-top:20px;">
                     <input type="checkbox" name="has_project_mgmt" id="has_pm" <?= $v['has_project_mgmt'] ? 'checked' : '' ?>>
@@ -393,10 +399,8 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
 <script>
 function calcGP() {
-    // kept for compatibility but gross profit not shown in form
+    // GP is calculated automatically in the IIPS List table — nothing shown in this form
 }
-
-
 </script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/imask@7/dist/imask.min.js"></script>
