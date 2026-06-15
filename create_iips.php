@@ -30,7 +30,7 @@ $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old_pid   = trim($_POST['old_project_id'] ?? '');
-    $p_id      = !empty(trim($_POST['project_id'])) ? trim($_POST['project_id']) : ('N/A_'.uniqid());
+    $p_id      = !empty(trim($_POST['project_id'])) ? trim($_POST['project_id']) : ('NA-'.strtoupper(uniqid()));
     $p_name    = trim($_POST['project_name']);
     $c_name    = trim($_POST['customer_name']);
 
@@ -255,7 +255,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                 </div>
                 <div class="form-group">
                     <label>Internal Cost (RM)</label>
-                    <input type="number" name="internal_cost" id="ic" step="0.01" min="0" value="<?= htmlspecialchars($v['internal_cost']) ?>">
+                    <input type="number" name="internal_cost" id="ic" step="0.01" min="0" value="<?= htmlspecialchars($v['internal_cost']) ?>" placeholder="0.00">
                 </div>
                 <div class="check-group" style="align-self:center; padding-top:20px;">
                     <input type="checkbox" name="has_project_mgmt" id="has_pm" <?= $v['has_project_mgmt'] ? 'checked' : '' ?>>

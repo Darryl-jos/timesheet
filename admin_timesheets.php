@@ -249,7 +249,7 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                     <div class="sel-list" id="proj-list">
                         <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
                         <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
-                            $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
+                            $label = ($p['project_id'] && !preg_match('/^N[\/.\-]?A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
                         ?>
                         <div class="sel-item"
                              data-value="<?= htmlspecialchars($p['project_id']) ?>"
@@ -374,7 +374,7 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                     data-mins="<?= $mins ?>">
                     <td><input type="checkbox" class="ts-chk" name="selected_ts[]" value="<?= $row['id'] ?>" onchange="onChkChange()"></td>
                     <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
-                    <td><code style="font-size:11px;"><?= preg_match('/^N\/A/i', $row['project_id']) ? '-' : htmlspecialchars($row['project_id']) ?></code></td>
+                    <td><code style="font-size:11px;"><?= preg_match('/^N[\/.\-]?A/i', $row['project_id']) ? '<span style=\'color:#9ca3af;\'>—</span>' : htmlspecialchars($row['project_id']) ?></code></td>
                     <td style="font-size:11px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:11px;"><?= htmlspecialchars($row['project_name']) ?></td>
                     <td><div class="act"><?= htmlspecialchars($row['work_description'] ?: 'No description') ?></div></td>

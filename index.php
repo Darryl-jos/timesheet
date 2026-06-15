@@ -278,7 +278,7 @@ function fmtDateDisplay($d) {
                         <div class="sel-item active" data-value="" onclick="pickProj(this, '', 'All IIPS')">All IIPS</div>
                         <?php if ($proj_list_res): while($p = $proj_list_res->fetch_assoc()):
                             $kw = strtolower("[".$p['project_id']."] ".$p['project_name']." ".$p['customer_name']);
-                            $pid_show = preg_match('/^N\/A/i', $p['project_id']) ? '' : '['.$p['project_id'].'] ';
+                            $pid_show = preg_match('/^N[\/.\-]?A/i', $p['project_id']) ? '' : '['.$p['project_id'].'] ';
                         ?>
                             <div class="sel-item"
                                  data-value="<?= htmlspecialchars($p['project_id']) ?>"
@@ -395,7 +395,7 @@ function fmtDateDisplay($d) {
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>"
                     data-mins="<?= intval($row['_minutes'] ?? 0) ?>">
-                    <td><code style="font-size:11px;"><?= preg_match('/^N\/A/i', $row['project_id']) ? '-' : htmlspecialchars($row['project_id']) ?></code></td>
+                    <td><code style="font-size:11px;"><?= preg_match('/^N[\/.\-]?A/i', $row['project_id']) ? '<span style=\'color:#9ca3af;\'>—</span>' : htmlspecialchars($row['project_id']) ?></code></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['customer_name']) ?></td>
                     <td style="font-size:12px;"><?= htmlspecialchars($row['project_name']) ?></td>
                     <td>

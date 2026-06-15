@@ -149,7 +149,7 @@ echo "\xEF\xBB\xBF";
                     $d_bill     = !empty($row['target_billing_date']) ? date('d-M-Y', strtotime($row['target_billing_date'])) : '-';
             ?>
                 <tr>
-                    <td class="text-bold"><?php echo preg_match('/^N\/?A/i', trim($row['project_id'])) ? '-' : htmlspecialchars($row['project_id']); ?></td>
+                    <td class="text-bold"><?php echo preg_match('/^N[\/\-]?A/i', trim($row['project_id'])) ? '-' : htmlspecialchars($row['project_id']); ?></td>
                     <td class="text-bold"><?php echo htmlspecialchars($row['project_name']); ?></td>
                     <td><?php echo htmlspecialchars($row['customer_name']); ?></td>
                     <td><?php echo $row['selling_price'] !== null ? 'RM ' . number_format($row['selling_price'], 2) : '-'; ?></td>

@@ -103,7 +103,7 @@ $projects_res = $conn->query("SELECT p.*, i.project_manager AS iips_mgr, i.partn
 $current_selected_label = "-- Select Project --";
 while($p = $projects_res->fetch_assoc()) {
     if ($sel_proj_id == $p['project_id']) {
-        $current_selected_label = ($p['project_id'] && !preg_match('/^N\/A/i', $p['project_id']) ? '['.$p['project_id'].'] ' : '') . $p['project_name'];
+        $current_selected_label = ($p['project_id'] && !preg_match('/^N[\/.\-]?A/i', $p['project_id']) ? '['.$p['project_id'].'] ' : '') . $p['project_name'];
     }
 }
 $projects_res->data_seek(0);
@@ -197,7 +197,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                             <input type="text" id="proj-inner" placeholder="🔍 Type to filter..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
                             <div class="sel-list" id="proj-list">
                                 <?php while($p = $projects_res->fetch_assoc()): 
-                                    $label = ($p['project_id'] && !preg_match('/^N\/A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
+                                    $label = ($p['project_id'] && !preg_match('/^N[\/.\-]?A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
                                     $kw = strtolower($p['project_id'].' '.$p['project_name'].' '.$p['customer_name']);
                                     $is_selected = ($sel_proj_id == $p['project_id']) ? 'active' : '';
                                 ?>

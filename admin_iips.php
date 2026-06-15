@@ -102,9 +102,16 @@ function fmtDate($d) {
     return $dt ? $dt->format('d-M-Y') : $d;
 }
 function fmtPid($pid) {
-    if (!$pid) return '-';
-    if (preg_match('/^N\/A/i', $pid)) return '-';
+    if (!$pid) return '<span class="dash">—</span>';
+    if (preg_match('/^N[\/.\-]?A/i', $pid)) return '<span class="dash">—</span>';
     return htmlspecialchars($pid);
+}
+function cleanNames($raw) {
+    // Split comma-separated names, drop blanks and any "N/A" variants
+    $names = array_filter(array_map('trim', explode(',', $raw ?? '')), function($n) {
+        return $n !== '' && !preg_match('/^N[\.\/\-]?A$/i', $n);
+    });
+    return $names;
 }
 function fmtMins($m) {
     if (!$m) return '-';
@@ -559,20 +566,20 @@ sort($actual_end_years);
                         <td class="bg-manual"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
                         <td class="bg-dropdown"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
                         <td><?php
-                            $names = array_filter(array_map('trim', explode(',', $r['account_manager'] ?? '')));
+                            $names = cleanNames($r['account_manager']);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td><?php
-                            $names = array_filter(array_map('trim', explode(',', $r['account_leader'] ?? '')));
+                            $names = cleanNames($r['account_leader']);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td><?php
-                            $names = array_filter(array_map('trim', explode(',', $r['presales_sdm'] ?? '')));
+                            $names = cleanNames($r['presales_sdm']);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td><?php
-                            $names = array_filter(array_map('trim', explode(',', $pm_display ?? '')));
+                            $names = cleanNames($pm_display);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td class="bg-auto"><?php if ($r['ts_engineers']): ?><ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;"><?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?><li><?= htmlspecialchars(trim($eng)) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td><?php
-                            $names = array_filter(array_map('trim', explode(',', $partner_display ?? '')));
+                            $names = cleanNames($partner_display);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td><a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a><a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a></td>
                     </tr>
