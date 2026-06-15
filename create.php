@@ -100,7 +100,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 $projects_res = $conn->query("SELECT p.*, i.project_manager AS iips_mgr, i.partner AS iips_partner FROM projects p LEFT JOIN iips_tracking i ON p.project_id = i.project_id ORDER BY p.project_id ASC");
-$current_selected_label = "-- Select Project --";
+$current_selected_label = "-- Select IIPS --";
 while($p = $projects_res->fetch_assoc()) {
     if ($sel_proj_id == $p['project_id']) {
         $current_selected_label = ($p['project_id'] && !preg_match('/^N[\/.\-]?A/i', $p['project_id']) ? '['.$p['project_id'].'] ' : '') . $p['project_name'];
@@ -285,7 +285,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             <div class="section-hdr" style="background:#4a235a;">👥 IIPS Management</div>
             <div class="section-body">
                 <div class="form-group">
-                    <label>Do you have an IIPS Manager?</label>
+                    <label>Do you have an Project Manager?</label>
                     <div style="display:flex;gap:20px;margin-top:6px;">
                         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
                             <input type="radio" name="has_iips_manager_radio" value="yes" onclick="document.getElementById('iips-mgr-field').style.display='block'"> Yes

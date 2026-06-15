@@ -241,13 +241,13 @@ thead tr.sec-row th.chk-col { z-index: 26; }
 
             <div class="sel-wrap" id="proj-wrap">
                 <div class="sel-box" id="proj-box" onclick="toggleSel('proj')">
-                    <span id="proj-label">All Projects</span>
+                    <span id="proj-label">All IIPS</span>
                     <span class="sel-arrow">▾</span>
                 </div>
                 <div class="sel-panel" id="proj-panel">
                     <input type="text" id="proj-inner" placeholder="Type to search..." oninput="filterSel('proj')" onclick="event.stopPropagation()">
                     <div class="sel-list" id="proj-list">
-                        <div class="sel-item active" data-value="" onclick="pickSel('proj','','All Projects',this)">All Projects</div>
+                        <div class="sel-item active" data-value="" onclick="pickSel('proj','','All IIPS',this)">All IIPS</div>
                         <?php if ($proj_list_result): while($p = $proj_list_result->fetch_assoc()):
                             $label = ($p['project_id'] && !preg_match('/^N[\/.\-]?A/i',$p['project_id']) ? '['.$p['project_id'].'] ' : '').$p['project_name'];
                         ?>
@@ -331,9 +331,9 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                     </tr>
                     <tr>
                         <th><div class="sort-wrap">Engineer<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(1,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(1,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(1,'alpha',2);return false;">Z → A</a></div></div></th>
-                        <th><div class="sort-wrap">Project ID<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
+                        <th><div class="sort-wrap">IIPS ID<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pid')"></button><div id="s-pid" class="sort-menu"><a href="#" onclick="sortT(2,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(2,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(2,'alpha',2);return false;">Z → A</a></div></div></th>
                         <th>Customer</th>
-                        <th>Project Name</th>
+                        <th>IIPS Name</th>
                         <th>Activity</th>
                         <th><div class="sort-wrap">Start Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-sd')"></button><div id="s-sd" class="sort-menu"><a href="#" onclick="sortT(6,'date',0);return false;">Default</a><a href="#" onclick="sortT(6,'date',1);return false;">Oldest First</a><a href="#" onclick="sortT(6,'date',2);return false;">Newest First</a></div></div></th>
                         <th>End Date</th>
