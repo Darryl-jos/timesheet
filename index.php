@@ -103,9 +103,9 @@ function fmtDateDisplay($d) {
     <title>My Timesheet Dashboard</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+        body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
         
-        .topbar { background: #343a40; padding: 15px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .topbar { position: sticky; top: 0; z-index: 500; background: #343a40; padding: 15px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
         .topbar h2 { color: white; margin: 0; font-size: 18px; }
         .topbar .nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
         .topbar a { color: #ffc107; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: background 0.2s, color 0.2s; }
@@ -156,7 +156,7 @@ function fmtDateDisplay($d) {
         .sel-item.hidden { display: none; }
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
         .card-hdr { padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
+        .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; min-width: 900px; }
         th, td { padding: 11px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
         th { background: #f8fafc; font-weight: 600; color: #475569; white-space: nowrap; }
@@ -188,7 +188,6 @@ function fmtDateDisplay($d) {
         .s-perf     { background: #004d40; }
         .error-border { border: 2px solid #dc2626 !important; }
 
-        /* ── Unified Filter Panel ── */
         .filter-panel { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 14px; }
         .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
@@ -224,9 +223,20 @@ function fmtDateDisplay($d) {
         .active-badge { display: inline-flex; align-items: center; gap: 5px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; flex-wrap: wrap; }
         .active-badge .x-btn { cursor: pointer; font-weight: 900; margin-left: 2px; }
         .active-badge .x-btn:hover { color: #dc2626; }
+        
+        .pagination-container { padding: 12px 20px; display: flex; align-items: center; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; width: 100%; box-sizing: border-box; overflow: hidden; gap: 6px; }
+        .page-btn { min-width: 32px; height: 32px; margin: 0; padding: 0 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; user-select: none; transition: all 0.2s; flex-shrink: 0; }
+        .page-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+        .page-btn.active { background: #007bff; color: white; border-color: #007bff; }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-scroll-wrap { display: flex; overflow-x: auto; flex: 1; scroll-behavior: smooth; align-items: center; gap: 6px; padding-bottom: 6px; margin-bottom: -6px; }
+        .page-scroll-wrap::-webkit-scrollbar { height: 6px; }
+        .page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+
         @media (max-width: 600px) {
             body { margin: 10px; }
-            .page { padding: 0; }
+            .page { padding: 12px; }
             .topbar { border-radius: 8px; padding: 12px 14px; }
             .topbar h2 { font-size: 15px; }
             .stats-bar { gap: 8px; }
@@ -242,7 +252,6 @@ function fmtDateDisplay($d) {
             .btn-apply-filter { width: 100%; height: 42px; font-size: 14px; }
             .btn-clear-filter { width: 100%; height: 42px; font-size: 14px; }
         }
-        @media (max-width: 600px) { .page { padding: 12px; } .stats-bar { gap: 8px; } .stat { min-width: 100px; padding: 10px 12px; } .filter-row { gap: 6px; } }
     </style>
 </head>
 <body>
@@ -261,9 +270,7 @@ function fmtDateDisplay($d) {
 <div class="page">
     <a href="create.php" class="btn-create">+ Create New Record</a>
 
-    <!-- ── Unified Filter Panel ── -->
     <div class="filter-panel">
-        <!-- Row 1: Search + IIPS dropdown -->
         <div class="filter-row">
             <span class="filter-label">🔍</span>
             <input type="text" class="filter-input" id="txt-search" placeholder="Search by activity, IIPS, customer..." oninput="doFilter()">
@@ -292,7 +299,6 @@ function fmtDateDisplay($d) {
                 </div>
             </div>
         </div>
-        <!-- Row 2: Date range + action buttons -->
         <div class="filter-row">
             <span class="filter-label">📅 Date</span>
             <div class="date-wrap">
@@ -329,7 +335,6 @@ function fmtDateDisplay($d) {
         </div>
         <?php endif; ?>
     </div>
-    <!-- ── End Filter Panel ── -->
 
     <div class="card">
         <div class="summary-card" id="sum-card">
@@ -343,8 +348,7 @@ function fmtDateDisplay($d) {
         <div class="card-hdr">
             <span>Timesheet Records</span>
             <span style="font-size:12px; color:#64748b; font-weight:400; display:flex; align-items:center; gap:8px;">
-                <span><?= $total_records ?> records · </span>
-                <?= calculateTotalProjectManDays($total_minutes) ?>
+                <span><?= $total_records ?> records</span>
             </span>
         </div>
         <?php if (empty($rows_cache)): ?>
@@ -391,6 +395,7 @@ function fmtDateDisplay($d) {
                 </tr>
             </thead>
             <tbody>
+                <tr id="empty-row" class="is-hidden"><td colspan="8" style="text-align:center;padding:40px;height:250px;vertical-align:middle;color:#9ca3af;">No matching logs found.</td></tr>
                 <?php foreach ($rows_cache as $row): ?>
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>"
@@ -414,7 +419,12 @@ function fmtDateDisplay($d) {
                         </div>
                     </td>
                     <td>
-                        <?= calculateDuration($row['start_date'], $row['start_time'], $row['end_time'], isset($row['meal_breaks']) ? intval($row['meal_breaks']) : 0) ?>
+                        <?php
+                            $mins = $row['_minutes'];
+                            $h = floor($mins / 60);
+                            $m = $mins % 60;
+                            echo $h . 'h ' . $m . 'm';
+                        ?>
                     </td>
                     <td>
                         <div style="display: flex; gap: 8px;">
@@ -427,6 +437,7 @@ function fmtDateDisplay($d) {
             </tbody>
         </table>
         </div>
+        <div id="pagination-container" class="pagination-container" style="display:none;"></div>
         <?php endif; ?>
     </div>
 </div>
@@ -435,10 +446,16 @@ function fmtDateDisplay($d) {
 let origRows = null;
 let activeProjFilter = '';
 
+let currentPage = 1;
+const rowsPerPage = 6;
+let paginationMode = 'standard';
+let currentFilteredRows = [];
+
 const MONTHS_D = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_U = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
 document.addEventListener('DOMContentLoaded', function() {
+    fixStickyHeaders();
     const params = new URLSearchParams(window.location.search);
     const startVal = params.get('start');
     const endVal   = params.get('end');
@@ -450,7 +467,80 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('end-picker').value = endVal;
         document.getElementById('end-display').value = formatDateDisplay(endVal);
     }
+    doFilter();
 });
+
+function goToPage(p) {
+    currentPage = p;
+    renderPagination(currentFilteredRows);
+}
+
+function togglePaginationMode() {
+    paginationMode = paginationMode === 'standard' ? 'all' : 'standard';
+    renderPagination(currentFilteredRows);
+}
+
+function renderPagination(rows) {
+    currentFilteredRows = rows;
+    const totalPages = Math.ceil(rows.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    rows.forEach((r, idx) => {
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        if (idx >= start && idx < end) {
+            r.classList.remove('is-hidden');
+        } else {
+            r.classList.add('is-hidden');
+        }
+    });
+
+    const pCont = document.getElementById('pagination-container');
+    if (!pCont) return;
+
+    if (rows.length === 0) {
+        pCont.innerHTML = '';
+        pCont.style.display = 'none';
+        return;
+    }
+    
+    pCont.style.display = 'flex';
+    let html = '';
+
+    if (paginationMode === 'standard') {
+        html += `<div style="display:flex; gap:6px; flex:1; justify-content:flex-end; align-items:center;">`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(1)" ${currentPage===1?'disabled':''}>&laquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
+
+        if (currentPage > 1) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})">${currentPage-1}</button>`;
+        html += `<button type="button" class="page-btn active">${currentPage}</button>`;
+        if (currentPage < totalPages) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})">${currentPage+1}</button>`;
+
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>&raquo;</button>`;
+        if (totalPages > 3) html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `</div>`;
+    } else {
+        html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `<div class="page-scroll-wrap">`;
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button type="button" class="page-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
+        }
+        html += `</div>`;
+    }
+    pCont.innerHTML = html;
+
+    if (paginationMode === 'all') {
+        setTimeout(() => {
+            const wrap = document.querySelector('.page-scroll-wrap');
+            const activeBtn = wrap.querySelector('.active');
+            if (activeBtn) {
+                wrap.scrollLeft = activeBtn.offsetLeft - wrap.offsetWidth / 2 + activeBtn.offsetWidth / 2;
+            }
+        }, 10);
+    }
+}
 
 function formatDateDisplay(ymd) {
     if (!ymd) return '';
@@ -536,7 +626,6 @@ function clearAllFilters() {
     if (allItem) allItem.classList.add('active');
     document.getElementById('sum-card').style.display = 'none';
     doFilter();
-    // If date filter was active server-side, navigate to clear it
     const params = new URLSearchParams(window.location.search);
     if (params.get('start') || params.get('end')) window.location.href = 'index.php';
 }
@@ -577,14 +666,25 @@ document.addEventListener('click', e => {
 function doFilter() {
     const txt = document.getElementById('txt-search').value.toLowerCase();
     let visRows = [];
-    document.querySelectorAll('#main-table tbody tr').forEach(tr => {
+    document.querySelectorAll('#main-table tbody tr[data-pid]').forEach(tr => {
         const rowPid  = tr.dataset.pid  || '';
         const rowText = tr.textContent.toLowerCase();
         const ok = (!txt || rowText.includes(txt)) && (!activeProjFilter || rowPid === activeProjFilter);
-        tr.classList.toggle('is-hidden', !ok);
+        tr.classList.add('is-hidden');
         if (ok) visRows.push(tr);
     });
+
+    let emptyTr = document.getElementById('empty-row');
+    if (visRows.length === 0) {
+        if (emptyTr) emptyTr.classList.remove('is-hidden');
+    } else {
+        if (emptyTr) emptyTr.classList.add('is-hidden');
+    }
+
     updateSummary(visRows, txt);
+    
+    currentPage = 1;
+    renderPagination(visRows);
 }
 
 function updateSummary(visRows, txt) {
@@ -613,7 +713,6 @@ function fixStickyHeaders() {
         colRow.querySelectorAll('th').forEach(th => th.style.top = h + 'px');
     }
 }
-window.addEventListener('DOMContentLoaded', fixStickyHeaders);
 window.addEventListener('resize', fixStickyHeaders);
 
 function toggleSort(e, id) {
@@ -626,9 +725,13 @@ window.addEventListener('click', () => document.querySelectorAll('.sort-menu').f
 function sortTable(col, type, dir) {
     const tbody = document.querySelector('#main-table tbody');
     if (!tbody) return;
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll('tr[data-pid]'));
     if (!origRows) origRows = [...rows];
-    if (dir === 0) { origRows.forEach(r => tbody.appendChild(r)); return; }
+    if (dir === 0) { 
+        origRows.forEach(r => tbody.appendChild(r)); 
+        doFilter();
+        return; 
+    }
     rows.sort((a, b) => {
         const ca = a.cells[col].textContent.trim();
         const cb = b.cells[col].textContent.trim();
@@ -641,6 +744,7 @@ function sortTable(col, type, dir) {
         return 0;
     });
     rows.forEach(r => tbody.appendChild(r));
+    doFilter();
 }
 </script>
 </body>

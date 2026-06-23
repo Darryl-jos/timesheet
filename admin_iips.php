@@ -67,28 +67,31 @@ $result = $conn->query("
     ORDER BY p.project_id ASC
 ");
 
-function getTimesheetData($conn, $project_id) {
-    $stmt = $conn->prepare("
-        SELECT
-            MIN(start_date) AS actual_start,
-            MAX(end_date)   AS actual_end,
-            SUM(
-                GREATEST(0, TIMESTAMPDIFF(MINUTE,
-                    CONCAT(start_date,' ',start_time),
-                    CONCAT(end_date,' ',end_time)
-                ) - (COALESCE(meal_breaks, 0) * 60))
-            ) AS total_minutes,
-            GROUP_CONCAT(DISTINCT engineer_name ORDER BY engineer_name SEPARATOR ', ') AS engineers
-        FROM timesheets WHERE project_id=?
-    ");
-    $stmt->bind_param("s", $project_id); $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
-    return $row;
+$ts_map = [];
+$ts_agg = $conn->query("
+    SELECT
+        project_id,
+        MIN(start_date) AS actual_start,
+        MAX(end_date)   AS actual_end,
+        SUM(
+            GREATEST(0, TIMESTAMPDIFF(MINUTE,
+                CONCAT(start_date,' ',start_time),
+                CONCAT(end_date,' ',end_time)
+            ) - (COALESCE(meal_breaks, 0) * 60))
+        ) AS total_minutes,
+        GROUP_CONCAT(DISTINCT engineer_name ORDER BY engineer_name SEPARATOR ', ') AS engineers
+    FROM timesheets
+    GROUP BY project_id
+");
+if ($ts_agg) {
+    while ($t = $ts_agg->fetch_assoc()) {
+        $ts_map[$t['project_id']] = $t;
+    }
 }
 
 $rows = [];
 while ($row = $result->fetch_assoc()) {
-    $ts = getTimesheetData($conn, $row['project_id']);
+    $ts = $ts_map[$row['project_id']] ?? null;
     $row['ts_start']    = $ts['actual_start'] ?? null;
     $row['ts_end']      = $ts['actual_end']   ?? null;
     $row['ts_minutes']  = intval($ts['total_minutes'] ?? 0);
@@ -107,7 +110,6 @@ function fmtPid($pid) {
     return htmlspecialchars($pid);
 }
 function cleanNames($raw) {
-    // Split comma-separated names, drop blanks and any "N/A" variants
     $names = array_filter(array_map('trim', explode(',', $raw ?? '')), function($n) {
         return $n !== '' && !preg_match('/^N[\.\/\-]?A$/i', $n);
     });
@@ -154,18 +156,17 @@ sort($actual_end_years);
 <style>
     .is-hidden { display: none !important; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-    .header h2 { margin: 0; font-size: 18px; }
-    .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
-    .page { padding: 20px; }
+    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+    .header { position: sticky !important; top: 0 !important; z-index: 500 !important; background: #343a40 !important; padding: 15px 20px !important; display: flex !important; border-radius: 8px !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; margin-bottom: 16px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+    .header h2 { color: white !important; margin: 0 !important; font-size: 18px !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+    .header a { color: #ffc107 !important; text-decoration: none !important; font-size: 13px !important; padding: 6px 12px !important; border-radius: 4px !important; font-weight: bold !important; transition: background 0.2s, color 0.2s !important; }
+    .header a:hover { background: rgba(255, 193, 7, 0.15) !important; color: #ffda6a !important; }    
     .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 0; }
     .card-hdr { padding: 16px 25px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: white; border-top-left-radius: 8px; border-top-right-radius: 8px; }
     .card-hdr h3 { margin: 0; font-size: 16px; color: #1f2937; }
-    @media (max-width: 768px) { body { margin: 0; } .page { padding: 10px; } .header { padding: 12px 14px; border-radius: 0; } .header h2 { font-size: 15px; } .card { padding: 0; } .card-hdr, .tbl-outer { padding: 12px; } }    .btn-create-iips { display: inline-flex; align-items: center; gap: 6px; background: #28a745; color: white; text-decoration: none; font-size: 13px; font-weight: 700; padding: 0 16px; height: 38px; border-radius: 6px; white-space: nowrap; border: none; cursor: pointer; }
+    .btn-create-iips { display: inline-flex; align-items: center; gap: 6px; background: #28a745; color: white; text-decoration: none; font-size: 13px; font-weight: 700; padding: 0 16px; height: 38px; border-radius: 6px; white-space: nowrap; border: none; cursor: pointer; }
     .btn-create-iips:hover { background: #218838; color: white; }
 
-    /* ── Unified Filter Panel ── */
     .filter-panel { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 12px; }
     .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
@@ -200,24 +201,6 @@ sort($actual_end_years);
     .active-filter-count { display: inline-flex; align-items: center; justify-content: center; background: #dc3545; color: white; border-radius: 10px; font-size: 10px; font-weight: 700; min-width: 17px; height: 17px; padding: 0 4px; margin-left: 2px; }
     .alert-err { background:#f8d7da; color:#721c24; padding:12px; border-radius:4px; margin-bottom:15px; border:1px solid #f5c6cb; font-size:13px; }
 
-    @media (max-width: 600px) {
-        body { margin: 10px; }
-        .page { padding: 0; }
-        .header { padding: 12px 14px; border-radius: 8px; }
-        .header h2 { font-size: 15px; }
-        .filter-panel { padding: 10px 12px; }
-        .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
-        .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
-        .filter-input { min-width: unset; width: 100%; }
-        .btn-create-iips { width: 100%; justify-content: center; }
-        .iips-date-wrap { flex: 1 1 auto; width: 100%; }
-        .date-sep { text-align: center; }
-        .filter-label { margin-left: 0 !important; }
-        div[style*="margin-left:auto"] { margin-left: 0 !important; width: 100%; }
-        .btn-adv-toggle, .btn-clear-filter { width: 100%; justify-content: center; height: 40px; font-size: 14px; }
-        .adv-filters > div { grid-template-columns: 1fr !important; }
-    }
-    
     #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     #bulk-toolbar span { font-size: 13px; font-weight: 600; color: #1e40af; flex: 1; }
     .btn-bulk { border: none; padding: 7px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
@@ -227,8 +210,8 @@ sort($actual_end_years);
     .btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
     .btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
 
-    .tbl-outer { position: relative; padding: 0 25px 25px 25px; }
-    .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
+    .tbl-outer { position: relative; padding: 0 25px 0 25px; }
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
     .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
@@ -292,7 +275,39 @@ sort($actual_end_years);
     .show-sort { display:block !important; }
     .auto-val { font-size: 12px; color: #065f46; white-space: nowrap; }
     .dash { color: #9ca3af; }
-    @media (max-width: 768px) { body { margin: 0; } .page { padding: 10px; } .header { padding: 10px; } .card { padding: 0; } .card-hdr, .tbl-outer { padding: 12px; } }
+    
+    .pagination-container { padding: 12px 25px; display: flex; align-items: center; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; width: 100%; box-sizing: border-box; overflow: hidden; gap: 6px; }
+    .page-btn { min-width: 32px; height: 32px; margin: 0; padding: 0 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; user-select: none; transition: all 0.2s; flex-shrink: 0; }
+    .page-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+    .page-btn.active { background: #007bff; color: white; border-color: #007bff; }
+    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .page-scroll-wrap { display: flex; overflow-x: auto; flex: 1; scroll-behavior: smooth; align-items: center; gap: 6px; padding-bottom: 6px; margin-bottom: -6px; }
+    .page-scroll-wrap::-webkit-scrollbar { height: 6px; }
+    .page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+    .empty-placeholder-row td { height: 62px; padding: 0 !important; border-bottom: 1px solid #dee2e6; background: #fff !important; pointer-events: none; }
+
+    @media (max-width: 600px) {
+        body { margin: 10px; }
+        .page { padding: 0; }
+        .header { padding: 12px 14px !important; border-radius: 8px !important; }
+        .header h2 { font-size: 15px !important; }
+        .filter-panel { padding: 10px 12px; }
+        .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
+        .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
+        .filter-input { min-width: unset; width: 100%; }
+        .btn-create-iips { width: 100%; justify-content: center; }
+        .iips-date-wrap { flex: 1 1 auto; width: 100%; }
+        .date-sep { text-align: center; }
+        .filter-label { margin-left: 0 !important; }
+        div[style*="margin-left:auto"] { margin-left: 0 !important; width: 100%; }
+        .btn-adv-toggle, .btn-clear-filter { width: 100%; justify-content: center; height: 40px; font-size: 14px; }
+        .adv-filters > div { grid-template-columns: 1fr !important; }
+        .card { padding: 0; }
+        .card-hdr { padding: 12px; }
+        .tbl-outer { padding: 12px 12px 0 12px; }
+        .pagination-container { padding: 12px; }
+    }
 </style>
 </head>
 <body>
@@ -307,15 +322,12 @@ sort($actual_end_years);
         <div class="alert-err">⚠️ <?= $error ?></div>
     <?php endif; ?>
 
-    <!-- ── Unified Filter Panel ── -->
     <div class="filter-panel">
-        <!-- Row 1: Search + Create button -->
         <div class="filter-row">
             <span class="filter-label">🔍</span>
             <input type="text" class="filter-input" id="search-input" placeholder="Search IIPS ID, name, customer, manager, partner..." oninput="applyFilters()">
             <a href="create_iips.php" class="btn-create-iips">+ Create IIPS</a>
         </div>
-        <!-- Row 2: Date filters -->
         <div class="filter-row">
             <span class="filter-label">🎯 Target</span>
             <div class="iips-date-wrap">
@@ -356,7 +368,6 @@ sort($actual_end_years);
                 <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear All</button>
             </div>
         </div>
-        <!-- Advanced: Status / Billing / Timesheet / Costing / Timeline checkboxes -->
         <div class="adv-filters" id="adv-filters">
             <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;">
                 <div class="adv-group">
@@ -415,7 +426,6 @@ sort($actual_end_years);
             </div>
         </div>
     </div>
-    <!-- ── End Filter Panel ── -->
 
     <div id="bulk-toolbar">
         <span id="bulk-count">0 selected</span>
@@ -478,9 +488,8 @@ sort($actual_end_years);
                         </tr>
                     </thead>
                     <tbody>
-                    <?php if (empty($rows)): ?>
-                        <tr><td colspan="27" style="text-align:center;padding:40px;color:#9ca3af;">No projects yet. Click "+ Create IIPS" to add one.</td></tr>
-                    <?php else: foreach ($rows as $r):
+                    <tr id="empty-row" class="is-hidden"><td colspan="27" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
+                    <?php if (!empty($rows)): foreach ($rows as $r):
                         $pid_display = fmtPid($r['project_id']);
                         $sp_raw = $r['selling_price'];
                         $pc_raw = $r['partner_cost'];
@@ -515,8 +524,15 @@ sort($actual_end_years);
                         $act_state = 'act_no';
                         if ($has_a_start && $has_a_end) $act_state = 'act_yes';
                         elseif ($has_a_start || $has_a_end) $act_state = 'act_partial';
+
+                        $search_str = strtolower(implode(' ', [
+                            $r['project_id'], $r['project_name'], $r['customer_name'],
+                            $r['account_manager'], $r['account_leader'], $r['presales_sdm'],
+                            $pm_display, $r['ts_engineers'], $partner_display
+                        ]));
                     ?>
                     <tr data-pid="<?= htmlspecialchars($r['project_id']) ?>"
+                        data-search="<?= htmlspecialchars($search_str) ?>"
                         data-iips-status="<?= htmlspecialchars($r['iips_status'] ?? '') ?>"
                         data-billing-status="<?= htmlspecialchars($r['billing_status'] ?? '') ?>"
                         data-has-pm="<?= intval($r['has_project_mgmt'] ?? 0) ?>"
@@ -556,7 +572,7 @@ sort($actual_end_years);
                             <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
                             <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
                         </td>
-                        <td class="bg-manual"><?php if ($r['target_mandays']) { $td_total_mins = round(floatval($r['target_mandays']) * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m'; } else { echo '<span class="dash">—</span>'; } ?></td>
+                        <td class="bg-manual"><?php if ($r['target_mandays']) { $td_total_mins = round(floatval($r['target_mandays']) * 8 * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m'; } else { echo '<span class="dash">—</span>'; } ?></td>
                         <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
                         <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
                         <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
@@ -588,19 +604,111 @@ sort($actual_end_years);
                 </table>
                 </div>
             </div>
+            <div id="pagination-container" class="pagination-container" style="display:none;"></div>
         </div>
     </form>
 </div>
 
 <script>
-// ---------- bulk UI logic ----------
+let currentPage = 1;
+const rowsPerPage = 10;
+let paginationMode = 'standard';
+let currentFilteredRows = [];
+
+function goToPage(p) {
+    currentPage = p;
+    renderPagination(currentFilteredRows);
+    document.getElementById('chk-all').checked = false;
+    onChkChange();
+}
+
+function togglePaginationMode() {
+    paginationMode = paginationMode === 'standard' ? 'all' : 'standard';
+    renderPagination(currentFilteredRows);
+}
+
+function renderPagination(rows) {
+    currentFilteredRows = rows;
+    const totalPages = Math.ceil(rows.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    let visibleCount = 0;
+    rows.forEach((r, idx) => {
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        if (idx >= start && idx < end) {
+            r.classList.remove('is-hidden');
+            visibleCount++;
+        } else {
+            r.classList.add('is-hidden');
+        }
+    });
+
+    const tbody = document.querySelector('#main-table tbody');
+    document.querySelectorAll('.empty-placeholder-row').forEach(e => e.remove());
+    
+    if (visibleCount > 0 && visibleCount < rowsPerPage) {
+        const cols = 27;
+        for (let i = visibleCount; i < rowsPerPage; i++) {
+            const tr = document.createElement('tr');
+            tr.className = 'empty-placeholder-row';
+            tr.innerHTML = `<td colspan="${cols}"></td>`;
+            tbody.appendChild(tr);
+        }
+    }
+
+    const pCont = document.getElementById('pagination-container');
+    if (rows.length === 0) {
+        pCont.innerHTML = '';
+        pCont.style.display = 'none';
+        return;
+    }
+    
+    pCont.style.display = 'flex';
+    let html = '';
+
+    if (paginationMode === 'standard') {
+        html += `<div style="display:flex; gap:6px; flex:1; justify-content:flex-end; align-items:center;">`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(1)" ${currentPage===1?'disabled':''}>&laquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
+
+        if (currentPage > 1) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})">${currentPage-1}</button>`;
+        html += `<button type="button" class="page-btn active">${currentPage}</button>`;
+        if (currentPage < totalPages) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})">${currentPage+1}</button>`;
+
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>&raquo;</button>`;
+        if (totalPages > 3) html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `</div>`;
+    } else {
+        html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `<div class="page-scroll-wrap">`;
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button type="button" class="page-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
+        }
+        html += `</div>`;
+    }
+    pCont.innerHTML = html;
+
+    if (paginationMode === 'all') {
+        setTimeout(() => {
+            const wrap = document.querySelector('.page-scroll-wrap');
+            const activeBtn = wrap.querySelector('.active');
+            if (activeBtn) {
+                wrap.scrollLeft = activeBtn.offsetLeft - wrap.offsetWidth / 2 + activeBtn.offsetWidth / 2;
+            }
+        }, 10);
+    }
+}
+
 function onChkChange() {
     const checked = document.querySelectorAll('.iips-chk:checked').length;
     const toolbar = document.getElementById('bulk-toolbar');
     toolbar.style.display = checked > 0 ? 'flex' : 'none';
     document.getElementById('bulk-count').textContent = checked + ' selected';
     
-    const visibleCheckboxes = document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .iips-chk');
+    const visibleCheckboxes = document.querySelectorAll('#main-table tbody tr:not(.is-hidden):not(.empty-placeholder-row) .iips-chk');
     let visibleCheckedCount = 0;
     visibleCheckboxes.forEach(c => { if(c.checked) visibleCheckedCount++; });
     
@@ -609,7 +717,7 @@ function onChkChange() {
 }
 
 function toggleAll(cb) {
-    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .iips-chk').forEach(c => c.checked = cb.checked);
+    document.querySelectorAll('#main-table tbody tr:not(.is-hidden):not(.empty-placeholder-row) .iips-chk').forEach(c => c.checked = cb.checked);
     onChkChange();
 }
 
@@ -643,25 +751,38 @@ function exportFilteredOrAll() {
     
     document.querySelectorAll('.dyn-iips').forEach(e => e.remove());
 
-    document.querySelectorAll('#main-table tbody tr:not(.is-hidden)').forEach(tr => {
-        const pid = tr.dataset.pid;
-        if (pid) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'selected_iips[]';
-            input.value = pid;
-            input.className = 'dyn-iips';
-            form.appendChild(input);
-        }
-    });
+    const btnExport = document.getElementById('btn-export-all');
+    if (btnExport.classList.contains('filtered')) {
+        currentFilteredRows.forEach(tr => {
+            const pid = tr.dataset.pid;
+            if (pid) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_iips[]';
+                input.value = pid;
+                input.className = 'dyn-iips';
+                form.appendChild(input);
+            }
+        });
+    } else {
+        document.querySelectorAll('#main-table tbody tr[data-pid]').forEach(tr => {
+            const pid = tr.dataset.pid;
+            if (pid) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_iips[]';
+                input.value = pid;
+                input.className = 'dyn-iips';
+                form.appendChild(input);
+            }
+        });
+    }
     
     form.submit();
     form.action = 'admin_iips.php';
     document.querySelectorAll('.dyn-iips').forEach(e => e.remove());
 }
 
-
-// ---------- Table logic ----------
 function fixStickyHeaders() {
     const secRow = document.querySelector('#main-table thead tr.sec-row');
     const colRow = document.querySelector('#main-table thead tr:last-child');
@@ -670,7 +791,11 @@ function fixStickyHeaders() {
         colRow.querySelectorAll('th').forEach(th => th.style.top = h + 'px');
     }
 }
-window.addEventListener('DOMContentLoaded', fixStickyHeaders);
+
+window.addEventListener('DOMContentLoaded', () => {
+    fixStickyHeaders();
+    applyFilters();
+});
 window.addEventListener('resize', fixStickyHeaders);
 document.getElementById('search-input').addEventListener('input', applyFilters);
 
@@ -701,9 +826,11 @@ function applyFilters() {
 
     const resFilters = ['has_pm','has_acc_mgr','has_partner'].filter(v => checks.includes(v));
 
-    document.querySelectorAll('#main-table tbody tr').forEach(tr => {
+    let visRows = [];
+
+    document.querySelectorAll('#main-table tbody tr[data-pid]').forEach(tr => {
         const d        = tr.dataset;
-        const text     = tr.textContent.toLowerCase();
+        const text     = d.search || '';
         const tsStart  = d.tsStart || '';
         const tsEnd    = d.tsEnd   || '';
         const tarStart = d.targetStart || '';
@@ -769,13 +896,23 @@ function applyFilters() {
             if (colFilters['aed-year'] !== '' && (d.aedYear || '') !== colFilters['aed-year'])        ok = false;
         }
 
-        tr.classList.toggle('is-hidden', !ok);
+        tr.classList.add('is-hidden');
+        if (ok) visRows.push(tr);
     });
+
+    let emptyTr = document.getElementById('empty-row');
+    if (visRows.length === 0) {
+        if (emptyTr) emptyTr.classList.remove('is-hidden');
+    } else {
+        if (emptyTr) emptyTr.classList.add('is-hidden');
+    }
     
     document.querySelectorAll('.filter-cats label').forEach(lbl => { lbl.classList.toggle('active-cat', lbl.querySelector('input').checked); });
     updateAdvCount();
 
-    // Handle "Export Filtered" Button UI
+    currentPage = 1;
+    renderPagination(visRows);
+
     let hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== ''));
     const btnExport = document.getElementById('btn-export-all');
     if (hasFilter) {
@@ -873,9 +1010,13 @@ function toggleSort(e, id) { e.stopPropagation(); document.querySelectorAll('.so
 window.addEventListener('click', () => document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')));
 function sortT(col, type, dir) {
     const tbody = document.querySelector('#main-table tbody');
-    const rows  = Array.from(tbody.querySelectorAll('tr'));
+    const rows  = Array.from(tbody.querySelectorAll('tr[data-pid]'));
     if (!origRows) origRows = [...rows];
-    if (dir === 0) { origRows.forEach(r => tbody.appendChild(r)); return; }
+    if (dir === 0) { 
+        origRows.forEach(r => tbody.appendChild(r)); 
+        applyFilters(); 
+        return; 
+    }
     rows.sort((a, b) => {
         const ca = a.cells[col] ? a.cells[col].textContent.trim() : '';
         const cb = b.cells[col] ? b.cells[col].textContent.trim() : '';
@@ -897,6 +1038,7 @@ function sortT(col, type, dir) {
         return 0;
     });
     rows.forEach(r => tbody.appendChild(r));
+    applyFilters();
 }
 </script>
 </body>

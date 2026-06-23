@@ -154,9 +154,9 @@ $v = [
 * { box-sizing: border-box; }
 body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
-.topbar { background: #343a40; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
+.topbar { position: sticky; top: 0; z-index: 500; background: #343a40; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
 .topbar h2 { color: white; margin: 0; font-size: 18px; }
-.topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
+.topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; }
 
 .page { max-width: 900px; margin: 20px auto; padding: 0 0 60px; }
 

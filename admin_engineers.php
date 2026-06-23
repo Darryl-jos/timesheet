@@ -122,10 +122,10 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
     .is-hidden { display: none !important; }
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; padding: 15px 20px; border-radius: 8px; color: white; flex-wrap: wrap; gap: 10px; }
-    .header h2 { margin: 0; font-size: 18px; }
-    .header a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
-    .page { padding: 16px; }
+    .header { position: sticky !important; top: 0 !important; z-index: 500 !important; background: #343a40 !important; padding: 15px 20px !important; display: flex !important; border-radius: 8px !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; margin-bottom: 16px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+    .header h2 { color: white !important; margin: 0 !important; font-size: 18px !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+    .header a { color: #ffc107 !important; text-decoration: none !important; font-size: 13px !important; padding: 6px 12px !important; border-radius: 4px !important; font-weight: bold !important; transition: background 0.2s, color 0.2s !important; }
+    .header a:hover { background: rgba(255, 193, 7, 0.15) !important; color: #ffda6a !important; }    .page { padding: 16px; }
     .card { background: white; padding: 16px 18px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 14px; }
     .alert { padding: 11px 15px; border-radius: 4px; margin-bottom: 14px; font-size: 13px; }
     .alert.success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
@@ -190,7 +190,7 @@ $eng_result = $conn->query("SELECT * FROM engineers ORDER BY is_admin DESC, engi
 
 <div class="header">
     <h2>👷 Engineer Accounts</h2>
-    <a href="admin.php">← Back to Admin Home</a>
+    <a href="admin.php">← Back to Admin</a>
 </div>
 
 <div class="page">

@@ -16,8 +16,8 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
         
-        .topbar { background: #343a40; padding: 12px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .topbar h2 { color: white; margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .topbar { position: sticky; top: 0; z-index: 500; background: #343a40; padding: 15px 20px; display: flex; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .topbar h2 { color: white; margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px; }
         .topbar .nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
         
         .topbar a { color: #ffc107; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: background 0.2s, color 0.2s; }

@@ -75,7 +75,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; }
-        .topbar { background: #ffffff; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .topbar { position: sticky; top: 0; z-index: 500; background: #ffffff; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .topbar h2 { color: #1f2937; margin: 0; font-size: 18px; }
         .topbar a { color: #007bff; font-weight: bold; text-decoration: none; font-size: 13px; }
         .card { max-width: 600px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }

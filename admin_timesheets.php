@@ -6,6 +6,75 @@ if (!isset($_SESSION['engineer_id']) || !isset($_SESSION['is_admin']) || ($_SESS
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['ajax_gantt']) && $_POST['ajax_gantt'] == '1') {
+    header('Content-Type: application/json');
+    $eng = $_POST['eng'] ?? '';
+    $proj = $_POST['proj'] ?? '';
+    
+    $query = "SELECT t.*, p.project_name, i.target_start_date, i.target_end_date 
+              FROM timesheets t 
+              JOIN projects p ON t.project_id = p.project_id 
+              LEFT JOIN (
+                  SELECT project_id, MAX(target_start_date) as target_start_date, MAX(target_end_date) as target_end_date 
+                  FROM iips_tracking 
+                  GROUP BY project_id
+              ) i ON p.project_id = i.project_id 
+              WHERE 1=1";
+    $params = [];
+    $types = "";
+    if ($eng !== '') { $query .= " AND t.engineer_name = ?"; $params[] = $eng; $types .= "s"; }
+    if ($proj !== '') { $query .= " AND t.project_id = ?"; $params[] = $proj; $types .= "s"; }
+    $query .= " ORDER BY t.start_date ASC, t.start_time ASC";
+    
+    $stmt = $conn->prepare($query);
+    if ($types) { $stmt->bind_param($types, ...$params); }
+    $stmt->execute();
+    $res = $stmt->get_result();
+    
+    $data = [];
+    
+    while ($row = $res->fetch_assoc()) {
+        $base_group = "";
+        if ($eng !== '' && $proj !== '') { 
+            $base_group = $row['work_description'] ?: 'Activity'; 
+        } else if ($eng !== '') { 
+            $base_group = $row['project_name']; 
+        } else if ($proj !== '') { 
+            $base_group = $row['engineer_name']; 
+        } else {
+            $base_group = $row['project_name'];
+        }
+        
+        $actual_key = $base_group;
+
+        if (!isset($data[$actual_key])) $data[$actual_key] = [];
+
+        $data[$actual_key][] = [
+            'id' => $row['id'],
+            'start' => $row['start_date'] . ' ' . $row['start_time'],
+            'end' => $row['end_date'] . ' ' . $row['end_time'],
+            'type' => 'actual',
+            'eng' => $row['engineer_name'],
+            'desc' => $row['work_description'] ?: 'Activity'
+        ];
+
+        if (!empty($row['target_start_date']) && $row['target_start_date'] !== '0000-00-00') {
+            $ts = substr(trim($row['target_start_date']), 0, 10);
+            $te = substr(trim($row['target_end_date']), 0, 10);
+            
+            if ($ts !== '1970-01-01' && $te !== '1970-01-01') {
+                $data[$actual_key][] = [
+                    'start' => $ts . ' 00:00:00',
+                    'end'   => $te . ' 23:59:59',
+                    'type'  => 'target'
+                ];
+            }
+        }
+    }
+    echo json_encode(['data' => $data]);
+    exit;
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['bulk_action']) && $_POST['bulk_action'] === 'delete') {
     if (isset($_POST['selected_ts']) && is_array($_POST['selected_ts'])) {
         $ids = array_map('intval', $_POST['selected_ts']);
@@ -33,11 +102,27 @@ $ts_result = $conn->query("
     SELECT t.*, p.project_name, p.customer_name, p.estimate_time
     FROM timesheets t
     JOIN projects p ON t.project_id = p.project_id
-    ORDER BY t.start_date DESC, t.start_time DESC
+    ORDER BY t.engineer_name ASC, MONTH(t.start_date) ASC, DAY(t.start_date) ASC, YEAR(t.start_date) ASC, t.start_time ASC
 ");
-if (!$ts_result) die("DB Error: " . $conn->error);
 
-$proj_list_result = $conn->query("SELECT project_id, project_name, customer_name FROM projects ORDER BY project_name ASC");
+$proj_list_result = $conn->query("
+    SELECT p.project_id, p.project_name, p.customer_name, 
+           i.iips_status, i.target_mandays, i.target_start_date, i.target_end_date
+    FROM projects p
+    LEFT JOIN iips_tracking i ON p.project_id = i.project_id
+    ORDER BY p.project_name ASC
+");
+
+$years_result = $conn->query("SELECT DISTINCT YEAR(start_date) as ts_year FROM timesheets WHERE start_date IS NOT NULL AND start_date != '0000-00-00' ORDER BY ts_year DESC");
+$years = [];
+if ($years_result) {
+    while ($y_row = $years_result->fetch_assoc()) {
+        $years[] = $y_row['ts_year'];
+    }
+}
+if (empty($years)) {
+    $years[] = date('Y');
+}
 
 $rows_cache = [];
 while ($row = $ts_result->fetch_assoc()) {
@@ -57,8 +142,6 @@ while ($row = $ts_result->fetch_assoc()) {
     $rows_cache[] = $row;
 }
 
-$proj_agg_json = json_encode([]);
-
 function fmtDate($d) {
     if (!$d) return '-';
     $dt = DateTime::createFromFormat('Y-m-d', $d);
@@ -71,27 +154,18 @@ function fmtDate($d) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Audit Timesheets — Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
-.topbar { background: #343a40; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-.topbar h2 { color: white; margin: 0; font-size: 18px; }
-.topbar a { color: #ffc107; font-weight: bold; text-decoration: none; font-size: 13px; }
-.topbar a:hover { color: #ffda6a; }
-.page { padding: 20px; }
-.live-dashboard { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); padding: 16px 20px; margin-bottom: 16px; border-left: 5px solid #007bff; display: none; }
-.live-dashboard h4 { margin: 0 0 12px; font-size: 14px; color: #1e40af; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-.live-dashboard h4 .pulse { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color: #333; padding-bottom: 20px; }
+.topbar { position: sticky !important; top: 0 !important; z-index: 500 !important; background: #343a40 !important; padding: 15px 20px !important; display: flex !important; border-radius: 8px !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; margin-bottom: 16px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+.topbar h2 { color: white !important; margin: 0 !important; font-size: 18px !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+.topbar a { color: #ffc107 !important; text-decoration: none !important; font-size: 13px !important; padding: 6px 12px !important; border-radius: 4px !important; font-weight: bold !important; transition: background 0.2s, color 0.2s !important; }
+.topbar a:hover { background: rgba(255, 193, 7, 0.15) !important; color: #ffda6a !important; }.live-dashboard { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); padding: 16px 20px; margin-bottom: 16px; border-left: 5px solid #007bff; display: none; }
 .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .dash-item { background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0; }
 .dash-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 3px; }
 .dash-value { font-size: 18px; font-weight: 700; color: #1e293b; }
-.dash-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-.filter-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.ftag { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
-.ftag.eng  { background: #dcfce7; color: #166534; }
-.ftag.date { background: #fef9c3; color: #854d0e; }
 .filter-panel { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; margin-bottom: 12px; }
 .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
@@ -105,21 +179,7 @@ body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color:
 .date-sep { font-size: 12px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
 .btn-clear-filter { background: #f1f5f9; color: #475569; border: 1px solid #d1d5db; height: 38px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .btn-clear-filter:hover { background: #e2e8f0; }
-@media (max-width: 600px) {
-    body { margin: 10px; }
-    .page { padding: 0; }
-    .topbar { border-radius: 8px; padding: 12px 14px; }
-    .topbar h2 { font-size: 15px; }
-    .filter-panel { padding: 10px 12px; }
-    .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
-    .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
-    .filter-input { min-width: unset; width: 100%; }
-    .sel-wrap { min-width: unset; width: 100%; }
-    .date-wrap { flex: 1 1 auto; width: 100%; }
-    .date-sep { text-align: center; }
-    .btn-clear-filter { width: 100%; height: 40px; font-size: 14px; }
-}
-.sel-wrap { flex: 2; min-width: 180px; position: relative; }
+.sel-wrap { flex: 2; min-width: 150px; position: relative; }
 .sel-box { height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; transition: border-color .15s; }
 .sel-box:hover { border-color: #007bff; }
 .sel-box span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: #333; }
@@ -135,7 +195,6 @@ body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color:
 .sel-item:hover { background: #f0f7ff; }
 .sel-item.active { background: #e6f0ff; color: #1d4ed8; font-weight: 600; }
 .sel-item.hidden { display: none; }
-.btn-clear { background: #6c757d; color: white; border: none; padding: 0 14px; height: 38px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; white-space: nowrap; }
 #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 #bulk-toolbar span { font-size: 13px; font-weight: 600; color: #1e40af; flex: 1; }
 .btn-bulk { border: none; padding: 7px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
@@ -147,8 +206,13 @@ body { font-family: Arial, sans-serif; margin: 16px; background: #f4f7f6; color:
 .card-hdr h3 { margin: 0; font-size: 15px; }
 .btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
 .btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
+
+.tbl-outer { position: relative; padding: 0 20px 0 20px; }
 .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.tbl-scroll { overflow-y: auto; max-height: 70vh; }
+.tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
+.tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
+.tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
+.tbl-wrap::-webkit-scrollbar-thumb:hover { background: #64748b; }
 table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 th, td { padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
 th { background: #f8fafc; font-weight: 600; color: #475569; }
@@ -160,9 +224,6 @@ tbody tr:hover { background: #f8faff; }
 .dr .d-time  { color: #94a3b8; font-size: 11px; }
 .dur { background: #d1fae5; color: #065f46; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 11px; white-space: nowrap; }
 .dur.multi { background: #dbeafe; color: #1e40af; }
-.gap-over  { color: #dc3545; font-weight: bold; font-size: 11px; }
-.gap-under { color: #28a745; font-weight: bold; font-size: 11px; }
-.gap-ok    { color: #6c757d; font-weight: bold; font-size: 11px; }
 .act { max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-line; cursor: pointer; color: #555; font-size: 11px; }
 .act.exp { display: block; max-height: none; }
 .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; }
@@ -187,8 +248,87 @@ thead tr.sec-row th.chk-col { z-index: 26; }
 .s-actual   { background: #004d40; }
 .s-act      { background: #343a40; }
 .chk-col { width: 36px; position: sticky; left: 0; z-index: 23; background: #343a40; border-right: 1px solid #dee2e6; }
-@media (max-width: 600px) { .page { padding: 10px; } }
+
+.pagination-container { padding: 12px 20px; display: flex; align-items: center; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; width: 100%; box-sizing: border-box; overflow: hidden; gap: 6px; }
+.page-btn { min-width: 32px; height: 32px; margin: 0; padding: 0 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; user-select: none; transition: all 0.2s; flex-shrink: 0; }
+.page-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+.page-btn.active { background: #007bff; color: white; border-color: #007bff; }
+.page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.page-scroll-wrap { display: flex; overflow-x: auto; flex: 1; scroll-behavior: smooth; align-items: center; gap: 6px; padding-bottom: 6px; margin-bottom: -6px; }
+.page-scroll-wrap::-webkit-scrollbar { height: 6px; }
+.page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+
+.gantt-section { margin-top:20px; display:none; background:white; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.07); }
+.gantt-header { padding: 12px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.gantt-header h3 { margin:0; font-size:15px; }
+.gantt-container { overflow-x:auto; border:1px solid #e5e7eb; border-radius:6px; position:relative; scroll-behavior: smooth; }
+.gantt-chart-inner { width:max-content; min-width:100%; display:flex; flex-direction:column; padding-bottom: 70px; position: relative; }
+.gantt-row { display:flex; border-bottom:1px solid #e5e7eb; position:relative; min-height:52px; }
+.gantt-row:last-child { border-bottom:none; }
+.gantt-y-axis { width:150px; flex-shrink:0; background:#f8fafc; border-right:1px solid #e5e7eb; padding:10px; font-size:12px; font-weight:bold; color:#333; display:flex; align-items:center; z-index:12; position:sticky; left:0; transition: background 0.2s; cursor: pointer; user-select: none; }
+.gantt-y-axis:hover { background: #e2e8f0; }
+.gantt-x-axis { flex-grow:1; position:relative; display:flex; }
+.gantt-grid { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; z-index:0; pointer-events:none; }
+.gantt-grid-line { flex-grow:1; border-right:1px dashed #e5e7eb; box-sizing:border-box; min-width: 120px; flex-shrink: 0; }
+.gantt-grid-line:last-child { border-right:none; }
+.gantt-bars { position:absolute; top:0; left:0; right:0; bottom:0; z-index:1; }
+.gantt-bar { position:absolute; border-radius:4px; transition:opacity 0.2s; cursor:pointer; }
+.gantt-bar.target { background: #3b82f6; height: 14px; z-index: 1; border: 1px solid #1d4ed8; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.gantt-bar.target:hover { background:#2563eb; }
+.gantt-bar.actual { background: #22c55e; height: 14px; z-index: 2; border: 1px solid #16a34a; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.gantt-bar.actual:hover { background:#15803d; }
+.gantt-header-row { background:#f1f5f9; font-weight:bold; min-height: 40px; }
+.gantt-header-row .gantt-y-axis { background:#f1f5f9; z-index: 15; cursor: default; }
+.gantt-header-row .gantt-y-axis:hover { background: #f1f5f9; }
+.gantt-tick { flex-grow:1; border-right:1px solid #d1d5db; padding:4px 0px; text-align:center; color:#475569; overflow:hidden; box-sizing:border-box; min-width: 120px; font-size: 10px; white-space:nowrap; text-overflow:ellipsis; flex-shrink: 0; }
+.gantt-tick:last-child { border-right:none; }
+.gantt-tick.prev-year-end { background: #fef08a; border-right: 2px solid #eab308; }
+.gantt-tooltip { position: absolute; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #334155; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); transform: translateX(-50%); cursor: default; z-index: 999; }
+.gantt-tooltip::before { content: ""; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); border-width: 0 6px 6px 6px; border-style: solid; border-color: transparent transparent #cbd5e1 transparent; }
+.gantt-tooltip::after { content: ""; position: absolute; top: -5px; left: 50%; transform: translateX(-50%); border-width: 0 5px 5px 5px; border-style: solid; border-color: transparent transparent #ffffff transparent; }
+.charts-section { display:none; background:white; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.07); margin-top:20px; }
+.charts-grid { display:flex; flex-wrap:wrap; padding:20px; gap:20px; }
+.chart-box { flex:1; min-width:300px; height:300px; }
+.chart-summary { padding:20px; border-top:1px solid #e5e7eb; }
+.chart-summary ul { list-style:none; padding:0; margin:0; font-size:13px; color:#475569; }
+.chart-summary li { padding:6px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; }
+.chart-summary li:last-child { border-bottom:none; }
+@media (max-width: 600px) {
+    body { margin: 10px; }
+    .page { padding: 0; }
+    .topbar { border-radius: 8px; padding: 12px 14px; }
+    .topbar h2 { font-size: 15px; }
+    .filter-panel { padding: 10px 12px; }
+    .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
+    .filter-row + .filter-row { margin-top: 8px; padding-top: 8px; }
+    .filter-input { min-width: unset; width: 100%; }
+    .sel-wrap { min-width: unset; width: 100%; }
+    .date-wrap { flex: 1 1 auto; width: 100%; }
+    .date-sep { text-align: center; }
+    .btn-clear-filter { width: 100%; height: 40px; font-size: 14px; }
+    .card { padding: 0; }
+    .card-hdr { padding: 12px; }
+    .tbl-outer { padding: 12px 12px 0 12px; }
+    .pagination-container { padding: 12px; }
+}
 </style>
+<script>
+const projData = {
+<?php
+if ($proj_list_result) {
+    while ($p = $proj_list_result->fetch_assoc()) {
+        $t_start_date = !empty($p['target_start_date']) ? $p['target_start_date'] : '';
+        $t_end_date = !empty($p['target_end_date']) ? $p['target_end_date'] : '';
+        $status = !empty($p['iips_status']) ? $p['iips_status'] : 'Not Quoted';
+        $mandays = isset($p['target_mandays']) && $p['target_mandays'] !== '' ? $p['target_mandays'] : '';
+        echo '"' . addslashes($p['project_id']) . '": { status: "' . addslashes($status) . '", target_start_date: "' . addslashes($t_start_date) . '", target_date: "' . addslashes($t_end_date) . '", target_mandays: "' . addslashes($mandays) . '" },';
+    }
+    $proj_list_result->data_seek(0);
+}
+?>
+};
+</script>
 </head>
 <body>
 
@@ -207,9 +347,7 @@ thead tr.sec-row th.chk-col { z-index: 26; }
         </div>
     </div>
 
-    <!-- ── Unified Filter Panel ── -->
     <div class="filter-panel">
-        <!-- Row 1: Search + Engineer + Project dropdowns -->
         <div class="filter-row">
             <span class="filter-label">🔍</span>
             <input type="text" class="filter-input" id="txt-search" placeholder="Search by activity, keyword..." oninput="doFilter()">
@@ -263,7 +401,6 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                 </div>
             </div>
         </div>
-        <!-- Row 2: Date range + Clear -->
         <div class="filter-row">
             <span class="filter-label">📅 Date</span>
             <div class="date-wrap">
@@ -284,29 +421,8 @@ thead tr.sec-row th.chk-col { z-index: 26; }
             <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear All</button>
         </div>
     </div>
-    <!-- ── End Filter Panel ── -->
 
-    <div class="live-dashboard" id="live-dashboard">
-        <div class="dash-grid">
-            <div class="dash-item">
-                <span class="dash-label">Matching Logs</span>
-                <div class="dash-value" id="dash-logs">—</div>
-            </div>
-            <div class="dash-item">
-                <span class="dash-label">Total Hours</span>
-                <div class="dash-value" id="dash-hours">—</div>
-            </div>
-            <div class="dash-item">
-                <span class="dash-label">Engineers</span>
-                <div class="dash-value" id="dash-engs">—</div>
-            </div>
-            <div class="dash-item">
-                <span class="dash-label">Date Range</span>
-                <div class="dash-value" style="font-size:13px;" id="dash-dates">—</div>
-                <div class="dash-sub" id="dash-days"></div>
-            </div>
-        </div>
-    </div>
+    <div class="live-dashboard" id="live-dashboard"></div>
 
     <form id="bulk-form" method="POST" action="admin_timesheets.php">
         <input type="hidden" name="bulk_action" id="bulk-action-field" value="">
@@ -316,7 +432,7 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                 <h3>Employee Work Hour Compliance Logs</h3>
                 <button type="button" id="btn-export-all" class="btn-export-all" onclick="exportFilteredOrAll()">📥 Export All</button>
             </div>
-            <div class="tbl-scroll">
+            <div class="tbl-outer">
             <div class="tbl-wrap">
             <table id="main-table">
                 <thead>
@@ -326,7 +442,7 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                         <th class="s-base" colspan="2">IIPS Details</th>
                         <th class="s-base" colspan="1">Activity</th>
                         <th class="s-timeline" colspan="2">Timeline</th>
-                        <th class="s-actual" colspan="3">Performance</th>
+                        <th class="s-actual" colspan="1">Performance</th>
                         <th class="s-act" rowspan="2">Actions</th>
                     </tr>
                     <tr>
@@ -338,34 +454,16 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                         <th><div class="sort-wrap">Start Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-sd')"></button><div id="s-sd" class="sort-menu"><a href="#" onclick="sortT(6,'date',0);return false;">Default</a><a href="#" onclick="sortT(6,'date',1);return false;">Oldest First</a><a href="#" onclick="sortT(6,'date',2);return false;">Newest First</a></div></div></th>
                         <th>End Date</th>
                         <th><div class="sort-wrap">Duration<button type="button" class="sort-btn" onclick="toggleSort(event,'s-dur')"></button><div id="s-dur" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Shortest First</a><a href="#" onclick="sortT(8,'num',2);return false;">Longest First</a></div></div></th>
-                        <th>Target Mandays</th>
-                        <th>Gap</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php if (empty($rows_cache)): ?>
-                    <tr><td colspan="12" style="text-align:center; padding:40px; color:#9ca3af;">No timesheets submitted yet.</td></tr>
-                <?php else: foreach ($rows_cache as $row):
+                <tr id="empty-row" class="is-hidden"><td colspan="10" style="text-align:center;padding:40px;height:410px;vertical-align:middle;color:#9ca3af;">No matching logs found.</td></tr>
+                <?php if (!empty($rows_cache)): foreach ($rows_cache as $row):
                     $mins  = $row['_minutes'];
                     $h     = floor($mins / 60);
                     $m     = $mins % 60;
-                    $days  = floor($h / 24);
-                    $dur_text = ($days > 0 ? $days.'d ' : '') . ($h%24) . 'h ' . $m . 'm';
+                    $dur_text = $h . 'h ' . $m . 'm';
                     $is_multi = ($row['start_date'] !== $row['end_date']);
-
-                    $target_mins = intval($row['estimate_time']) * 60;
-                    $gap_mins = $mins - $target_mins;
-                    if ($target_mins == 0) {
-                        $gap_html = '<span class="gap-ok">No Target</span>';
-                    } elseif ($gap_mins > 0) {
-                        $gh = floor(abs($gap_mins)/60); $gm = abs($gap_mins)%60;
-                        $gap_html = '<span class="gap-over">▲ '.$gh.'h '.$gm.'m Over</span>';
-                    } elseif ($gap_mins < 0) {
-                        $gh = floor(abs($gap_mins)/60); $gm = abs($gap_mins)%60;
-                        $gap_html = '<span class="gap-under">▼ '.$gh.'h '.$gm.'m Saved</span>';
-                    } else {
-                        $gap_html = '<span class="gap-ok">✓ On Track</span>';
-                    }
                 ?>
                 <tr data-pid="<?= htmlspecialchars($row['project_id']) ?>"
                     data-eng="<?= htmlspecialchars($row['engineer_name']) ?>"
@@ -381,8 +479,6 @@ thead tr.sec-row th.chk-col { z-index: 26; }
                     <td><span class="d-start"><?= fmtDate($row['start_date']) ?></span><span class="d-time"> <?= htmlspecialchars(substr($row['start_time'],0,5)) ?></span></td>
                     <td><span class="d-end"><?= fmtDate($row['end_date']) ?></span><span class="d-time"> <?= htmlspecialchars(substr($row['end_time'],0,5)) ?></span></td>
                     <td data-raw="<?= $mins ?>"><span class="dur <?= $is_multi ? 'multi' : '' ?>"><?= $dur_text ?></span></td>
-                    <td><span style="font-weight:700;color:#1e40af;"><?= intval($row['estimate_time']) ?>h (<?= round($row['estimate_time']/8, 1) ?> days)</span></td>
-                    <td><?= $gap_html ?></td>
                     <td><a href="edit.php?edit=<?= $row['id'] ?>" class="btn-edit">Edit</a><a href="admin_timesheets.php?delete_ts=<?= $row['id'] ?>" class="btn-del" onclick="return confirm('Delete this log?')">Delete</a></td>
                 </tr>
                 <?php endforeach; endif; ?>
@@ -390,14 +486,199 @@ thead tr.sec-row th.chk-col { z-index: 26; }
             </table>
             </div>
             </div>
+            <div id="pagination-container" class="pagination-container" style="display:none;"></div>
         </div>
     </form>
+
+    <section id="gantt-section" class="gantt-section card">
+        <div class="gantt-header card-hdr">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <h3 id="gantt-title">Gantt Chart</h3>
+                <div style="display:flex; gap:20px;">
+                    <span style="font-size:12px; color:#475569; font-weight:bold;">
+                        <span style="display:inline-block;width:14px;height:14px;background:#3b82f6;border:1px solid #1d4ed8;border-radius:3px;margin-right:6px;vertical-align:-2px;"></span>Target Date
+                    </span>
+                    <span style="font-size:12px; color:#475569; font-weight:bold;">
+                        <span style="display:inline-block;width:14px;height:14px;background:#22c55e;border:1px solid #16a34a;border-radius:3px;margin-right:6px;vertical-align:-2px;"></span>Actual Work
+                    </span>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                <label style="font-size:12px; font-weight:bold; color:#475569; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none;">
+                    <input type="checkbox" id="chk-show-target" onchange="toggleTargetDates()" style="cursor:pointer; width:14px; height:14px;">
+                    Show Target Date
+                </label>
+                <div class="sel-wrap" id="year-wrap">
+                    <div class="sel-box" id="year-box" onclick="toggleSel('year')">
+                        <span id="year-label">Year: All</span>
+                        <span class="sel-arrow">▾</span>
+                    </div>
+                    <div class="sel-panel" id="year-panel">
+                        <div class="sel-list" id="year-list">
+                            <div class="sel-item active" data-value="all" onclick="pickSel('year','all','Year: All',this)">All</div>
+                            <?php foreach($years as $yr): ?>
+                            <div class="sel-item" data-value="<?= $yr ?>" onclick="pickSel('year','<?= $yr ?>','Year: <?= $yr ?>',this)">
+                                <?= $yr ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="padding: 20px;">
+            <div class="gantt-container">
+                <div id="gantt-chart-inner" class="gantt-chart-inner"></div>
+            </div>
+        </div>
+    </section>
+
+    <div id="charts-section" class="charts-section card">
+        <div class="card-hdr">
+            <h3 id="charts-title">Analysis</h3>
+        </div>
+        <div class="charts-grid" style="display:block;">
+            <div class="chart-box" style="width:100%;"><canvas id="barChart"></canvas></div>
+        </div>
+        <div id="chart-summary" class="chart-summary"></div>
+    </div>
 </div>
 
 <script>
 let activeProjFilter = '';
 let activeEngFilter  = '';
+let activeYearFilter = 'all';
+let showTargetDates  = false;
 let origRows = null;
+let ganttData = {};
+
+let currentPage = 1;
+const rowsPerPage = 10;
+let paginationMode = 'standard';
+let currentFilteredRows = [];
+
+window.ganttScrollMap = {};
+window.ganttScrollIdx = {};
+window.ganttScrollDir = {};
+window.barChartInst = null;
+
+function goToPage(p) {
+    currentPage = p;
+    renderPagination(currentFilteredRows);
+    document.getElementById('chk-all').checked = false;
+    onChkChange();
+}
+
+function togglePaginationMode() {
+    paginationMode = paginationMode === 'standard' ? 'all' : 'standard';
+    renderPagination(currentFilteredRows);
+}
+
+function renderPagination(rows) {
+    currentFilteredRows = rows;
+    const totalPages = Math.ceil(rows.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    let visibleCount = 0;
+    rows.forEach((r, idx) => {
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        if (idx >= start && idx < end) {
+            r.classList.remove('is-hidden');
+            visibleCount++;
+        } else {
+            r.classList.add('is-hidden');
+        }
+    });
+
+    const tbody = document.querySelector('#main-table tbody');
+
+    const pCont = document.getElementById('pagination-container');
+    if (rows.length === 0) {
+        pCont.innerHTML = '';
+        pCont.style.display = 'none';
+        return;
+    }
+    
+    pCont.style.display = 'flex';
+    let html = '';
+
+    if (paginationMode === 'standard') {
+        html += `<div style="display:flex; gap:6px; flex:1; justify-content:flex-end; align-items:center;">`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(1)" ${currentPage===1?'disabled':''}>&laquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
+
+        if (currentPage > 1) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})">${currentPage-1}</button>`;
+        html += `<button type="button" class="page-btn active">${currentPage}</button>`;
+        if (currentPage < totalPages) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})">${currentPage+1}</button>`;
+
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>&raquo;</button>`;
+        if (totalPages > 3) html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `</div>`;
+    } else {
+        html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `<div class="page-scroll-wrap">`;
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button type="button" class="page-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
+        }
+        html += `</div>`;
+    }
+    pCont.innerHTML = html;
+
+    if (paginationMode === 'all') {
+        setTimeout(() => {
+            const wrap = document.querySelector('.page-scroll-wrap');
+            const activeBtn = wrap.querySelector('.active');
+            if (activeBtn) {
+                wrap.scrollLeft = activeBtn.offsetLeft - wrap.offsetWidth / 2 + activeBtn.offsetWidth / 2;
+            }
+        }, 10);
+    }
+}
+
+window.cycleGroupScroll = function(groupId, viewMinT, totalRange) {
+    let times = window.ganttScrollMap[groupId];
+    if (!times || times.length === 0) return;
+    
+    if (times.length === 1) {
+        let leftPerc = (times[0] - viewMinT) / totalRange;
+        const xAxis = document.querySelector('.gantt-row .gantt-x-axis');
+        const container = document.querySelector('.gantt-container');
+        if (xAxis && container) {
+            const offset = container.clientWidth / 2; 
+            const targetX = (leftPerc * xAxis.offsetWidth) - offset; 
+            container.scrollLeft = Math.max(0, targetX);
+        }
+        return;
+    }
+
+    if (!window.ganttScrollDir[groupId]) window.ganttScrollDir[groupId] = 1;
+    let idx = window.ganttScrollIdx[groupId] || 0;
+    
+    idx += window.ganttScrollDir[groupId];
+    
+    if (idx >= times.length) {
+        window.ganttScrollDir[groupId] = -1;
+        idx = times.length - 2;
+    } else if (idx < 0) {
+        window.ganttScrollDir[groupId] = 1;
+        idx = 1;
+    }
+    
+    window.ganttScrollIdx[groupId] = idx;
+    let t = times[idx];
+    
+    let leftPerc = (t - viewMinT) / totalRange;
+    const xAxis = document.querySelector('.gantt-row .gantt-x-axis');
+    const container = document.querySelector('.gantt-container');
+    if (xAxis && container) {
+        const offset = container.clientWidth / 2; 
+        const targetX = (leftPerc * xAxis.offsetWidth) - offset; 
+        container.scrollLeft = Math.max(0, targetX);
+    }
+};
 
 const TS_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function syncTsDate(type) {
@@ -437,9 +718,10 @@ function toggleSel(type) {
     const wrap = document.getElementById(type+'-wrap');
     const isOpen = wrap.classList.contains('open');
     document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open'));
-    if (!isOpen) { wrap.classList.add('open'); document.getElementById(type+'-inner').focus(); }
+    if (!isOpen) { wrap.classList.add('open'); if(document.getElementById(type+'-inner')) document.getElementById(type+'-inner').focus(); }
 }
 function filterSel(type) {
+    if(!document.getElementById(type+'-inner')) return;
     const val = document.getElementById(type+'-inner').value.toLowerCase();
     document.querySelectorAll('#'+type+'-list .sel-item').forEach(item => {
         if (!item.dataset.value) { item.classList.remove('hidden'); return; }
@@ -448,15 +730,25 @@ function filterSel(type) {
 }
 function pickSel(type, value, label, el) {
     if (type === 'proj') { activeProjFilter = value; document.getElementById('proj-label').textContent = label; }
-    else                 { activeEngFilter  = value; document.getElementById('eng-label').textContent  = label; }
+    else if (type === 'eng') { activeEngFilter = value; document.getElementById('eng-label').textContent = label; }
+    else if (type === 'year') { activeYearFilter = value; document.getElementById('year-label').textContent = label; }
     document.querySelectorAll('#'+type+'-list .sel-item').forEach(i => i.classList.remove('active'));
     el.classList.add('active');
     document.getElementById(type+'-wrap').classList.remove('open');
-    document.getElementById(type+'-inner').value = '';
-    filterSel(type);
+    if(document.getElementById(type+'-inner')) {
+        document.getElementById(type+'-inner').value = '';
+        filterSel(type);
+    }
     doFilter();
 }
 document.addEventListener('click', e => { if (!e.target.closest('.sel-wrap')) document.querySelectorAll('.sel-wrap').forEach(w => w.classList.remove('open')); });
+
+function toggleTargetDates() {
+    showTargetDates = document.getElementById('chk-show-target').checked;
+    if (Object.keys(ganttData).length > 0) {
+        renderGantt();
+    }
+}
 
 function doFilter() {
     const txt       = document.getElementById('txt-search').value.toLowerCase();
@@ -464,7 +756,7 @@ function doFilter() {
     const dateEnd   = document.getElementById('date-end').value;
     let visRows = [];
 
-    document.querySelectorAll('#main-table tbody tr').forEach(tr => {
+    document.querySelectorAll('#main-table tbody tr[data-pid]').forEach(tr => {
         const rPid = tr.dataset.pid || '';
         const rEng = tr.dataset.eng || '';
         const rSd  = tr.dataset.sd  || '';
@@ -472,14 +764,25 @@ function doFilter() {
         const ok = (!txt              || rTxt.includes(txt))
                 && (!activeProjFilter || rPid === activeProjFilter)
                 && (!activeEngFilter  || rEng === activeEngFilter)
+                && (activeYearFilter === 'all' || rSd.startsWith(activeYearFilter))
                 && (!dateStart        || rSd  >= dateStart)
                 && (!dateEnd          || rSd  <= dateEnd);
-        tr.classList.toggle('is-hidden', !ok);
+        tr.classList.add('is-hidden');
         if (ok) visRows.push(tr);
     });
-    updateLiveDashboard(visRows, txt, dateStart, dateEnd);
 
-    // Export Button UI Update logic
+    let emptyTr = document.getElementById('empty-row');
+    if (visRows.length === 0) {
+        if (emptyTr) emptyTr.classList.remove('is-hidden');
+    } else {
+        if (emptyTr) emptyTr.classList.add('is-hidden');
+    }
+
+    updateLiveDashboard(visRows);
+    
+    currentPage = 1;
+    renderPagination(visRows);
+
     const hasFilter = (txt !== '' || activeProjFilter !== '' || activeEngFilter !== '' || dateStart !== '' || dateEnd !== '');
     const btnExport = document.getElementById('btn-export-all');
     if (hasFilter) {
@@ -492,63 +795,90 @@ function doFilter() {
 
     document.getElementById('chk-all').checked = false;
     onChkChange();
+
+    if (activeEngFilter !== '' || activeProjFilter !== '') {
+        fetchGanttData(activeEngFilter, activeProjFilter);
+    } else {
+        document.getElementById('gantt-section').style.display = 'none';
+        document.getElementById('charts-section').style.display = 'none';
+    }
 }
 
 function fmtDateJS(ymd) {
     if (!ymd) return '';
-    const p = ymd.split('-');
+    const dt = ymd.split(' ')[0];
+    const p = dt.split('-');
+    if(p.length !== 3) return ymd;
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return parseInt(p[2]) + ' ' + months[parseInt(p[1])-1] + ' ' + p[0];
+    return parseInt(p[2], 10) + ' ' + months[parseInt(p[1], 10)-1] + ' ' + p[0];
 }
 
-function updateLiveDashboard(visRows, txt, dateStart, dateEnd) {
+function updateLiveDashboard(visRows) {
     const dash = document.getElementById('live-dashboard');
-    const hasFilter = txt || activeProjFilter || activeEngFilter || dateStart || dateEnd;
-    if (!hasFilter) { dash.style.display = 'none'; return; }
+    if (!activeProjFilter) { 
+        dash.style.display = 'none'; 
+        return; 
+    }
+
+    const pData = projData[activeProjFilter] || {status:'', target_start_date:'', target_date:'', target_mandays:''};
+    let statusStr = pData.status || 'Not Quoted';
 
     let totalMins = 0;
     const engSet  = new Set();
-    let minDate = '', maxDate = '';
+    let actualMinDate = '';
+    let actualMaxDate = '';
 
     visRows.forEach(tr => {
         totalMins += parseInt(tr.dataset.mins) || 0;
         if (tr.dataset.eng) engSet.add(tr.dataset.eng);
         const sd = tr.dataset.sd || '';
-        if (sd) {
-            if (!minDate || sd < minDate) minDate = sd;
-            if (!maxDate || sd > maxDate) maxDate = sd;
-        }
+        const ed = tr.dataset.ed || '';
+        if (sd && (!actualMinDate || sd < actualMinDate)) actualMinDate = sd;
+        if (ed && (!actualMaxDate || ed > actualMaxDate)) actualMaxDate = ed;
     });
 
-    const h = Math.floor(totalMins/60), m = totalMins%60;
-    document.getElementById('dash-logs').textContent  = visRows.length;
-    document.getElementById('dash-hours').textContent = h+'h '+m+'m';
-    document.getElementById('dash-engs').textContent  = engSet.size;
+    const totalLogs = visRows.length;
+    const engCount = engSet.size;
 
-    if (minDate && maxDate) {
-        document.getElementById('dash-dates').textContent = minDate === maxDate ? fmtDateJS(minDate) : fmtDateJS(minDate) + ' → ' + fmtDateJS(maxDate);
-        const diff = Math.round((new Date(maxDate) - new Date(minDate)) / 86400000) + 1;
-        document.getElementById('dash-days').textContent = diff + ' day' + (diff !== 1 ? 's' : '') + ' span';
-    } else {
-        document.getElementById('dash-dates').textContent = '—';
-        document.getElementById('dash-days').textContent  = '';
+    let targetMins = (parseFloat(pData.target_mandays) || 0) * 8 * 60;
+    let th = Math.floor(targetMins / 60);
+    let tm_rem = Math.round(targetMins % 60);
+    let ah = Math.floor(totalMins / 60);
+    let am = totalMins % 60;
+
+    let tsDate = pData.target_start_date ? fmtDateJS(pData.target_start_date) : '-';
+    let teDate = pData.target_date ? fmtDateJS(pData.target_date) : '-';
+    let targetDateStr = tsDate + ' &mdash; ' + teDate;
+
+    let asDate = actualMinDate ? fmtDateJS(actualMinDate) : '-';
+    let aeDate = '-';
+    if (statusStr.toLowerCase() === 'completed') {
+        aeDate = actualMaxDate ? fmtDateJS(actualMaxDate) : '-';
     }
-    dash.style.display = 'block';
-}
+    let actualDateStr = asDate + ' &mdash; ' + aeDate;
 
-function clearAllFilters() {
-    document.getElementById('txt-search').value  = '';
-    document.getElementById('date-start').value  = '';
-    document.getElementById('date-end').value    = '';
-    document.getElementById('date-start-display').value = '';
-    document.getElementById('date-end-display').value   = '';
-    activeProjFilter = ''; activeEngFilter  = '';
-    document.getElementById('proj-label').textContent = 'All Projects';
-    document.getElementById('eng-label').textContent  = 'All Engineers';
-    document.querySelectorAll('.sel-item').forEach(i => i.classList.remove('active'));
-    document.querySelectorAll('.sel-item[data-value=""]').forEach(i => i.classList.add('active'));
-    document.getElementById('live-dashboard').style.display = 'none';
-    doFilter();
+    let utilHtml = '';
+    if (targetMins > 0) {
+        let pct = (totalMins / targetMins) * 100;
+        let fillCol = pct > 100 ? '#dc3545' : '#28a745';
+        let dispPct = pct;
+        let overText = '';
+        if (pct > 100) {
+            let overMins = totalMins - targetMins;
+            overText = `<span style="color:#dc3545;font-size:11px;font-weight:bold;margin-top:4px;display:block;">▲ ${Math.floor(overMins/60)}h ${overMins%60}m Over</span>`;
+        }
+        utilHtml = `<div style="width:100%; margin-top:4px;"><div style="text-align:right; font-size:11px; font-weight:bold; color:#0f172a; margin-bottom:4px;">${parseFloat(pct.toFixed(1))}%</div><div style="width:100%; background:#e2e8f0; height:8px; border-radius:4px; overflow:visible; position:relative;"><div style="width:${dispPct}%; background:${fillCol}; height:100%; border-radius:4px; transition:width 0.3s; max-width:200%;"></div></div></div>${overText}`;
+    } else {
+        utilHtml = `<span style="color:#64748b;font-size:12px;">No Target</span>`;
+    }
+
+    let overdueHtml = '';
+    if (pData.target_date && actualMaxDate && actualMaxDate > pData.target_date) {
+        overdueHtml = `<span style="color:#dc3545;font-weight:bold;font-size:12px;margin-left:8px;">⚠ Overdue</span>`;
+    }
+
+    dash.innerHTML = `<div class="dash-grid" style="margin-bottom:12px;"><div class="dash-item"><span class="dash-label">Total Logs</span><div class="dash-value">${totalLogs}</div></div><div class="dash-item"><span class="dash-label">Engineers</span><div class="dash-value">${engCount}</div></div><div class="dash-item"><span class="dash-label">IIPS Status</span><div class="dash-value" style="color:#16a34a;">${statusStr}</div></div><div class="dash-item"><span class="dash-label">Utilization</span><div class="dash-value" style="font-size:13px;display:flex;flex-wrap:wrap;align-items:center;">${utilHtml}${overdueHtml}</div></div></div><div class="dash-grid"><div class="dash-item"><span class="dash-label">Target Date</span><div class="dash-value" style="font-size:14px;">${targetDateStr}</div></div><div class="dash-item"><span class="dash-label">Actual Date</span><div class="dash-value" style="font-size:14px;">${actualDateStr}</div></div><div class="dash-item"><span class="dash-label">Target Time</span><div class="dash-value" style="font-size:14px;">${targetMins > 0 ? th + 'h ' + tm_rem + 'm' : '—'}</div></div><div class="dash-item"><span class="dash-label">Actual Time</span><div class="dash-value" style="font-size:14px;">${ah}h ${am}m</div></div></div>`;
+    dash.style.display = 'block';
 }
 
 function onChkChange() {
@@ -557,7 +887,6 @@ function onChkChange() {
     toolbar.style.display = checked > 0 ? 'flex' : 'none';
     document.getElementById('bulk-count').textContent = checked + ' selected';
     
-    // 只计算肉眼可见的checkbox
     const visibleCheckboxes = document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk');
     let visibleCheckedCount = 0;
     visibleCheckboxes.forEach(c => { if(c.checked) visibleCheckedCount++; });
@@ -603,13 +932,28 @@ function exportFilteredOrAll() {
 
     const btnExport = document.getElementById('btn-export-all');
     if (btnExport.classList.contains('filtered')) {
-        document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk').forEach(chk => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'selected_ts[]';
-            input.value = chk.value;
-            input.className = 'dyn-ts';
-            form.appendChild(input);
+        currentFilteredRows.forEach(tr => {
+            const chk = tr.querySelector('.ts-chk');
+            if (chk) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_ts[]';
+                input.value = chk.value;
+                input.className = 'dyn-ts';
+                form.appendChild(input);
+            }
+        });
+    } else {
+        document.querySelectorAll('#main-table tbody tr[data-pid]').forEach(tr => {
+            const chk = tr.querySelector('.ts-chk');
+            if (chk) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_ts[]';
+                input.value = chk.value;
+                input.className = 'dyn-ts';
+                form.appendChild(input);
+            }
         });
     }
     
@@ -628,7 +972,10 @@ function fixStickyHeaders() {
         colRow.querySelectorAll('th').forEach(th => th.style.top = h + 'px');
     }
 }
-window.addEventListener('DOMContentLoaded', fixStickyHeaders);
+window.addEventListener('DOMContentLoaded', () => {
+    fixStickyHeaders();
+    doFilter();
+});
 window.addEventListener('resize', fixStickyHeaders);
 
 document.querySelectorAll('.act').forEach(c => {
@@ -641,9 +988,13 @@ function toggleSort(e, id) { e.stopPropagation(); document.querySelectorAll('.so
 window.addEventListener('click', () => document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')));
 function sortT(col, type, dir) {
     const tbody = document.querySelector('#main-table tbody');
-    const rows  = Array.from(tbody.querySelectorAll('tr'));
+    const rows  = Array.from(tbody.querySelectorAll('tr[data-pid]'));
     if (!origRows) origRows = [...rows];
-    if (dir === 0) { origRows.forEach(r => tbody.appendChild(r)); return; }
+    if (dir === 0) { 
+        origRows.forEach(r => tbody.appendChild(r)); 
+        doFilter();
+        return; 
+    }
     rows.sort((a, b) => {
         const ca = col === 8 ? parseInt(a.cells[col].dataset.raw||0) : a.cells[col].textContent.trim();
         const cb = col === 8 ? parseInt(b.cells[col].dataset.raw||0) : b.cells[col].textContent.trim();
@@ -653,6 +1004,494 @@ function sortT(col, type, dir) {
         return 0;
     });
     rows.forEach(r => tbody.appendChild(r));
+    doFilter();
+}
+
+function toggleGanttTooltip(e, el, stStr, etStr, mins, barId, type) {
+    e.stopPropagation();
+    const layer = document.getElementById('gantt-tooltip-layer');
+    const existing = layer.querySelector(`.gantt-tooltip[data-bar-id="${barId}"]`);
+    
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    let durText = '';
+    if (type === 'target') {
+        const sDate = new Date(stStr.replace(/-/g,'/'));
+        const eDate = new Date(etStr.replace(/-/g,'/'));
+        let d = Math.round(Math.abs(eDate - sDate) / 86400000);
+        if (d === 0) d = 1;
+        let th = d * 8; 
+        durText = th + 'h 0m';
+    } else {
+        const h = Math.floor(mins / 60);
+        const m = Math.floor(mins % 60);
+        durText = h + 'h ' + m + 'm';
+    }
+
+    const titleText = type === 'target' ? '🎯 Target Date' : '⏱ Actual Work';
+
+    const tt = document.createElement('div');
+    tt.className = 'gantt-tooltip';
+    tt.dataset.barId = barId;
+    tt.style.pointerEvents = 'auto'; 
+    tt.innerHTML = `<div style="font-weight:bold;color:#0f172a;margin-bottom:4px;white-space:nowrap;">${titleText} (${durText})</div><div style="color:#64748b;white-space:nowrap;">Start: ${stStr}</div><div style="color:#64748b;white-space:nowrap;">End: ${etStr}</div>`;
+    layer.appendChild(tt);
+
+    const barRect = el.getBoundingClientRect();
+    const innerRect = document.getElementById('gantt-chart-inner').getBoundingClientRect();
+    const scrollContainer = document.querySelector('.gantt-container');
+
+    const topPos = barRect.bottom - innerRect.top;
+    let leftPos = (barRect.left + barRect.width / 2) - innerRect.left;
+
+    const scrollLeft = scrollContainer.scrollLeft;
+    const scrollRight = scrollLeft + scrollContainer.clientWidth;
+    const visibleLeft = scrollLeft + 150; 
+    const visibleRight = scrollRight;
+
+    let clampedLeft = leftPos;
+    if (leftPos < visibleLeft + 80) clampedLeft = visibleLeft + 80;
+    if (leftPos > visibleRight - 80) clampedLeft = visibleRight - 80;
+
+    tt.style.top = (topPos + 6) + 'px';
+    tt.style.left = clampedLeft + 'px';
+}
+
+function fetchGanttData(eng, proj) {
+    const fd = new FormData();
+    fd.append('ajax_gantt', '1');
+    fd.append('eng', eng);
+    fd.append('proj', proj);
+    fetch('admin_timesheets.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+        ganttData = res.data;
+        const sec = document.getElementById('gantt-section');
+        const title = document.getElementById('gantt-title');
+        sec.style.display = 'block';
+        const engLabel = document.getElementById('eng-label').textContent;
+        const projLabel = document.getElementById('proj-label').textContent;
+        if (eng && proj) title.textContent = `Gantt Chart for "${engLabel}" working on "${projLabel}"`;
+        else if (eng) title.textContent = `Gantt Chart for "${engLabel}"`;
+        else title.textContent = `Gantt Chart for "${projLabel}"`;
+        renderGantt();
+        renderCharts();
+    });
+}
+
+function renderCharts() {
+    const sec = document.getElementById('charts-section');
+    if (!activeProjFilter) { sec.style.display = 'none'; return; }
+    
+    const pData = projData[activeProjFilter];
+    if (!pData || pData.status.toLowerCase() !== 'completed') { sec.style.display = 'none'; return; }
+
+    sec.style.display = 'block';
+
+    const isModeB = (activeEngFilter !== '');
+    const titleText = isModeB ? 'Engineer Timesheet Analysis' : 'Project Engineer Contribution Analysis';
+    document.getElementById('charts-title').textContent = titleText;
+
+    let barLabels = [];
+    let barData = [];
+    let summaryHtml = '<ul>';
+    let tooltipsRaw = [];
+
+    if (!isModeB) {
+        let engMins = {};
+        let totalMins = 0;
+
+        Object.values(ganttData).forEach(grp => {
+            grp.forEach(s => {
+                if (s.type === 'actual') {
+                    let st = new Date(s.start.replace(/-/g,'/'));
+                    let et = new Date(s.end.replace(/-/g,'/'));
+                    let m = (et - st) / 60000;
+                    if (m < 0) m = 0;
+                    let eName = s.eng || 'Unknown';
+                    if (!engMins[eName]) engMins[eName] = 0;
+                    engMins[eName] += m;
+                    totalMins += m;
+                }
+            });
+        });
+
+        for (let e in engMins) {
+            let p = totalMins > 0 ? ((engMins[e] / totalMins) * 100).toFixed(2) : 0;
+            let hStr = (engMins[e] / 60).toFixed(2);
+            barLabels.push(e);
+            barData.push(hStr);
+            tooltipsRaw.push({ name: e, val: hStr, perc: p, mins: engMins[e] });
+        }
+
+        tooltipsRaw.sort((a, b) => b.mins - a.mins);
+        
+        tooltipsRaw.forEach(t => {
+            let h = Math.floor(t.mins / 60);
+            let rm = Math.round(t.mins % 60);
+            summaryHtml += `<li><div><strong>${t.name}</strong></div><div>${h}h ${rm}m <span style="color:#2563eb;font-weight:bold;margin-left:10px;">${t.perc}%</span></div></li>`;
+        });
+        summaryHtml += '</ul>';
+
+    } else {
+        let tsList = [];
+        let totalMins = 0;
+
+        Object.values(ganttData).forEach(grp => {
+            grp.forEach(s => {
+                if (s.type === 'actual') {
+                    let st = new Date(s.start.replace(/-/g,'/'));
+                    let et = new Date(s.end.replace(/-/g,'/'));
+                    let m = (et - st) / 60000;
+                    if (m < 0) m = 0;
+                    tsList.push({
+                        date: s.start.substring(0, 10),
+                        desc: s.desc,
+                        mins: m
+                    });
+                    totalMins += m;
+                }
+            });
+        });
+
+        tsList.sort((a, b) => new Date(a.date.replace(/-/g,'/')) - new Date(b.date.replace(/-/g,'/')));
+
+        tsList.forEach((t, idx) => {
+            let lbl = t.date + ' (#' + (idx + 1) + ')';
+            let p = totalMins > 0 ? ((t.mins / totalMins) * 100).toFixed(2) : 0;
+            let hStr = (t.mins / 60).toFixed(2);
+            
+            barLabels.push(lbl);
+            barData.push(hStr);
+            tooltipsRaw.push({ name: lbl, act: t.desc, val: hStr, perc: p, mins: t.mins });
+        });
+
+        tooltipsRaw.forEach(t => {
+            let h = Math.floor(t.mins / 60);
+            let rm = Math.round(t.mins % 60);
+            summaryHtml += `<li><div style="flex:1;"><strong>${t.name.split(' ')[0]}</strong> <span style="color:#64748b;font-size:11px;">- ${t.act}</span></div><div>${h}h ${rm}m <span style="color:#2563eb;font-weight:bold;margin-left:10px;">${t.perc}%</span></div></li>`;
+        });
+        summaryHtml += '</ul>';
+    }
+
+    document.getElementById('chart-summary').innerHTML = summaryHtml;
+
+    if (window.barChartInst) window.barChartInst.destroy();
+
+    const ctxBar = document.getElementById('barChart').getContext('2d');
+    window.barChartInst = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: barLabels,
+            datasets: [{
+                label: 'Hours',
+                data: barData,
+                backgroundColor: '#3b82f6',
+                maxBarThickness: 40
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    border: {
+                        display: true
+                    },
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        crossAlign: 'far'
+                    },
+                    afterFit: function(scale) {
+                        scale.width = scale.chart.width / 3;
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            let idx = ctx.dataIndex;
+                            return tooltipsRaw[idx].val + 'h (' + tooltipsRaw[idx].perc + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderGantt() {
+    const container = document.getElementById('gantt-chart-inner');
+    container.innerHTML = '';
+
+    let workingData = {};
+    let globalTargetSegment = null;
+
+    Object.keys(ganttData).forEach(g => {
+        workingData[g] = [];
+        ganttData[g].forEach(s => {
+            if (s.type === 'target') {
+                if (activeProjFilter !== '') {
+                    if (!globalTargetSegment) {
+                        if (s.start && s.end && !s.start.startsWith('1970') && !s.end.startsWith('1970')) {
+                            globalTargetSegment = {...s};
+                        }
+                    }
+                } else {
+                    workingData[g].push({...s});
+                }
+            } else {
+                workingData[g].push({...s});
+            }
+        });
+        if (workingData[g].length === 0) delete workingData[g];
+    });
+
+    if (showTargetDates && activeProjFilter !== '' && globalTargetSegment) {
+        let sd = globalTargetSegment.start.substring(0,10).split('-');
+        let ed = globalTargetSegment.end.substring(0,10).split('-');
+        let label = `${sd[2]}/${sd[1]}/${sd[0]} &mdash; ${ed[2]}/${ed[1]}/${ed[0]}`;
+        let tgKey = 'TARGET_ROW|' + label;
+        workingData[tgKey] = [globalTargetSegment];
+    }
+
+    const rawGroups = Object.keys(workingData);
+    if (rawGroups.length === 0) {
+        container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;font-weight:bold;">No data available</div>';
+        return;
+    }
+
+    const dsVal = document.getElementById('date-start').value;
+    const deVal = document.getElementById('date-end').value;
+
+    let filterStartT = dsVal ? new Date(dsVal + 'T00:00:00').getTime() : -Infinity;
+    let filterEndT = deVal ? new Date(deVal + 'T23:59:59').getTime() : Infinity;
+
+    let filteredData = {};
+    let activeMinT = Infinity;
+    let activeMaxT = -Infinity;
+    let currentYear = new Date().getFullYear();
+    let selectedYear = activeYearFilter === 'all' ? currentYear : parseInt(activeYearFilter);
+
+    rawGroups.forEach(g => {
+        let keepGroup = false;
+
+        workingData[g].forEach(s => {
+            if (s.type === 'target' && !showTargetDates) return;
+
+            let st = new Date(s.start.replace(/-/g,'/')).getTime();
+            let et = new Date(s.end.replace(/-/g,'/')).getTime();
+            if (st > et) { let tmp = st; st = et; et = tmp; }
+            
+            let stYr = new Date(st).getFullYear();
+            let etYr = new Date(et).getFullYear();
+            let yearMatch = (activeYearFilter === 'all' || (selectedYear >= stYr && selectedYear <= etYr));
+            let overlap = (st <= filterEndT && et >= filterStartT);
+
+            if (yearMatch && overlap) {
+                keepGroup = true;
+            }
+        });
+
+        if (keepGroup) {
+            let validSegments = [];
+            workingData[g].forEach(s => {
+                if (s.type === 'target' && !showTargetDates) return;
+
+                let stDate = s.start.substring(0, 10).replace(/-/g,'/');
+                let etDate = s.end.substring(0, 10).replace(/-/g,'/');
+                let st = new Date(stDate + ' 00:00:00').getTime();
+                let et = new Date(etDate + ' 00:00:00').getTime();
+                if (st > et) { let tmp = st; st = et; et = tmp; }
+                
+                let stYr = new Date(st).getFullYear();
+                let etYr = new Date(et).getFullYear();
+                let yearMatch = (activeYearFilter === 'all' || (selectedYear >= stYr && selectedYear <= etYr));
+
+                if (yearMatch) {
+                    validSegments.push(s);
+                    if (st < activeMinT) activeMinT = st;
+                    if (et > activeMaxT) activeMaxT = et;
+                }
+            });
+            if(validSegments.length > 0) {
+                filteredData[g] = validSegments;
+            }
+        }
+    });
+
+    const groups = Object.keys(filteredData).sort((a, b) => {
+        if (a.startsWith('TARGET_ROW|')) return -1;
+        if (b.startsWith('TARGET_ROW|')) return 1;
+
+        const getActualMin = (groupKey) => {
+            const actuals = filteredData[groupKey].filter(s => s.type === 'actual');
+            if (actuals.length === 0) return Infinity;
+            return Math.min(...actuals.map(s => new Date(s.start.replace(/-/g, '/')).getTime()));
+        };
+
+        let aMin = getActualMin(a);
+        let bMin = getActualMin(b);
+        
+        return aMin - bMin;
+    });
+    
+    if (groups.length === 0 || activeMinT === Infinity) {
+        container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;font-weight:bold;">No matching logs found for the selected date range / year.</div>';
+        return;
+    }
+
+    let minD = new Date(activeMinT);
+    minD.setHours(0, 0, 0, 0);
+    let viewMinT = minD.getTime();
+
+    let maxD = new Date(activeMaxT);
+    let viewMaxD = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 1, 0, 0, 0);
+    let viewMaxT = viewMaxD.getTime();
+
+    let totalRange = viewMaxT - viewMinT;
+    if (totalRange <= 0) totalRange = 86400000;
+
+    let ticks = [];
+    let curr = new Date(viewMinT);
+    while (curr.getTime() < viewMaxT) {
+        let yr = curr.getFullYear();
+        let dateStr = String(curr.getDate()).padStart(2, '0') + '/' + String(curr.getMonth() + 1).padStart(2, '0');
+        let isFirstDayOfYear = (curr.getDate() === 1 && curr.getMonth() === 0);
+        
+        let topYear = '&nbsp;';
+        if (curr.getTime() === viewMinT || isFirstDayOfYear) {
+            topYear = yr;
+        }
+
+        let l = `<div style="font-size:9px; color:#1d4ed8; font-weight:bold; line-height:1;">${topYear}</div><div style="font-size:10px; line-height:1.2; margin-top:2px;">${dateStr}</div>`;
+        
+        ticks.push({ label: l, isPrevEnd: isFirstDayOfYear, time: curr.getTime() });
+        curr.setDate(curr.getDate() + 1);
+    }
+
+    let yAxisTitle = 'Item';
+    if (activeEngFilter !== '' && activeProjFilter !== '') {
+        yAxisTitle = 'Activity';
+    } else if (activeEngFilter !== '') {
+        yAxisTitle = 'IIPS';
+    } else if (activeProjFilter !== '') {
+        yAxisTitle = 'Engineer';
+    }
+
+    let headerHtml = `<div class="gantt-row gantt-header-row"><div class="gantt-y-axis">${yAxisTitle}</div><div class="gantt-x-axis">`;
+    ticks.forEach(tick => { 
+        let extraClass = tick.isPrevEnd ? ' prev-year-end' : '';
+        headerHtml += `<div class="gantt-tick${extraClass}">${tick.label}</div>`; 
+    });
+    headerHtml += `</div></div>`;
+    let htmlContent = headerHtml;
+
+    window.ganttScrollMap = {};
+    window.ganttScrollIdx = {};
+    window.ganttScrollDir = {};
+    
+    let barIdCounter = 0;
+    let groupCounter = 0;
+
+    groups.forEach(g => {
+        if (g.startsWith('TARGET_ROW|') && !showTargetDates) return;
+
+        let groupId = 'gantt-grp-' + groupCounter++;
+        let yLabel = g;
+        let yAxisStyle = '';
+        
+        if (g.startsWith('TARGET_ROW|')) {
+            yLabel = `<span style="font-weight:bold; font-size:12px; color:#1e293b;">${g.split('|')[1]}</span>`;
+            yAxisStyle = 'background-color: #ffffff;';
+        } else if (g.includes('|')) {
+            yLabel = g.split('|')[0];
+        }
+        
+        let actualTimes = filteredData[g]
+            .filter(s => s.type === 'actual')
+            .map(s => new Date(s.start.substring(0, 10).replace(/-/g,'/') + ' 00:00:00').getTime());
+            
+        if (actualTimes.length === 0) {
+            actualTimes = filteredData[g].map(s => new Date(s.start.substring(0, 10).replace(/-/g,'/') + ' 00:00:00').getTime());
+        }
+        
+        let barTimes = [...new Set(actualTimes)].sort((a,b) => b - a);
+        window.ganttScrollMap[groupId] = barTimes;
+        window.ganttScrollIdx[groupId] = 0;
+        window.ganttScrollDir[groupId] = 1;
+
+        let rowHtml = `<div class="gantt-row"><div class="gantt-y-axis" style="${yAxisStyle}" title="Click to track logs" onclick="cycleGroupScroll('${groupId}', ${viewMinT}, ${totalRange})">${yLabel}</div><div class="gantt-x-axis"><div class="gantt-grid">`;
+            
+        ticks.forEach(() => { rowHtml += `<div class="gantt-grid-line"></div>`; });
+        rowHtml += `</div><div class="gantt-bars">`;
+        
+        filteredData[g].forEach(s => {
+            if (s.type === 'target' && !showTargetDates) return;
+
+            const hasTarget = filteredData[g].some(item => item.type === 'target');
+            const hasActual = filteredData[g].some(item => item.type === 'actual');
+    
+            let topPos = '50%';
+            if (showTargetDates && hasTarget && hasActual) {
+                topPos = (s.type === 'target') ? '30%' : '70%';
+            }
+
+            let stDate = s.start.substring(0, 10).replace(/-/g,'/');
+            let etDate = s.end.substring(0, 10).replace(/-/g,'/');
+            
+            let st = new Date(stDate + ' 00:00:00').getTime();
+            let et = new Date(etDate + ' 00:00:00').getTime() + 86400000;
+            
+            if (st > et) { let tmp = st; st = et; et = tmp; }
+            
+            let origSt = new Date(s.start.replace(/-/g,'/')).getTime();
+            let origEt = new Date(s.end.replace(/-/g,'/')).getTime();
+            if (origSt > origEt) { let tmp = origSt; origSt = origEt; origEt = tmp; }
+            const mins = (origEt - origSt) / 60000;
+            
+            let leftPercent = ((st - viewMinT) / totalRange) * 100;
+            let widthPercent = ((et - st) / totalRange) * 100;
+            
+            if (leftPercent > 100 || leftPercent + widthPercent < 0) return; 
+            if (leftPercent < 0) { widthPercent += leftPercent; leftPercent = 0; }
+            if (leftPercent + widthPercent > 100) widthPercent = 100 - leftPercent;
+            
+            if (widthPercent < 0.2) widthPercent = 0.2;
+            
+            rowHtml += `<div class="gantt-bar ${s.type}" id="bar-${barIdCounter}" style="left:${leftPercent}%; width:${widthPercent}%; top:${topPos}; transform:translateY(-50%);" onclick="toggleGanttTooltip(event, this, '${s.start}', '${s.end}', ${mins}, ${barIdCounter}, '${s.type}')"></div>`;  
+            barIdCounter++;
+        });
+        
+        rowHtml += `</div></div></div>`;
+        htmlContent += rowHtml;
+    });
+
+    htmlContent += `<div id="gantt-tooltip-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></div>`;
+    container.innerHTML = htmlContent;
+
+    setTimeout(() => {
+        let scrollToTime = new Date().getTime(); 
+        
+        if (scrollToTime < viewMinT) scrollToTime = viewMinT;
+        if (scrollToTime > viewMaxT) scrollToTime = viewMaxT;
+
+        let leftPerc = (scrollToTime - viewMinT) / totalRange;
+        const xAxis = document.querySelector('.gantt-row .gantt-x-axis');
+        const scrollContainer = document.querySelector('.gantt-container');
+        if (xAxis && scrollContainer) {
+             const offset = scrollContainer.clientWidth / 2; 
+             const targetX = (leftPerc * xAxis.offsetWidth) - offset; 
+             scrollContainer.scrollLeft = Math.max(0, targetX);
+        }
+    }, 100);
 }
 </script>
 </body>
