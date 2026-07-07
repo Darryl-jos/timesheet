@@ -1,9 +1,3 @@
--- ================================================================
--- ESSRPT TIMESHEET DATABASE - Full Rebuild from Excel
--- Generated: 2026-06-15 01:47
--- Projects: 972 | IIPS: 972 | Engineers: 2
--- ================================================================
-
 DROP DATABASE IF EXISTS timesheet;
 CREATE DATABASE timesheet CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE timesheet;
@@ -69,7 +63,6 @@ CREATE TABLE iips_tracking (
     FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- ── Engineers ──────────────────────────────────────────
 INSERT INTO engineers (username_id, engineer_name, password, is_admin, is_verified) VALUES
 ('admin', 'Administrator', '$2y$10$ipcXrrb9h6iBpLIrb5iIwuQfB1boJ.ZuiknZWwjpa6ZaWumXHipl6', 1, 1);
 INSERT INTO engineers (username_id, engineer_name, password, is_admin, is_verified) VALUES 
@@ -98,7 +91,6 @@ INSERT INTO engineers (username_id, engineer_name, password, is_admin, is_verifi
 ('klyap','Yap Kian Lip, Kenny','$2y$10$dkQ8EFGawJj2jzaI2Q7VvOd8JTBN2jWZEen.hhj0v62PU/VPmQHf.',0,1),
 ('ckyo','Yo Choon Kit','$2y$10$dkQ8EFGawJj2jzaI2Q7VvOd8JTBN2jWZEen.hhj0v62PU/VPmQHf.',0,1);
 
--- ── Projects (972) ─────────────────────────────
 INSERT INTO projects (project_id, customer_name, project_name, estimate_time, pricing) VALUES
 ('SV2206140001', 'CONVEX MALAYSIA SDN BHD', 'Huawei Wifi Network Refresh - Phase 2', 8, NULL),
 ('SL2112030004', 'J.K. Wire Harness Sdn. Bhd.', 'Veeam Backup Installation', 8, NULL),
