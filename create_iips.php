@@ -34,41 +34,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $p_name    = trim($_POST['project_name']);
     $c_name    = trim($_POST['customer_name']);
 
-    // IIPS Costing
     $selling   = strlen(trim($_POST['selling_price'] ?? '')) > 0 ? floatval($_POST['selling_price']) : null;
     $partner   = strlen(trim($_POST['partner_cost']  ?? '')) > 0 ? floatval($_POST['partner_cost'])  : null;
-    $internal  = strlen(trim($_POST['internal_cost'] ?? '')) > 0 ? floatval($_POST['internal_cost']) : 0;
+    $internal  = strlen(trim($_POST['internal_cost'] ?? '')) > 0 ? floatval($_POST['internal_cost']) : null;
     $gross     = ($selling !== null && $partner !== null) ? $selling - $partner : null;
-    $has_pm    = isset($_POST['has_project_mgmt']) ? 1 : 0;
+    $has_pm    = 0; 
 
-    // Timeline
+    $accrued = strlen(trim($_POST['accrued'] ?? '')) > 0 ? floatval($_POST['accrued']) : null;
+    $remarks_status  = trim($_POST['remarks_status'] ?? '');
+
     $tgt_md    = strlen(trim($_POST['target_mandays']      ?? '')) > 0 ? floatval($_POST['target_mandays'])       : null;
     $tgt_sd    = !empty($_POST['target_start_date'])   ? $_POST['target_start_date']   : null;
     $tgt_ed    = !empty($_POST['target_end_date'])     ? $_POST['target_end_date']     : null;
     $tgt_bd    = !empty($_POST['target_billing_date']) ? $_POST['target_billing_date'] : null;
 
-    // Status
     $iips_stat = $_POST['iips_status']    ?? '';
     $bill_stat = $_POST['billing_status'] ?? '';
 
-    // Resources
     $acc_mgr   = implode(', ', array_filter(array_map('trim', $_POST['account_manager_multi']  ?? [])));
     $acc_ldr   = implode(', ', array_filter(array_map('trim', $_POST['account_leader_multi']   ?? [])));
     $presales  = implode(', ', array_filter(array_map('trim', $_POST['presales_sdm_multi']     ?? [])));
-    $proj_mgr  = $iips_data['project_manager'] ?? '';
+    $proj_mgr  = implode(', ', array_filter(array_map('trim', $_POST['project_manager_multi']  ?? [])));
 
-    // ── Validation ────────────────────────────────────────────────────────────
-    if (empty($p_name))    $errors[] = "IIPS Name is required.";
-    if (empty($c_name))    $errors[] = "Customer Name is required.";
-    if ($selling === null) $errors[] = "Selling Price is required.";
-    if ($partner === null) $errors[] = "Partner Cost is required.";
-    if ($tgt_md  === null) $errors[] = "Target Man-Days is required.";
-    if (!$tgt_sd)          $errors[] = "Target Start Date is required.";
-    if (!$tgt_ed)          $errors[] = "Target End Date is required.";
-    if (!$tgt_bd)          $errors[] = "Target Billing Date is required.";
-    if ($tgt_sd && $tgt_ed && $tgt_ed < $tgt_sd)  $errors[] = "Target End Date must be on or after Target Start Date.";
-    if ($tgt_ed && $tgt_bd && $tgt_bd < $tgt_ed)  $errors[] = "Target Billing Date must be on or after Target End Date.";
+    if (empty($p_name)) $errors['project_name'] = "⚠ IIPS Name is required.";
+    if (empty($c_name)) $errors['customer_name'] = "⚠ Customer Name is required.";
+    if ($selling !== null && $partner === null && $internal === null) {
+        $errors['cost'] = "⚠ Please fill in either Partner Cost or Internal Cost (or both).";
+    }
 
+    if ($tgt_sd && $tgt_ed && $tgt_ed < $tgt_sd)  $errors['ted'] = "⚠ Target End Date must be on or after Target Start Date.";
+    if ($tgt_ed && $tgt_bd && $tgt_bd < $tgt_ed)  $errors['tbd'] = "⚠ Target Billing Date must be on or after Target End Date.";
+
+    if (!$edit_mode && empty($errors)) {
+        $chk_id = $conn->prepare("SELECT project_id FROM projects WHERE project_id = ?");
+        $chk_id->bind_param("s", $p_id);
+        $chk_id->execute();
+        if ($chk_id->get_result()->num_rows > 0) {
+            $errors['project_id'] = "⚠ IIPS ID (".$p_id.") already exists. Please use a different ID.";
+        }
+        $chk_id->close();
+    }
 
     if (empty($errors)) {
         if ($edit_mode && !empty($old_pid)) {
@@ -76,7 +81,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $conn->query("SET FOREIGN_KEY_CHECKS=0");
 
-                // Update projects table (no estimate_time/pricing here)
                 $s = $conn->prepare("UPDATE projects SET project_id=?, project_name=?, customer_name=? WHERE project_id=?");
                 $s->bind_param("ssss", $p_id, $p_name, $c_name, $old_pid);
                 $s->execute(); $s->close();
@@ -89,41 +93,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $conn->query("SET FOREIGN_KEY_CHECKS=1");
 
-                // Upsert iips_tracking
                 $chk = $conn->prepare("SELECT id FROM iips_tracking WHERE project_id=?");
                 $chk->bind_param("s", $p_id); $chk->execute();
                 $exists = $chk->get_result()->num_rows > 0; $chk->close();
 
                 if ($exists) {
-                    $upd = $conn->prepare("UPDATE iips_tracking SET selling_price=?,partner_cost=?,internal_cost=?,gross_profit=?,has_project_mgmt=?,target_mandays=?,target_start_date=?,target_end_date=?,target_billing_date=?,iips_status=?,billing_status=?,account_manager=?,account_leader=?,presales_sdm=?,project_manager=? WHERE project_id=?");
-                    $upd->bind_param("ddddidssssssssss", $selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
+                    $upd = $conn->prepare("UPDATE iips_tracking SET selling_price=?,partner_cost=?,internal_cost=?,gross_profit=?,has_project_mgmt=?,target_mandays=?,target_start_date=?,target_end_date=?,target_billing_date=?,iips_status=?,billing_status=?,accrued=?,remarks_status=?,account_manager=?,account_leader=?,presales_sdm=?,project_manager=? WHERE project_id=?");
+                    $upd->bind_param("ddddidsssssdssssss", $selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$accrued,$remarks_status,$acc_mgr,$acc_ldr,$presales,$proj_mgr,$p_id);
                     $upd->execute(); $upd->close();
                 } else {
-                    $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,internal_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-                    $ins->bind_param("sddddidsssssssss", $p_id,$selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
+                    $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,internal_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,accrued,remarks_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                    $ins->bind_param("sddddidsssssdsssss", $p_id,$selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$accrued,$remarks_status,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
                     $ins->execute(); $ins->close();
                 }
                 $conn->commit();
                 header("Location: admin_iips.php"); exit;
             } catch(Exception $e) {
                 $conn->rollback();
-                $errors[] = "Database error: ".$e->getMessage();
+                $errors['general'] = "⚠ Database error: ".$e->getMessage();
             }
         } else {
-            // Insert new
             $est_time = 0;
             $pricing = null;
             $s = $conn->prepare("INSERT INTO projects (project_id,project_name,customer_name,estimate_time,pricing) VALUES (?,?,?,?,?)");
             $s->bind_param("sssid", $p_id,$p_name,$c_name,$est_time,$pricing); $s->execute(); $s->close();
-            $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,internal_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $ins->bind_param("sddddidsssssssss", $p_id,$selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
+            $ins = $conn->prepare("INSERT INTO iips_tracking (project_id,selling_price,partner_cost,internal_cost,gross_profit,has_project_mgmt,target_mandays,target_start_date,target_end_date,target_billing_date,iips_status,billing_status,accrued,remarks_status,account_manager,account_leader,presales_sdm,project_manager) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $ins->bind_param("sddddidsssssdsssss", $p_id,$selling,$partner,$internal,$gross,$has_pm,$tgt_md,$tgt_sd,$tgt_ed,$tgt_bd,$iips_stat,$bill_stat,$accrued,$remarks_status,$acc_mgr,$acc_ldr,$presales,$proj_mgr);
             $ins->execute(); $ins->close();
             header("Location: admin_iips.php"); exit;
         }
     }
 }
 
-// Pre-fill
 $v = [
     'project_id'          => $_POST['project_id']          ?? ($edit_data['project_id']    ?? ''),
     'project_name'        => $_POST['project_name']        ?? ($edit_data['project_name']  ?? ''),
@@ -131,17 +132,18 @@ $v = [
     'selling_price'       => $_POST['selling_price']       ?? ($iips_data['selling_price']  ?? ''),
     'partner_cost'        => $_POST['partner_cost']        ?? ($iips_data['partner_cost']   ?? ''),
     'internal_cost'       => $_POST['internal_cost']       ?? ($iips_data['internal_cost']  ?? ''),
-    'has_project_mgmt'    => ($_SERVER['REQUEST_METHOD'] === 'POST') ? (isset($_POST['has_project_mgmt']) ? 1 : 0) : ($iips_data['has_project_mgmt'] ?? 0),
     'target_mandays'      => $_POST['target_mandays']      ?? ($iips_data['target_mandays']      ?? ''),
     'target_start_date'   => $_POST['target_start_date']   ?? ($iips_data['target_start_date']   ?? ''),
     'target_end_date'     => $_POST['target_end_date']     ?? ($iips_data['target_end_date']     ?? ''),
     'target_billing_date' => $_POST['target_billing_date'] ?? ($iips_data['target_billing_date'] ?? ''),
     'iips_status'         => $_POST['iips_status']         ?? ($edit_mode ? ($iips_data['iips_status']    ?? '') : ''),
     'billing_status'      => $_POST['billing_status']      ?? ($edit_mode ? ($iips_data['billing_status'] ?? '') : ''),
+    'accrued'             => $_POST['accrued']             ?? ($iips_data['accrued'] ?? ''),
+    'remarks_status'      => $_POST['remarks_status']      ?? ($iips_data['remarks_status'] ?? ''),
     'account_manager'     => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['account_manager_multi'] ?? []))) : ($iips_data['account_manager'] ?? ''),
     'account_leader'      => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['account_leader_multi']  ?? []))) : ($iips_data['account_leader']  ?? ''),
     'presales_sdm'        => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['presales_sdm_multi']    ?? []))) : ($iips_data['presales_sdm']    ?? ''),
-    'project_manager'     => $_POST['project_manager']     ?? ($iips_data['project_manager'] ?? ''),
+    'project_manager'     => $_SERVER['REQUEST_METHOD']==='POST' ? implode(', ', array_filter(array_map('trim', $_POST['project_manager_multi'] ?? []))) : ($iips_data['project_manager'] ?? ''),
 ];
 ?>
 <!DOCTYPE html>
@@ -172,24 +174,16 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group label { font-size: 12px; font-weight: 700; color: #495057; }
 .req { color: #dc2626; }
-.form-group input, .form-group select {
+.form-group input, .form-group select, .form-group textarea {
     height: 38px; padding: 0 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; width: 100%;
 }
-.form-group input.err, .form-group select.err { border-color: #dc2626; }
-.form-group input:focus, .form-group select:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
-.hint { font-size: 11px; color: #6c757d; }
+.form-group textarea { resize: vertical; padding: 8px 10px; min-height: 38px; font-family: Arial, sans-serif; }
+.form-group input.err, .form-group select.err, .form-group textarea.err { border-color: #dc2626; background: #fff5f5; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
 
-.check-group { display: flex; align-items: center; gap: 10px; padding-top: 8px; }
-.check-group input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
-.check-group label { font-size: 13px; font-weight: 600; color: #333; margin: 0; cursor: pointer; }
-
-.gp-preview { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 0 10px; height: 38px; display: flex; align-items: center; font-size: 13px; font-weight: 700; }
-
-/* Errors */
-.error-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; }
-.error-box p { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #991b1b; }
-.error-box ul { margin: 0; padding-left: 18px; }
-.error-box ul li { font-size: 12px; color: #b91c1c; margin-bottom: 2px; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 .actions { display: flex; gap: 12px; margin-top: 4px; align-items: center; }
 .btn-save { background: #28a745; color: white; border: none; padding: 0 28px; height: 40px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; }
@@ -212,94 +206,91 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 
 <div class="page">
 
-    <?php if (!empty($errors)): ?>
-    <div class="error-box">
-        <p>⚠️ Please fix the following before saving:</p>
-        <ul><?php foreach($errors as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul>
-    </div>
+    <?php if (isset($errors['general'])): ?>
+        <div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:12px 16px; margin-bottom:20px; font-size:13px; font-weight:700; color:#991b1b;">
+            <?= htmlspecialchars($errors['general']) ?>
+        </div>
     <?php endif; ?>
 
-    <form method="POST">
+    <form method="POST" id="iips-form">
         <input type="hidden" name="old_project_id" value="<?= htmlspecialchars($edit_data['project_id'] ?? '') ?>">
 
-        <!-- Project Details -->
         <div class="section">
             <div class="section-hdr">📁 IIPS Details</div>
             <div class="section-body three-col">
                 <div class="form-group">
                     <label>IIPS ID</label>
-                    <input type="text" name="project_id" value="<?= htmlspecialchars($v['project_id']) ?>" placeholder="e.g. SO-0000123">
+                    <input type="text" name="project_id" id="project_id" value="<?= htmlspecialchars($v['project_id']) ?>" placeholder="e.g. SO-0000123" class="<?= isset($errors['project_id']) ? 'err' : '' ?>" oninput="clearErr('project_id')">
+                    <?php if (isset($errors['project_id'])): ?><div id="err-project_id" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['project_id'] ?></div><?php endif; ?>
                 </div>
                 <div class="form-group">
                     <label>IIPS Name <span class="req">*</span></label>
-                    <input type="text" name="project_name" value="<?= htmlspecialchars($v['project_name']) ?>" class="<?= in_array('Project Name is required.',$errors)?'err':'' ?>">
+                    <input type="text" name="project_name" id="project_name" value="<?= htmlspecialchars($v['project_name']) ?>" class="<?= isset($errors['project_name']) ? 'err' : '' ?>" oninput="clearErr('project_name')">
+                    <?php if (isset($errors['project_name'])): ?><div id="err-project_name" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['project_name'] ?></div><?php endif; ?>
                 </div>
                 <div class="form-group">
                     <label>Customer Name <span class="req">*</span></label>
-                    <input type="text" name="customer_name" value="<?= htmlspecialchars($v['customer_name']) ?>" class="<?= in_array('Customer Name is required.',$errors)?'err':'' ?>">
+                    <input type="text" name="customer_name" id="customer_name" value="<?= htmlspecialchars($v['customer_name']) ?>" class="<?= isset($errors['customer_name']) ? 'err' : '' ?>" oninput="clearErr('customer_name')">
+                    <?php if (isset($errors['customer_name'])): ?><div id="err-customer_name" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['customer_name'] ?></div><?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- IIPS Costing -->
         <div class="section">
             <div class="section-hdr green">💰 IIPS Costing</div>
             <div class="section-body three-col">
                 <div class="form-group">
-                    <label>Selling Price (RM) <span class="req">*</span></label>
-                    <input type="number" name="selling_price" id="sp" step="0.01" min="0" value="<?= htmlspecialchars($v['selling_price']) ?>" oninput="calcGP()" class="<?= in_array('Selling Price is required.',$errors)?'err':'' ?>">
+                    <label>Selling Price (RM)</label>
+                    <input type="number" name="selling_price" id="sp" step="0.01" min="0" value="<?= htmlspecialchars($v['selling_price']) ?>"oninput="clearCostErr()">
                 </div>
                 <div class="form-group">
-                    <label>Partner Cost (RM) <span class="req">*</span></label>
-                    <input type="number" name="partner_cost" id="pc" step="0.01" min="0" value="<?= htmlspecialchars($v['partner_cost']) ?>" oninput="calcGP()" class="<?= in_array('Partner Cost is required.',$errors)?'err':'' ?>">
+                    <label>Partner Cost (RM)</label>
+                    <input type="number" name="partner_cost" id="pc" step="0.01" min="0" value="<?= htmlspecialchars($v['partner_cost']) ?>"oninput="clearCostErr()" class="<?= isset($errors['cost']) ? 'err' : '' ?>">
                 </div>
                 <div class="form-group">
-                    <label>Internal Cost (RM)</label>
-                    <input type="number" name="internal_cost" id="ic" step="0.01" min="0" value="<?= htmlspecialchars($v['internal_cost']) ?>" placeholder="0.00">
-                </div>
-                <div class="check-group" style="align-self:center; padding-top:20px;">
-                    <input type="checkbox" name="has_project_mgmt" id="has_pm" <?= $v['has_project_mgmt'] ? 'checked' : '' ?>>
-                    <label for="has_pm">Project Management Included</label>
+                    <label>Internal Cost (RM)<label>
+                    <input type="number" name="internal_cost" id="ic" step="0.01" min="0" value="<?= htmlspecialchars($v['internal_cost']) ?>" oninput="clearCostErr()" class="<?= isset($errors['cost']) ? 'err' : '' ?>">
+                    <?php if (isset($errors['cost'])): ?><div id="err-cost" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['cost'] ?></div><?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- IIPS Timeline -->
         <div class="section">
             <div class="section-hdr blue">📅 IIPS Timeline — Target</div>
             <div class="section-body">
                 <div class="form-group">
-                    <label>Target Man-Days (hrs) <span class="req">*</span></label>
-                    <input type="number" name="target_mandays" step="0.5" min="0" value="<?= htmlspecialchars($v['target_mandays']) ?>" class="<?= in_array('Target Man-Days is required.',$errors)?'err':'' ?>">
+                    <label>Target Man-Days (days)</label>
+                    <input type="number" name="target_mandays" step="0.5" min="0" value="<?= htmlspecialchars($v['target_mandays']) ?>">
                 </div>
                 <div class="form-group">
-                    <label>Target Billing Date <span class="req">*</span></label>
+                    <label>Target Billing Date<label>
                     <div style="position:relative; height:38px; width:100%; display:flex;">
-                        <input type="text" id="tbd_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_billing_date'])) ?>" class="<?= in_array('Target Billing Date is required.',$errors)?'err':'' ?>">
+                        <input type="text" id="tbd_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_billing_date'])) ?>" class="<?= isset($errors['tbd']) ? 'err' : '' ?>">
                         <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('tbd_val').showPicker()">📅</div>
                         <input type="date" name="target_billing_date" id="tbd_val" value="<?= htmlspecialchars($v['target_billing_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('tbd')">
                     </div>
+                    <?php if (isset($errors['tbd'])): ?><div id="err-tbd" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['tbd'] ?></div><?php endif; ?>
                 </div>
                 <div class="form-group">
-                    <label>Target Start Date <span class="req">*</span></label>
+                    <label>Target Start Date</label>
                     <div style="position:relative; height:38px; width:100%; display:flex;">
-                        <input type="text" id="tsd_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_start_date'])) ?>" class="<?= in_array('Target Start Date is required.',$errors)?'err':'' ?>">
+                        <input type="text" id="tsd_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_start_date'])) ?>">
                         <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('tsd_val').showPicker()">📅</div>
                         <input type="date" name="target_start_date" id="tsd_val" value="<?= htmlspecialchars($v['target_start_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('tsd')">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Target End Date <span class="req">*</span></label>
+                    <label>Target End Date</label>
                     <div style="position:relative; height:38px; width:100%; display:flex;">
-                        <input type="text" id="ted_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_end_date'])) ?>" class="<?= in_array('Target End Date is required.',$errors)?'err':'' ?>">
+                        <input type="text" id="ted_display" placeholder="DD MMM YYYY" oninput="liveDate(this)" style="flex:1;height:100%;padding:8px 36px 8px 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;text-transform:uppercase;" autocomplete="off" value="<?= htmlspecialchars(fmtDateDisplay($v['target_end_date'])) ?>" class="<?= isset($errors['ted']) ? 'err' : '' ?>">
                         <div style="position:absolute;right:0;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;" onclick="document.getElementById('ted_val').showPicker()">📅</div>
                         <input type="date" name="target_end_date" id="ted_val" value="<?= htmlspecialchars($v['target_end_date']) ?>" style="position:absolute;top:0;right:0;width:36px;height:100%;opacity:0;cursor:pointer;z-index:5;" onchange="syncDate('ted')">
                     </div>
+                    <?php if (isset($errors['ted'])): ?><div id="err-ted" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['ted'] ?></div><?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Status -->
         <div class="section">
             <div class="section-hdr teal">📊 Status</div>
             <div class="section-body">
@@ -321,10 +312,17 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Accrued (RM)</label>
+                    <input type="number" name="accrued" id="accrued" step="0.01" min="0" value="<?= htmlspecialchars($v['accrued']) ?>">
+                </div>
+                <div class="form-group">
+                    <label>Remarks Status</label>
+                    <textarea name="remarks_status" rows="1"><?= htmlspecialchars($v['remarks_status']) ?></textarea>
+                </div>
             </div>
         </div>
 
-        <!-- Resources -->
         <div class="section">
             <div class="section-hdr purple">👥 IIPS Management <span style="font-weight:400; font-size:11px; opacity:.7;">(optional)</span></div>
             <div class="section-body">
@@ -364,6 +362,18 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
                     </div>
                     <button type="button" onclick="addName('presales-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button>
                 </div>
+                <div class="form-group">
+                    <label>Project Manager</label>
+                    <div id="project-mgr-list">
+                        <?php $pm_names = array_filter(array_map('trim', explode(',', $v['project_manager']))); if(empty($pm_names)) $pm_names = ['']; foreach($pm_names as $i => $n): ?>
+                        <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
+                            <input type="text" name="project_manager_multi[]" value="<?= htmlspecialchars($n) ?>" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;">
+                            <button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?= $i===0?'visibility:hidden':''; ?>">×</button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="button" onclick="addName('project-mgr-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button>
+                </div>
             </div>
         </div>
 
@@ -373,7 +383,12 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             const div = document.createElement('div');
             div.className = 'multi-name-row';
             div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
-            const nameMap = { 'acc-mgr-list':'account_manager_multi[]', 'acc-ldr-list':'account_leader_multi[]', 'presales-list':'presales_sdm_multi[]' };
+            const nameMap = { 
+                'acc-mgr-list': 'account_manager_multi[]', 
+                'acc-ldr-list': 'account_leader_multi[]', 
+                'presales-list': 'presales_sdm_multi[]',
+                'project-mgr-list': 'project_manager_multi[]'
+            };
             div.innerHTML = `<input type="text" name="${nameMap[listId]}" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid #ced4da;border-radius:4px;font-size:13px;"><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;">×</button>`;
             list.appendChild(div);
             div.querySelector('input').focus();
@@ -382,7 +397,6 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             const row = btn.closest('.multi-name-row');
             const list = row.parentElement;
             row.remove();
-            // Ensure first row delete button is hidden
             const rows = list.querySelectorAll('.multi-name-row');
             if (rows.length > 0) {
                 rows[0].querySelector('button').style.visibility = rows.length === 1 ? 'hidden' : 'visible';
@@ -398,18 +412,50 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 </div>
 
 <script>
-function calcGP() {
-    // GP is calculated automatically in the IIPS List table — nothing shown in this form
+function clearErr(id) {
+    const el = document.getElementById(id);
+    if(el) {
+        el.classList.remove('err');
+        el.style.background = '';
+    }
+    const errNode = document.getElementById('err-' + id);
+    if (errNode) errNode.remove();
+}
+
+function triggerErr(id, msg) {
+    const el = document.getElementById(id);
+    if(el) {
+        el.classList.add('err');
+        let errNode = document.getElementById('err-' + id);
+        if (!errNode) {
+            errNode = document.createElement('div');
+            errNode.id = 'err-' + id;
+            errNode.style.cssText = 'color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;';
+            el.parentNode.appendChild(errNode);
+        }
+        errNode.textContent = msg;
+        return el;
+    }
+    return null;
+}
+
+function clearCostErr() {
+    const sp = document.getElementById('sp');
+    const pc = document.getElementById('pc');
+    const ic = document.getElementById('ic');
+    if (sp.value.trim() === '' || pc.value.trim() !== '' || ic.value.trim() !== '') {
+        pc.classList.remove('err');
+        ic.classList.remove('err');
+        const err = document.getElementById('err-cost');
+        if (err) err.remove();
+    }
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/imask@7/dist/imask.min.js"></script>
 <script>
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function liveDate(inp) {
-    // Just uppercase — parsing happens on blur
     inp.value = inp.value.toUpperCase();
 }
 
@@ -435,7 +481,6 @@ function validateDateOrder() {
     const tedDisplay = document.getElementById('ted_display');
     const tbdDisplay = document.getElementById('tbd_display');
 
-    // Target End must be >= Target Start
     if (sd && ed && ed < sd) {
         tedDisplay.style.borderColor = '#dc3545';
         tedDisplay.style.background  = '#fff5f5';
@@ -446,7 +491,6 @@ function validateDateOrder() {
         clearDateError('ted');
     }
 
-    // Target Billing must be >= Target End
     if (ed && bd && bd < ed) {
         tbdDisplay.style.borderColor = '#dc3545';
         tbdDisplay.style.background  = '#fff5f5';
@@ -524,21 +568,59 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDateField(p);
     });
 
-    document.querySelector('form').addEventListener('submit', function(e) {
+    document.getElementById('iips-form').addEventListener('submit', function(e) {
+        let firstErr = null;
+
+        const pName = document.getElementById('project_name');
+        if (pName.value.trim() === '') {
+            e.preventDefault();
+            const el = triggerErr('project_name', '⚠ IIPS Name is required.');
+            if (!firstErr) firstErr = el;
+        }
+
+        const cName = document.getElementById('customer_name');
+        if (cName.value.trim() === '') {
+            e.preventDefault();
+            const el = triggerErr('customer_name', '⚠ Customer Name is required.');
+            if (!firstErr) firstErr = el;
+        }
+
+        const sp = document.getElementById('sp');
+        const pc = document.getElementById('pc');
+        const ic = document.getElementById('ic');
+        if (sp.value.trim() !== '' && pc.value.trim() === '' && ic.value.trim() === '') {
+            e.preventDefault();
+            pc.classList.add('err');
+            ic.classList.add('err');
+            let errNode = document.getElementById('err-cost');
+            if (!errNode) {
+                errNode = document.createElement('div');
+                errNode.id = 'err-cost';
+                errNode.style.cssText = 'color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;';
+                ic.parentNode.appendChild(errNode);
+            }
+            errNode.textContent = '⚠ Please fill in either Partner Cost or Internal Cost (or both).';
+            if (!firstErr) firstErr = pc;
+        }
+
         const sd = document.getElementById('tsd_val').value;
         const ed = document.getElementById('ted_val').value;
         const bd = document.getElementById('tbd_val').value;
         if (sd && ed && ed < sd) {
             e.preventDefault();
             showDateError('ted', '⚠ End Date must be on or after Start Date');
-            document.getElementById('ted_display').scrollIntoView({behavior:'smooth', block:'center'});
-            return;
+            document.getElementById('ted_display').classList.add('err');
+            if (!firstErr) firstErr = document.getElementById('ted_display');
         }
         if (ed && bd && bd < ed) {
             e.preventDefault();
             showDateError('tbd', '⚠ Billing Date must be on or after End Date');
-            document.getElementById('tbd_display').scrollIntoView({behavior:'smooth', block:'center'});
-            return;
+            document.getElementById('tbd_display').classList.add('err');
+            if (!firstErr) firstErr = document.getElementById('tbd_display');
+        }
+
+        if (firstErr) {
+            firstErr.scrollIntoView({behavior:'smooth', block:'center'});
         }
     });
 });

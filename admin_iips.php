@@ -56,6 +56,7 @@ $result = $conn->query("
         p.*,
         i.id            AS iips_id,
         i.selling_price, i.partner_cost, i.internal_cost, i.gross_profit,
+        i.accrued, i.remarks_status,
         i.has_project_mgmt,
         i.target_mandays, i.target_start_date, i.target_end_date,
         i.target_billing_date,
@@ -219,12 +220,10 @@ sort($actual_end_years);
     table { width: 100%; border-collapse: collapse; min-width: 1850px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
     th { font-weight: bold; color: #495057; background: #f8f9fa; }
-    tbody tr:hover { background: #f8faff; }
     .sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); position: sticky; top: 0; z-index: 22; }
     thead tr:last-child th { position: sticky; top: 27px; z-index: 21; background: #f8f9fa; box-shadow: 0 2px 0 #dee2e6; }
     
     .chk-col { width: 36px; position: sticky; left: 0; z-index: 23; background: #ffffff; border-right: 1px solid #dee2e6; }
-    tbody tr:hover td.chk-col { background: #f8faff; }
     tbody tr td.chk-col { background: #ffffff; }
     thead tr:last-child th.chk-col { z-index: 25; background: #f8f9fa; }
     thead tr.sec-row th.chk-col { z-index: 26; background: #343a40; }
@@ -236,10 +235,22 @@ sort($actual_end_years);
     .s-status  { background: #6a1b4d; }
     .s-res     { background: #4a235a; }
     .s-act     { background: #343a40; width: 90px; }
-    .bg-manual   { background: #fffbf0; }
-    .bg-auto     { background: #f0fdf4; color: #065f46; }
-    .bg-calc     { background: #eff6ff; }
-    .bg-dropdown { background: #fdf4ff; }
+
+    .bg-c-base { background: #f8f9fa; }
+    .bg-c-cost { background: #eafaf1; } 
+    .bg-c-tgt  { background: #e8eaf6; }  
+    .bg-c-act  { background: #e0f2f1; }  
+    .bg-c-stat { background: #fce4ec; } 
+    .bg-c-res  { background: #f3e5f5; }  
+    
+    tbody tr:hover td.chk-col   { background: #f8faff; }
+    tbody tr:hover td.bg-c-base { background: #f1f3f5; }
+    tbody tr:hover td.bg-c-cost { background: #d4f5e1; }
+    tbody tr:hover td.bg-c-tgt  { background: #c5cae9; }
+    tbody tr:hover td.bg-c-act  { background: #b2dfdb; }
+    tbody tr:hover td.bg-c-stat { background: #f8bbd0; }
+    tbody tr:hover td.bg-c-res  { background: #e1bee7; }
+
     .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
     .b-nq   { background:#f1f5f9; color:#475569; }
     .b-q    { background:#dbeafe; color:#1e40af; }
@@ -251,13 +262,6 @@ sort($actual_end_years);
     .b-fc   { background:#dbeafe; color:#1e40af; }
     .b-pend { background:#fef9c3; color:#854d0e; }
     .b-bdc  { background:#166534; color:white; }
-    .tog { display: inline-flex; align-items: center; gap: 5px; }
-    .tog-track { width: 30px; height: 16px; background: #d1d5db; border-radius: 8px; position: relative; }
-    .tog-track.on { background: #28a745; }
-    .tog-thumb { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: white; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
-    .tog-track.on .tog-thumb { transform: translateX(14px); }
-    .tog-lbl { font-size: 11px; font-weight: 700; color: #6b7280; }
-    .tog-lbl.yes { color: #166534; }
     td:last-child { white-space: nowrap; }
     .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; }
     .btn-del  { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; }
@@ -285,7 +289,6 @@ sort($actual_end_years);
     .page-scroll-wrap::-webkit-scrollbar { height: 6px; }
     .page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
-    .empty-placeholder-row td { height: 62px; padding: 0 !important; border-bottom: 1px solid #dee2e6; background: #fff !important; pointer-events: none; }
 
     @media (max-width: 600px) {
         body { margin: 10px; }
@@ -362,6 +365,9 @@ sort($actual_end_years);
                 <input type="date" id="filter-actual-end-hidden" onchange="syncFilterDate('actual-end')">
             </div>
             <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                <button type="button" class="btn-adv-toggle" id="btn-inverse-filter" onclick="toggleInverse()">
+                    🔄 Exclude Selected
+                </button>
                 <button type="button" class="btn-adv-toggle" id="adv-toggle-btn" onclick="toggleAdvFilters()">
                     Advanced <span class="arr" id="adv-arr">▾</span><span class="active-filter-count" id="adv-count" style="display:none">0</span>
                 </button>
@@ -379,6 +385,7 @@ sort($actual_end_years);
                         <label><input type="checkbox" value="in_progress" onchange="applyFilters()"> In Progress</label>
                         <label><input type="checkbox" value="completed"   onchange="applyFilters()"> Completed</label>
                         <label><input type="checkbox" value="cancelled"   onchange="applyFilters()"> Cancelled</label>
+                        <label><input type="checkbox" value="iips_none"   onchange="applyFilters()"> No Status</label>
                     </div>
                 </div>
                 <div class="adv-group">
@@ -388,6 +395,9 @@ sort($actual_end_years);
                         <label><input type="checkbox" value="billing_fc"      onchange="applyFilters()"> Forecasted</label>
                         <label><input type="checkbox" value="billing_pending" onchange="applyFilters()"> Pending</label>
                         <label><input type="checkbox" value="billing_done"    onchange="applyFilters()"> Completed</label>
+                        <label><input type="checkbox" value="billing_none"    onchange="applyFilters()"> No Status</label>
+                        <label><input type="checkbox" value="accrued_got"     onchange="applyFilters()"> Got Accrued</label>
+                        <label><input type="checkbox" value="accrued_no"      onchange="applyFilters()"> No Accrued</label>
                     </div>
                 </div>
                 <div class="adv-group">
@@ -400,11 +410,12 @@ sort($actual_end_years);
                 <div class="adv-group">
                     <span class="adv-group-label">IIPS Costing</span>
                     <div class="filter-cats">
-                        <label><input type="checkbox" value="cost_sp_only" onchange="applyFilters()"> Selling Price Only</label>
                         <label><input type="checkbox" value="cost_pc_only" onchange="applyFilters()"> Partner Cost Only</label>
+                        <label><input type="checkbox" value="cost_ic_only" onchange="applyFilters()"> Internal Cost Only</label>
                         <label><input type="checkbox" value="cost_empty"   onchange="applyFilters()"> Empty</label>
-                        <label><input type="checkbox" value="has_ic" onchange="applyFilters()"> Has Internal Cost</label>
-                        <label><input type="checkbox" value="no_ic"  onchange="applyFilters()"> No Internal Cost</label>
+                        <label><input type="checkbox" value="no_sp"        onchange="applyFilters()"> No Selling Price</label>
+                        <label><input type="checkbox" value="no_pc"        onchange="applyFilters()"> No Partner Cost</label>
+                        <label><input type="checkbox" value="no_ic"        onchange="applyFilters()"> No Internal Cost</label>
                     </div>
                 </div>
                 <div class="adv-group">
@@ -413,6 +424,7 @@ sort($actual_end_years);
                         <label><input type="checkbox" value="tgt_yes"     onchange="applyFilters()"> Yes</label>
                         <label><input type="checkbox" value="tgt_partial" onchange="applyFilters()"> Partial</label>
                         <label><input type="checkbox" value="tgt_no"      onchange="applyFilters()"> No</label>
+                        <label><input type="checkbox" value="tgt_no_md"   onchange="applyFilters()"> No Man-Day</label>
                     </div>
                 </div>
                 <div class="adv-group">
@@ -452,10 +464,10 @@ sort($actual_end_years);
                         <tr class="sec-row">
                             <th class="chk-col s-base" rowspan="2" style="z-index:25;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
                             <th class="s-base"    colspan="3">IIPS Details</th>
-                            <th class="s-costing" colspan="7">IIPS Costing</th>
+                            <th class="s-costing" colspan="6">IIPS Costing</th>
                             <th class="s-timeline" colspan="3">Target Timeline</th>
                             <th class="s-actual"   colspan="3">Actual Timeline</th>
-                            <th class="s-status"   colspan="3">Status</th>
+                            <th class="s-status"   colspan="5">Status</th>
                             <th class="s-res"      colspan="6">Resources</th>
                             <th class="s-act" rowspan="2">Actions</th>
                         </tr>
@@ -469,34 +481,50 @@ sort($actual_end_years);
                             <th><div class="sort-wrap">Internal Cost (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ic')"></button><div id="s-ic" class="sort-menu"><a href="#" onclick="sortT(7,'num',0);return false;">Default</a><a href="#" onclick="sortT(7,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(7,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Actual GP (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(8,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">GP %<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gppct')"></button><div id="s-gppct" class="sort-menu"><a href="#" onclick="sortT(9,'num',0);return false;">Default</a><a href="#" onclick="sortT(9,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(9,'num',2);return false;">High → Low</a></div></div></th>
-                            <th><div class="sort-wrap">Project Mgmt<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pm')"></button><div id="s-pm" class="sort-menu"><a href="#" onclick="filterCol('pm','');return false;">Default (All)</a><a href="#" onclick="filterCol('pm','1');return false;">Yes</a><a href="#" onclick="filterCol('pm','0');return false;">No</a></div></div></th>
-                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(11,'num',0);return false;">Default</a><a href="#" onclick="sortT(11,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(11,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(10,'num',0);return false;">Default</a><a href="#" onclick="sortT(10,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(10,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Target Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu"><a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a><?php foreach ($target_start_years as $y): ?><a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Target End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu"><a href="#" onclick="filterCol('ted-year','');return false;">All Years</a><?php foreach ($target_end_years as $y): ?><a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(14,'num',0);return false;">Default</a><a href="#" onclick="sortT(14,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(14,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(13,'num',0);return false;">Default</a><a href="#" onclick="sortT(13,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(13,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Actual Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu"><a href="#" onclick="filterCol('asd-year','');return false;">All Years</a><?php foreach ($actual_start_years as $y): ?><a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Actual End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu"><a href="#" onclick="filterCol('aed-year','');return false;">All Years</a><?php foreach ($actual_end_years as $y): ?><a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">IIPS Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
                             <th><div class="sort-wrap">Target Billing Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Billing Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
-                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Project Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(23,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(23,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(23,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(24,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(24,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(24,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(25,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(25,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(25,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Accrued (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-acc')"></button><div id="s-acc" class="sort-menu"><a href="#" onclick="sortT(19,'num',0);return false;">Default</a><a href="#" onclick="sortT(19,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(19,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Remarks<button type="button" class="sort-btn" onclick="toggleSort(event,'s-rem')"></button><div id="s-rem" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(23,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(23,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(23,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Project Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(24,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(24,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(24,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(25,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(25,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(25,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(26,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(26,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(26,'alpha',2);return false;">Z → A</a></div></div></th>
                         </tr>
                     </thead>
                     <tbody>
-                    <tr id="empty-row" class="is-hidden"><td colspan="27" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
+                    <tr id="empty-row" class="is-hidden"><td colspan="28" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
                     <?php if (!empty($rows)): foreach ($rows as $r):
                         $pid_display = fmtPid($r['project_id']);
                         $sp_raw = $r['selling_price'];
                         $pc_raw = $r['partner_cost'];
                         $ic_raw = $r['internal_cost'];
-                        $gp_wo  = ($sp_raw !== null && $pc_raw !== null) ? floatval($sp_raw) - floatval($pc_raw) : null;
-                        $gp     = ($gp_wo !== null) ? $gp_wo - floatval($ic_raw ?? 0) : null;
-                        $gp_pct = ($gp !== null && floatval($sp_raw) > 0) ? ($gp / floatval($sp_raw)) * 100 : null;
+                        
+                        $gp_wo = null;
+                        $gp = null;
+                        $gp_pct = null;
+                        
+                        if ($sp_raw !== null && strlen(trim((string)$sp_raw)) > 0) {
+                            $sp_val = floatval($sp_raw);
+                            $pc_val = floatval($pc_raw ?? 0);
+                            $ic_val = floatval($ic_raw ?? 0);
+                            
+                            $gp_wo = $sp_val - $pc_val;
+                            $gp = $sp_val - $pc_val - $ic_val;
+                            
+                            if ($sp_val > 0) {
+                                $gp_pct = ($gp / $sp_val) * 100;
+                            }
+                        }
+
                         $gp_wo_color = ($gp_wo ?? 0) > 0 ? '#166534' : (($gp_wo ?? 0) < 0 ? '#dc2626' : '#6b7280');
                         $gp_color    = ($gp ?? 0) > 0 ? '#166534' : (($gp ?? 0) < 0 ? '#dc2626' : '#6b7280');
 
@@ -506,18 +534,26 @@ sort($actual_end_years);
                         $pm_display = $r['project_manager'] ?: null;
                         $partner_display = $r['partner'] ?: null;
 
-                        $sp = floatval($r['selling_price'] ?? 0);
-                        $pc = floatval($r['partner_cost'] ?? 0);
-                        $cost_state = 'both';
-                        if ($sp > 0 && $pc <= 0) $cost_state = 'cost_sp_only';
-                        elseif ($pc > 0 && $sp <= 0) $cost_state = 'cost_pc_only';
-                        elseif ($sp <= 0 && $pc <= 0) $cost_state = 'cost_empty';
+                        $sp_chk = floatval($r['selling_price'] ?? 0);
+                        $pc_chk = floatval($r['partner_cost'] ?? 0);
+                        $ic_chk = floatval($r['internal_cost'] ?? 0);
+                        
+                        $cost_state = '';
+                        if ($sp_chk <= 0 && $pc_chk <= 0 && $ic_chk <= 0) $cost_state = 'cost_empty';
+                        elseif ($pc_chk > 0 && $sp_chk <= 0 && $ic_chk <= 0) $cost_state = 'cost_pc_only';
+                        elseif ($ic_chk > 0 && $sp_chk <= 0 && $pc_chk <= 0) $cost_state = 'cost_ic_only';
+
+                        $has_no_sp = ($r['selling_price'] === null || $sp_chk <= 0) ? '1' : '0';
+                        $has_no_pc = ($r['partner_cost'] === null || $pc_chk <= 0) ? '1' : '0';
+                        $has_no_ic = ($r['internal_cost'] === null || $ic_chk <= 0) ? '1' : '0';
 
                         $has_t_start = !empty($r['target_start_date']);
                         $has_t_end = !empty($r['target_end_date']);
                         $tgt_state = 'tgt_no';
                         if ($has_t_start && $has_t_end) $tgt_state = 'tgt_yes';
                         elseif ($has_t_start || $has_t_end) $tgt_state = 'tgt_partial';
+                        
+                        $tgt_no_md = (empty($r['target_mandays']) || floatval($r['target_mandays']) <= 0) ? '1' : '0';
 
                         $has_a_start = !empty($r['ts_start']);
                         $has_a_end = !empty($r['ts_end']);
@@ -525,17 +561,22 @@ sort($actual_end_years);
                         if ($has_a_start && $has_a_end) $act_state = 'act_yes';
                         elseif ($has_a_start || $has_a_end) $act_state = 'act_partial';
 
+                        $iips_none = empty($r['iips_status']) ? '1' : '0';
+                        $billing_none = empty($r['billing_status']) ? '1' : '0';
+
                         $search_str = strtolower(implode(' ', [
                             $r['project_id'], $r['project_name'], $r['customer_name'],
                             $r['account_manager'], $r['account_leader'], $r['presales_sdm'],
-                            $pm_display, $r['ts_engineers'], $partner_display
+                            $pm_display, $r['ts_engineers'], $partner_display,
+                            $r['remarks_status'] ?? ''
                         ]));
                     ?>
                     <tr data-pid="<?= htmlspecialchars($r['project_id']) ?>"
                         data-search="<?= htmlspecialchars($search_str) ?>"
                         data-iips-status="<?= htmlspecialchars($r['iips_status'] ?? '') ?>"
                         data-billing-status="<?= htmlspecialchars($r['billing_status'] ?? '') ?>"
-                        data-has-pm="<?= intval($r['has_project_mgmt'] ?? 0) ?>"
+                        data-iips-none="<?= $iips_none ?>"
+                        data-billing-none="<?= $billing_none ?>"
                         data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
                         data-ts-end="<?= htmlspecialchars($r['ts_end'] ?? '') ?>"
                         data-target-start="<?= htmlspecialchars($r['target_start_date'] ?? '') ?>"
@@ -547,7 +588,11 @@ sort($actual_end_years);
                         data-asd-year="<?= $r['ts_start']            ? date('Y', strtotime($r['ts_start']))            : '' ?>"
                         data-aed-year="<?= $r['ts_end']              ? date('Y', strtotime($r['ts_end']))              : '' ?>"
                         data-cost-state="<?= $cost_state ?>"
-                        data-has-ic="<?= ($ic_raw !== null && floatval($ic_raw) > 0) ? '1' : '0' ?>"
+                        data-no-sp="<?= $has_no_sp ?>"
+                        data-no-pc="<?= $has_no_pc ?>"
+                        data-no-ic="<?= $has_no_ic ?>"
+                        data-tgt-no-md="<?= $tgt_no_md ?>"
+                        data-has-accrued="<?= ($r['accrued'] !== null && floatval($r['accrued']) > 0) ? '1' : '0' ?>"
                         data-tgt-state="<?= $tgt_state ?>"
                         data-act-state="<?= $act_state ?>"
                         data-has-acc-mgr="<?= !empty($r['account_manager']) ? '1' : '0' ?>"
@@ -559,42 +604,40 @@ sort($actual_end_years);
                         data-billing-fc="<?= ($r['billing_status'] ?? '') === 'Forecasted' ? '1' : '0' ?>"
                         data-billing-nf="<?= ($r['billing_status'] ?? '') === 'Not Forecasted' ? '1' : '0' ?>">
                         <td class="chk-col"><input type="checkbox" class="iips-chk" name="selected_iips[]" value="<?= htmlspecialchars($r['project_id']) ?>" onchange="onChkChange()"></td>
-                        <td><code style="font-size:12px;"><?= $pid_display ?></code></td>
-                        <td><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
-                        <td style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
-                        <td class="bg-manual"><?= $r['selling_price'] !== null ? 'RM '.number_format($r['selling_price'],2) : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-manual"><?= $r['partner_cost']  !== null ? 'RM '.number_format($r['partner_cost'],2)  : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_wo_color ?>"><?= $gp_wo !== null ? 'RM '.number_format($gp_wo,2) : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-manual"><?= $ic_raw !== null ? 'RM '.number_format($ic_raw,2) : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp !== null ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-calc" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp_pct !== null ? number_format($gp_pct,1).'%' : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-manual">
-                            <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
-                            <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
-                        </td>
-                        <td class="bg-manual"><?php if ($r['target_mandays']) { $td_total_mins = round(floatval($r['target_mandays']) * 8 * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m'; } else { echo '<span class="dash">—</span>'; } ?></td>
-                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
-                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
-                        <td class="bg-auto"><span class="auto-val"><?= $r['ts_minutes'] > 0 ? fmtMins($r['ts_minutes']) : '<span class="dash">—</span>' ?></span></td>
-                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?= $r['ts_start'] ? fmtDate($r['ts_start']) : '<span class="dash">—</span>' ?></span></td>
-                        <td class="bg-auto" style="white-space:nowrap;"><span class="auto-val"><?php if (($r['iips_status'] ?? '') === 'Completed'): ?><?= $r['ts_end'] ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?><?php else: ?><span class="dash">—</span><?php endif; ?></span></td>
-                        <td class="bg-dropdown"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
-                        <td class="bg-manual"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
-                        <td class="bg-dropdown"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
-                        <td><?php
+                        <td class="bg-c-base"><code style="font-size:12px;"><?= $pid_display ?></code></td>
+                        <td class="bg-c-base"><strong><?= htmlspecialchars($r['project_name']) ?></strong></td>
+                        <td class="bg-c-base" style="font-size:12px;"><?= htmlspecialchars($r['customer_name']) ?></td>
+                        <td class="bg-c-cost"><?= $r['selling_price'] !== null ? 'RM '.number_format($r['selling_price'],2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-cost"><?= $r['partner_cost']  !== null ? 'RM '.number_format($r['partner_cost'],2)  : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-cost" style="font-weight:700; color:<?= $gp_wo_color ?>"><?= $gp_wo !== null ? 'RM '.number_format($gp_wo,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-cost"><?= $r['internal_cost'] !== null ? 'RM '.number_format($r['internal_cost'],2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-cost" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp !== null ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-cost" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp_pct !== null ? number_format($gp_pct,1).'%' : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-tgt"><?php if ($r['target_mandays']) { $tgt_d = floatval($r['target_mandays']); $td_total_mins = round($tgt_d * 8 * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m ('.round($tgt_d, 2).' man-days)'; } else { echo '<span class="dash">—</span>'; } ?></td>
+                        <td class="bg-c-tgt" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-c-tgt" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-c-act"><span class="auto-val"><?php if ($r['ts_minutes'] > 0) { $am_mins = intval($r['ts_minutes']); $am_h = floor($am_mins / 60); $am_m = $am_mins % 60; $act_d = $am_mins / (8 * 60); echo $am_h.'h '.$am_m.'m ('.round($act_d, 2).' man-days)'; } else { echo '<span class="dash">—</span>'; } ?></span></td>
+                        <td class="bg-c-act" style="white-space:nowrap;"><span class="auto-val"><?= $r['ts_start'] ? fmtDate($r['ts_start']) : '<span class="dash">—</span>' ?></span></td>
+                        <td class="bg-c-act" style="white-space:nowrap;"><span class="auto-val"><?php if (($r['iips_status'] ?? '') === 'Completed'): ?><?= $r['ts_end'] ? fmtDate($r['ts_end']) : '<span class="dash">—</span>' ?><?php else: ?><span class="dash">—</span><?php endif; ?></span></td>
+                        <td class="bg-c-stat"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
+                        <td class="bg-c-stat"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-stat"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
+                        <td class="bg-c-stat"><?= $r['accrued'] !== null ? 'RM '.number_format($r['accrued'],2) : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-stat"><?= htmlspecialchars($r['remarks_status'] ?? '') ?: '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-res"><?php
                             $names = cleanNames($r['account_manager']);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                        <td><?php
+                        <td class="bg-c-res"><?php
                             $names = cleanNames($r['account_leader']);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                        <td><?php
+                        <td class="bg-c-res"><?php
                             $names = cleanNames($r['presales_sdm']);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                        <td><?php
+                        <td class="bg-c-res"><?php
                             $names = cleanNames($pm_display);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                        <td class="bg-auto"><?php if ($r['ts_engineers']): ?><ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;"><?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?><li><?= htmlspecialchars(trim($eng)) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                        <td><?php
+                        <td class="bg-c-res"><?php if ($r['ts_engineers']): ?><ul style="margin:0; padding-left:16px; font-size:11px; color:#065f46; line-height:1.8;"><?php foreach (explode(', ', $r['ts_engineers']) as $eng): ?><li><?= htmlspecialchars(trim($eng)) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
+                        <td class="bg-c-res"><?php
                             $names = cleanNames($partner_display);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
                         <td><a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a><a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a></td>
@@ -618,7 +661,6 @@ let currentFilteredRows = [];
 function goToPage(p) {
     currentPage = p;
     renderPagination(currentFilteredRows);
-    document.getElementById('chk-all').checked = false;
     onChkChange();
 }
 
@@ -646,17 +688,6 @@ function renderPagination(rows) {
     });
 
     const tbody = document.querySelector('#main-table tbody');
-    document.querySelectorAll('.empty-placeholder-row').forEach(e => e.remove());
-    
-    if (visibleCount > 0 && visibleCount < rowsPerPage) {
-        const cols = 27;
-        for (let i = visibleCount; i < rowsPerPage; i++) {
-            const tr = document.createElement('tr');
-            tr.className = 'empty-placeholder-row';
-            tr.innerHTML = `<td colspan="${cols}"></td>`;
-            tbody.appendChild(tr);
-        }
-    }
 
     const pCont = document.getElementById('pagination-container');
     if (rows.length === 0) {
@@ -703,27 +734,33 @@ function renderPagination(rows) {
 }
 
 function onChkChange() {
-    const checked = document.querySelectorAll('.iips-chk:checked').length;
+    let filteredCheckedCount = 0;
+    currentFilteredRows.forEach(tr => {
+        const chk = tr.querySelector('.iips-chk');
+        if (chk && chk.checked) filteredCheckedCount++;
+    });
+
     const toolbar = document.getElementById('bulk-toolbar');
-    toolbar.style.display = checked > 0 ? 'flex' : 'none';
-    document.getElementById('bulk-count').textContent = checked + ' selected';
+    toolbar.style.display = filteredCheckedCount > 0 ? 'flex' : 'none';
+    document.getElementById('bulk-count').textContent = filteredCheckedCount + ' selected';
     
-    const visibleCheckboxes = document.querySelectorAll('#main-table tbody tr:not(.is-hidden):not(.empty-placeholder-row) .iips-chk');
-    let visibleCheckedCount = 0;
-    visibleCheckboxes.forEach(c => { if(c.checked) visibleCheckedCount++; });
-    
-    document.getElementById('chk-all').indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleCheckboxes.length;
-    document.getElementById('chk-all').checked = visibleCheckedCount > 0 && visibleCheckedCount === visibleCheckboxes.length;
+    const chkAll = document.getElementById('chk-all');
+    chkAll.indeterminate = filteredCheckedCount > 0 && filteredCheckedCount < currentFilteredRows.length;
+    chkAll.checked = filteredCheckedCount > 0 && filteredCheckedCount === currentFilteredRows.length && currentFilteredRows.length > 0;
 }
 
 function toggleAll(cb) {
-    document.querySelectorAll('#main-table tbody tr:not(.is-hidden):not(.empty-placeholder-row) .iips-chk').forEach(c => c.checked = cb.checked);
+    currentFilteredRows.forEach(tr => {
+        const chk = tr.querySelector('.iips-chk');
+        if (chk) chk.checked = cb.checked;
+    });
     onChkChange();
 }
 
 function deselectAll() {
     document.querySelectorAll('.iips-chk').forEach(c => c.checked = false);
     document.getElementById('chk-all').checked = false;
+    document.getElementById('chk-all').indeterminate = false;
     document.getElementById('bulk-toolbar').style.display = 'none';
 }
 
@@ -799,7 +836,22 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('resize', fixStickyHeaders);
 document.getElementById('search-input').addEventListener('input', applyFilters);
 
-let colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
+let colFilters = { iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
+
+function toggleInverse() {
+    const btn = document.getElementById('btn-inverse-filter');
+    btn.classList.toggle('active-inverse');
+    if (btn.classList.contains('active-inverse')) {
+        btn.style.background = '#dc3545';
+        btn.style.color = 'white';
+        btn.style.borderColor = '#dc3545';
+    } else {
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+    }
+    applyFilters();
+}
 
 function applyFilters() {
     const txt      = document.getElementById('search-input').value.toLowerCase();
@@ -809,12 +861,15 @@ function applyFilters() {
     const actEnd   = document.getElementById('filter-actual-end-hidden').value;
     const checks   = Array.from(document.querySelectorAll('.filter-cats input[type="checkbox"]:checked')).map(c => c.value);
 
+    const hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== ''));
+    const isInverse = document.getElementById('btn-inverse-filter').classList.contains('active-inverse');
+
     const groups = {
-        iips_status:     ['not_quoted','quoted','not_started','in_progress','completed','cancelled'],
-        billing:         ['billing_nf','billing_fc','billing_pending','billing_done'],
+        iips_status:     ['not_quoted','quoted','not_started','in_progress','completed','cancelled','iips_none'],
+        billing:         ['billing_nf','billing_fc','billing_pending','billing_done','billing_none','accrued_got','accrued_no'],
         timesheet:       ['has_data','no_data'],
-        costing:         ['cost_sp_only','cost_pc_only','cost_empty','has_ic','no_ic'],
-        target_timeline: ['tgt_yes','tgt_partial','tgt_no'],
+        costing:         ['cost_pc_only','cost_ic_only','cost_empty','no_sp','no_pc','no_ic'],
+        target_timeline: ['tgt_yes','tgt_partial','tgt_no','tgt_no_md'],
         actual_timeline: ['act_yes','act_partial','act_no']
     };
 
@@ -823,8 +878,6 @@ function applyFilters() {
         const active = vals.filter(v => checks.includes(v));
         if (active.length > 0) activeGroups[grp] = active;
     });
-
-    const resFilters = ['has_pm','has_acc_mgr','has_partner'].filter(v => checks.includes(v));
 
     let visRows = [];
 
@@ -853,22 +906,30 @@ function applyFilters() {
                     if (chk === 'in_progress'    && (d.iipsStatus||'').toLowerCase() === 'in progress')  groupMatch = true;
                     if (chk === 'completed'      && (d.iipsStatus||'').toLowerCase() === 'completed')    groupMatch = true;
                     if (chk === 'cancelled'      && d.cancelled    === '1') groupMatch = true;
+                    if (chk === 'iips_none'      && d.iipsNone     === '1') groupMatch = true;
+                    
                     if (chk === 'billing_nf'     && d.billingNf    === '1') groupMatch = true;
                     if (chk === 'billing_fc'     && d.billingFc    === '1') groupMatch = true;
                     if (chk === 'billing_pending'&& (d.billingStatus||'').toLowerCase() === 'pending')   groupMatch = true;
                     if (chk === 'billing_done'   && (d.billingStatus||'').toLowerCase() === 'completed') groupMatch = true;
+                    if (chk === 'billing_none'   && d.billingNone  === '1') groupMatch = true;
+                    if (chk === 'accrued_got'    && d.hasAccrued   === '1') groupMatch = true;
+                    if (chk === 'accrued_no'     && d.hasAccrued   === '0') groupMatch = true;
+
                     if (chk === 'has_data'       && d.hasTs        === '1') groupMatch = true;
                     if (chk === 'no_data'        && d.hasTs        === '0') groupMatch = true;
 
-                    if (chk === 'cost_sp_only'   && d.costState    === 'cost_sp_only') groupMatch = true;
                     if (chk === 'cost_pc_only'   && d.costState    === 'cost_pc_only') groupMatch = true;
+                    if (chk === 'cost_ic_only'   && d.costState    === 'cost_ic_only') groupMatch = true;
                     if (chk === 'cost_empty'     && d.costState    === 'cost_empty')   groupMatch = true;
-                    if (chk === 'has_ic'         && d.hasIc        === '1')            groupMatch = true;
-                    if (chk === 'no_ic'          && d.hasIc        === '0')            groupMatch = true;
+                    if (chk === 'no_sp'          && d.noSp         === '1')            groupMatch = true;
+                    if (chk === 'no_pc'          && d.noPc         === '1')            groupMatch = true;
+                    if (chk === 'no_ic'          && d.noIc         === '1')            groupMatch = true;
                     
                     if (chk === 'tgt_yes'        && d.tgtState     === 'tgt_yes')      groupMatch = true;
                     if (chk === 'tgt_partial'    && d.tgtState     === 'tgt_partial')  groupMatch = true;
                     if (chk === 'tgt_no'         && d.tgtState     === 'tgt_no')       groupMatch = true;
+                    if (chk === 'tgt_no_md'      && d.tgtNoMd      === '1')            groupMatch = true;
                     
                     if (chk === 'act_yes'        && d.actState     === 'act_yes')      groupMatch = true;
                     if (chk === 'act_partial'    && d.actState     === 'act_partial')  groupMatch = true;
@@ -877,16 +938,8 @@ function applyFilters() {
                 if (!groupMatch) ok = false;
             });
         }
-        if (ok && resFilters.length > 0) {
-            resFilters.forEach(chk => {
-                if (chk === 'has_pm'      && d.hasPm      !== '1') ok = false;
-                if (chk === 'has_acc_mgr' && d.hasAccMgr  !== '1') ok = false;
-                if (chk === 'has_partner' && d.hasPartner !== '1') ok = false;
-            });
-        }
 
         if (ok) {
-            if (colFilters.pm      !== '' && d.hasPm         !== colFilters.pm)                      ok = false;
             if (colFilters.iips    !== '' && (d.iipsStatus    || '') !== colFilters.iips)             ok = false;
             if (colFilters.billing !== '' && (d.billingStatus || '') !== colFilters.billing)          ok = false;
             if (colFilters['tbd-year'] !== '' && (d.tbdYear || '') !== colFilters['tbd-year'])        ok = false;
@@ -894,6 +947,10 @@ function applyFilters() {
             if (colFilters['ted-year'] !== '' && (d.tedYear || '') !== colFilters['ted-year'])        ok = false;
             if (colFilters['asd-year'] !== '' && (d.asdYear || '') !== colFilters['asd-year'])        ok = false;
             if (colFilters['aed-year'] !== '' && (d.aedYear || '') !== colFilters['aed-year'])        ok = false;
+        }
+
+        if (hasFilter && isInverse) {
+            ok = !ok;
         }
 
         tr.classList.add('is-hidden');
@@ -913,9 +970,8 @@ function applyFilters() {
     currentPage = 1;
     renderPagination(visRows);
 
-    let hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== ''));
     const btnExport = document.getElementById('btn-export-all');
-    if (hasFilter) {
+    if (hasFilter && (!isInverse || visRows.length !== document.querySelectorAll('#main-table tbody tr[data-pid]').length)) {
         btnExport.textContent = '📥 Export Filtered';
         btnExport.classList.add('filtered');
     } else {
@@ -923,7 +979,6 @@ function applyFilters() {
         btnExport.classList.remove('filtered');
     }
 
-    document.getElementById('chk-all').checked = false;
     onChkChange();
 }
 
@@ -957,7 +1012,14 @@ function clearAllFilters() {
     document.getElementById('filter-actual-end-hidden').value = '';
     document.querySelectorAll('.filter-cats input[type="checkbox"]').forEach(c => c.checked = false);
     document.querySelectorAll('.filter-cats label').forEach(l => l.classList.remove('active-cat'));
-    colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
+    
+    const invBtn = document.getElementById('btn-inverse-filter');
+    invBtn.classList.remove('active-inverse');
+    invBtn.style.background = '';
+    invBtn.style.color = '';
+    invBtn.style.borderColor = '';
+
+    colFilters = { iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
     updateAdvCount();
     applyFilters();
 }
