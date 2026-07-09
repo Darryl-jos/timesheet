@@ -63,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($tgt_sd && $tgt_ed && $tgt_ed < $tgt_sd)  $errors['ted'] = "⚠ Target End Date must be on or after Target Start Date.";
-    if ($tgt_ed && $tgt_bd && $tgt_bd < $tgt_ed)  $errors['tbd'] = "⚠ Target Billing Date must be on or after Target End Date.";
 
     if (!$edit_mode && empty($errors)) {
         $chk_id = $conn->prepare("SELECT project_id FROM projects WHERE project_id = ?");
@@ -476,10 +475,8 @@ function syncDate(prefix) {
 function validateDateOrder() {
     const sd  = document.getElementById('tsd_val').value;
     const ed  = document.getElementById('ted_val').value;
-    const bd  = document.getElementById('tbd_val').value;
 
     const tedDisplay = document.getElementById('ted_display');
-    const tbdDisplay = document.getElementById('tbd_display');
 
     if (sd && ed && ed < sd) {
         tedDisplay.style.borderColor = '#dc3545';
@@ -489,16 +486,6 @@ function validateDateOrder() {
         tedDisplay.style.borderColor = '';
         tedDisplay.style.background  = '';
         clearDateError('ted');
-    }
-
-    if (ed && bd && bd < ed) {
-        tbdDisplay.style.borderColor = '#dc3545';
-        tbdDisplay.style.background  = '#fff5f5';
-        showDateError('tbd', '⚠ Billing Date must be on or after End Date');
-    } else {
-        tbdDisplay.style.borderColor = '';
-        tbdDisplay.style.background  = '';
-        clearDateError('tbd');
     }
 }
 
@@ -547,13 +534,14 @@ function bindDateField(prefix) {
     });
 
     display.addEventListener('blur', function() {
-        const parsed = parseDateInput(this.value);
-        if (parsed) {
-            hidden.value = parsed;
+        if (this.value.trim() === '') {
+            hidden.value = '';
             syncDate(prefix);
-        } else if (!hidden.value) {
-            this.value = '';
         } else {
+            const parsed = parseDateInput(this.value);
+            if (parsed) {
+                hidden.value = parsed;
+            }
             syncDate(prefix);
         }
     });
@@ -605,18 +593,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const sd = document.getElementById('tsd_val').value;
         const ed = document.getElementById('ted_val').value;
-        const bd = document.getElementById('tbd_val').value;
         if (sd && ed && ed < sd) {
             e.preventDefault();
             showDateError('ted', '⚠ End Date must be on or after Start Date');
             document.getElementById('ted_display').classList.add('err');
             if (!firstErr) firstErr = document.getElementById('ted_display');
-        }
-        if (ed && bd && bd < ed) {
-            e.preventDefault();
-            showDateError('tbd', '⚠ Billing Date must be on or after End Date');
-            document.getElementById('tbd_display').classList.add('err');
-            if (!firstErr) firstErr = document.getElementById('tbd_display');
         }
 
         if (firstErr) {
@@ -626,4 +607,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 </body>
-</html>
+</html> 
