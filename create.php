@@ -285,7 +285,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
             <div class="section-hdr" style="background:#4a235a;">👥 IIPS Management</div>
             <div class="section-body">
                 <div class="form-group">
-                    <label>Do you have an IIPS Manager?</label>
+                    <label>Do you have an Project Manager?</label>
                     <div style="display:flex;gap:20px;margin-top:6px;">
                         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px;cursor:pointer;">
                             <input type="radio" name="has_iips_manager_radio" value="yes" onclick="document.getElementById('iips-mgr-field').style.display='block'"> Yes
