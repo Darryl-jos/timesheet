@@ -217,8 +217,8 @@ sort($actual_end_years);
     .btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
     .btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
 
-    .tbl-outer { position: relative; padding: 0 25px 0 25px; }
-    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tbl-outer { position: relative; padding: 0 25px 25px 25px; }
+    .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
     .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
     .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
@@ -256,6 +256,14 @@ sort($actual_end_years);
     tbody tr:hover td.bg-c-act  { background: #b2dfdb; }
     tbody tr:hover td.bg-c-stat { background: #f8bbd0; }
     tbody tr:hover td.bg-c-res  { background: #e1bee7; }
+
+    .tog { display: inline-flex; align-items: center; gap: 5px; }
+    .tog-track { width: 30px; height: 16px; background: #d1d5db; border-radius: 8px; position: relative; }
+    .tog-track.on { background: #28a745; }
+    .tog-thumb { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: white; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+    .tog-track.on .tog-thumb { transform: translateX(14px); }
+    .tog-lbl { font-size: 11px; font-weight: 700; color: #6b7280; }
+    .tog-lbl.yes { color: #166534; }
 
     .card-hdr .hdr-left { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
     #totals-bar { display: flex; gap: 22px; align-items: center; padding-left: 20px; border-left: 1px solid #e5e7eb; }
@@ -298,16 +306,6 @@ sort($actual_end_years);
     .show-sort { display:block !important; }
     .auto-val { font-size: 12px; color: #065f46; white-space: nowrap; }
     .dash { color: #9ca3af; }
-    
-    .pagination-container { padding: 12px 25px; display: flex; align-items: center; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; width: 100%; box-sizing: border-box; overflow: hidden; gap: 6px; }
-    .page-btn { min-width: 32px; height: 32px; margin: 0; padding: 0 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; user-select: none; transition: all 0.2s; flex-shrink: 0; }
-    .page-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
-    .page-btn.active { background: #007bff; color: white; border-color: #007bff; }
-    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .page-scroll-wrap { display: flex; overflow-x: auto; flex: 1; scroll-behavior: smooth; align-items: center; gap: 6px; padding-bottom: 6px; margin-bottom: -6px; }
-    .page-scroll-wrap::-webkit-scrollbar { height: 6px; }
-    .page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    .page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 
     @media (max-width: 600px) {
         body { margin: 10px; }
@@ -327,8 +325,7 @@ sort($actual_end_years);
         .adv-filters > div { grid-template-columns: 1fr !important; }
         .card { padding: 0; }
         .card-hdr { padding: 12px; }
-        .tbl-outer { padding: 12px 12px 0 12px; }
-        .pagination-container { padding: 12px; }
+        .tbl-outer { padding: 12px; }
     }
 </style>
 </head>
@@ -490,7 +487,7 @@ sort($actual_end_years);
                 <div class="hdr-left">
                     <h3>IIPS Database</h3>
                     <div id="totals-bar">
-                        <span class="tot-lbl">Total all in the Database <em id="tot-rows-lbl">(0 projects)</em></span>
+                        <span class="tot-lbl">Total Rows <em id="tot-rows-lbl">(0 projects)</em></span>
                         <div class="tot-item"><small>Total Selling Price</small><span id="tot-sr">RM 0.00</span></div>
                         <div class="tot-item"><small>Total Partner Cost</small><span id="tot-pr">RM 0.00</span></div>
                         <div class="tot-item"><small>Total Actual GP</small><span id="tot-gp">RM 0.00</span></div>
@@ -506,7 +503,7 @@ sort($actual_end_years);
                         <tr class="sec-row">
                             <th class="chk-col s-base" rowspan="2" style="z-index:25;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
                             <th class="s-base"    colspan="3">IIPS Details</th>
-                            <th class="s-costing" colspan="6">IIPS Costing</th>
+                            <th class="s-costing" colspan="7">IIPS Costing</th>
                             <th class="s-timeline" colspan="3">Target Timeline</th>
                             <th class="s-actual"   colspan="3">Actual Timeline</th>
                             <th class="s-status"   colspan="6">Status</th>
@@ -523,28 +520,29 @@ sort($actual_end_years);
                             <th><div class="sort-wrap">Internal Cost (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ic')"></button><div id="s-ic" class="sort-menu"><a href="#" onclick="sortT(7,'num',0);return false;">Default</a><a href="#" onclick="sortT(7,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(7,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Actual GP (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gp')"></button><div id="s-gp" class="sort-menu"><a href="#" onclick="sortT(8,'num',0);return false;">Default</a><a href="#" onclick="sortT(8,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(8,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">GP %<button type="button" class="sort-btn" onclick="toggleSort(event,'s-gppct')"></button><div id="s-gppct" class="sort-menu"><a href="#" onclick="sortT(9,'num',0);return false;">Default</a><a href="#" onclick="sortT(9,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(9,'num',2);return false;">High → Low</a></div></div></th>
-                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(10,'num',0);return false;">Default</a><a href="#" onclick="sortT(10,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(10,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Project Mgmt<button type="button" class="sort-btn" onclick="toggleSort(event,'s-pm')"></button><div id="s-pm" class="sort-menu"><a href="#" onclick="filterCol('pm','');return false;">Default (All)</a><a href="#" onclick="filterCol('pm','1');return false;">Yes</a><a href="#" onclick="filterCol('pm','0');return false;">No</a></div></div></th>
+                            <th><div class="sort-wrap">Target Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tmd')"></button><div id="s-tmd" class="sort-menu"><a href="#" onclick="sortT(11,'num',0);return false;">Default</a><a href="#" onclick="sortT(11,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(11,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Target Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tsd')"></button><div id="s-tsd" class="sort-menu"><a href="#" onclick="filterCol('tsd-year','');return false;">All Years</a><?php foreach ($target_start_years as $y): ?><a href="#" onclick="filterCol('tsd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Target End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ted')"></button><div id="s-ted" class="sort-menu"><a href="#" onclick="filterCol('ted-year','');return false;">All Years</a><?php foreach ($target_end_years as $y): ?><a href="#" onclick="filterCol('ted-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
-                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(13,'num',0);return false;">Default</a><a href="#" onclick="sortT(13,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(13,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Actual Man-Days (hr)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-amd')"></button><div id="s-amd" class="sort-menu"><a href="#" onclick="sortT(14,'num',0);return false;">Default</a><a href="#" onclick="sortT(14,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(14,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Actual Start<button type="button" class="sort-btn" onclick="toggleSort(event,'s-asd')"></button><div id="s-asd" class="sort-menu"><a href="#" onclick="filterCol('asd-year','');return false;">All Years</a><?php foreach ($actual_start_years as $y): ?><a href="#" onclick="filterCol('asd-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Actual End<button type="button" class="sort-btn" onclick="toggleSort(event,'s-aed')"></button><div id="s-aed" class="sort-menu"><a href="#" onclick="filterCol('aed-year','');return false;">All Years</a><?php foreach ($actual_end_years as $y): ?><a href="#" onclick="filterCol('aed-year','<?= $y ?>');return false;"><?= $y ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">IIPS Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
                             <th><div class="sort-wrap">Target Billing Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Billing Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
-                            <th><div class="sort-wrap">Billing On<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bon')"></button><div id="s-bon" class="sort-menu"><a href="#" onclick="sortT(18,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(18,'alpha',1);return false;">Low → High</a><a href="#" onclick="sortT(18,'alpha',2);return false;">High → Low</a></div></div></th>
-                            <th><div class="sort-wrap">Accrued (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-acc')"></button><div id="s-acc" class="sort-menu"><a href="#" onclick="sortT(19,'num',0);return false;">Default</a><a href="#" onclick="sortT(19,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(19,'num',2);return false;">High → Low</a></div></div></th>
-                            <th><div class="sort-wrap">Remarks<button type="button" class="sort-btn" onclick="toggleSort(event,'s-rem')"></button><div id="s-rem" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(23,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(23,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(23,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Project Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(24,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(24,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(24,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(25,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(25,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(25,'alpha',2);return false;">Z → A</a></div></div></th>
-                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(26,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(26,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(26,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Billing On<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bon')"></button><div id="s-bon" class="sort-menu"><a href="#" onclick="sortT(19,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(19,'alpha',1);return false;">Low → High</a><a href="#" onclick="sortT(19,'alpha',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Accrued (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-acc')"></button><div id="s-acc" class="sort-menu"><a href="#" onclick="sortT(20,'num',0);return false;">Default</a><a href="#" onclick="sortT(20,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(20,'num',2);return false;">High → Low</a></div></div></th>
+                            <th><div class="sort-wrap">Remarks<button type="button" class="sort-btn" onclick="toggleSort(event,'s-rem')"></button><div id="s-rem" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(22,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(22,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(22,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Account Leader<button type="button" class="sort-btn" onclick="toggleSort(event,'s-al')"></button><div id="s-al" class="sort-menu"><a href="#" onclick="sortT(23,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(23,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(23,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Pre-Sales / SDM<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ps')"></button><div id="s-ps" class="sort-menu"><a href="#" onclick="sortT(24,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(24,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(24,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Project Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-im')"></button><div id="s-im" class="sort-menu"><a href="#" onclick="sortT(25,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(25,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(25,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Engineers<button type="button" class="sort-btn" onclick="toggleSort(event,'s-eng')"></button><div id="s-eng" class="sort-menu"><a href="#" onclick="sortT(26,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(26,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(26,'alpha',2);return false;">Z → A</a></div></div></th>
+                            <th><div class="sort-wrap">Partner<button type="button" class="sort-btn" onclick="toggleSort(event,'s-par')"></button><div id="s-par" class="sort-menu"><a href="#" onclick="sortT(27,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(27,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(27,'alpha',2);return false;">Z → A</a></div></div></th>
                         </tr>
                     </thead>
                     <tbody>
-                    <tr id="empty-row" class="is-hidden"><td colspan="29" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
+                    <tr id="empty-row" class="is-hidden"><td colspan="30" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
                     <?php if (!empty($rows)): foreach ($rows as $r):
                         $pid_display = fmtPid($r['project_id']);
                         $sp_raw = $r['selling_price'];
@@ -621,6 +619,7 @@ sort($actual_end_years);
                         data-billing-on="<?= htmlspecialchars($r['billing_on'] ?? '') ?>"
                         data-iips-none="<?= $iips_none ?>"
                         data-billing-none="<?= $billing_none ?>"
+                        data-has-pm="<?= intval($r['has_project_mgmt'] ?? 0) ?>"
                         data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
                         data-ts-end="<?= htmlspecialchars($r['ts_end'] ?? '') ?>"
                         data-target-start="<?= htmlspecialchars($r['target_start_date'] ?? '') ?>"
@@ -657,6 +656,10 @@ sort($actual_end_years);
                         <td class="bg-c-cost"><?= $r['internal_cost'] !== null ? 'RM '.number_format($r['internal_cost'],2) : '<span class="dash">—</span>' ?></td>
                         <td class="bg-c-cost" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp !== null ? 'RM '.number_format($gp,2) : '<span class="dash">—</span>' ?></td>
                         <td class="bg-c-cost" style="font-weight:700; color:<?= $gp_color ?>"><?= $gp_pct !== null ? number_format($gp_pct,1).'%' : '<span class="dash">—</span>' ?></td>
+                        <td class="bg-c-cost">
+                            <?php $pm_val = intval($r['has_project_mgmt'] ?? 0); ?>
+                            <div class="tog"><div class="tog-track <?= $pm_val ? 'on' : '' ?>"><div class="tog-thumb"></div></div><span class="tog-lbl <?= $pm_val ? 'yes' : '' ?>"><?= $pm_val ? 'Yes' : 'No' ?></span></div>
+                        </td>
                         <td class="bg-c-tgt"><?php if ($r['target_mandays']) { $tgt_d = floatval($r['target_mandays']); $td_total_mins = round($tgt_d * 8 * 60); $td_h = floor($td_total_mins / 60); $td_m = $td_total_mins % 60; echo $td_h.'h '.$td_m.'m ('.round($tgt_d, 2).' man-days)'; } else { echo '<span class="dash">—</span>'; } ?></td>
                         <td class="bg-c-tgt" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_start_date'] ? fmtDate($r['target_start_date']) : '<span class="dash">—</span>' ?></span></td>
                         <td class="bg-c-tgt" style="white-space:nowrap;"><span class="auto-val"><?= $r['target_end_date']   ? fmtDate($r['target_end_date'])   : '<span class="dash">—</span>' ?></span></td>
@@ -696,96 +699,16 @@ sort($actual_end_years);
                 </table>
                 </div>
             </div>
-            <div id="pagination-container" class="pagination-container" style="display:none;"></div>
         </div>
     </form>
 </div>
 
 <script>
-let currentPage = 1;
-const rowsPerPage = 10;
-let paginationMode = 'standard';
-let currentFilteredRows = [];
-
-function goToPage(p) {
-    currentPage = p;
-    renderPagination(currentFilteredRows);
-    onChkChange();
-}
-
-function togglePaginationMode() {
-    paginationMode = paginationMode === 'standard' ? 'all' : 'standard';
-    renderPagination(currentFilteredRows);
-}
-
-function renderPagination(rows) {
-    currentFilteredRows = rows;
-    const totalPages = Math.ceil(rows.length / rowsPerPage) || 1;
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-
-    let visibleCount = 0;
-    rows.forEach((r, idx) => {
-        const start = (currentPage - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-        if (idx >= start && idx < end) {
-            r.classList.remove('is-hidden');
-            visibleCount++;
-        } else {
-            r.classList.add('is-hidden');
-        }
-    });
-
-    const tbody = document.querySelector('#main-table tbody');
-
-    const pCont = document.getElementById('pagination-container');
-    if (rows.length === 0) {
-        pCont.innerHTML = '';
-        pCont.style.display = 'none';
-        return;
-    }
-    
-    pCont.style.display = 'flex';
-    let html = '';
-
-    if (paginationMode === 'standard') {
-        html += `<div style="display:flex; gap:6px; flex:1; justify-content:flex-end; align-items:center;">`;
-        html += `<button type="button" class="page-btn" onclick="goToPage(1)" ${currentPage===1?'disabled':''}>&laquo;</button>`;
-        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
-
-        if (currentPage > 1) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})">${currentPage-1}</button>`;
-        html += `<button type="button" class="page-btn active">${currentPage}</button>`;
-        if (currentPage < totalPages) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})">${currentPage+1}</button>`;
-
-        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
-        html += `<button type="button" class="page-btn" onclick="goToPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>&raquo;</button>`;
-        if (totalPages > 3) html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
-        html += `</div>`;
-    } else {
-        html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
-        html += `<div class="page-scroll-wrap">`;
-        for (let i = 1; i <= totalPages; i++) {
-            html += `<button type="button" class="page-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
-        }
-        html += `</div>`;
-    }
-    pCont.innerHTML = html;
-
-    if (paginationMode === 'all') {
-        setTimeout(() => {
-            const wrap = document.querySelector('.page-scroll-wrap');
-            const activeBtn = wrap.querySelector('.active');
-            if (activeBtn) {
-                wrap.scrollLeft = activeBtn.offsetLeft - wrap.offsetWidth / 2 + activeBtn.offsetWidth / 2;
-            }
-        }, 10);
-    }
-}
-
 function onChkChange() {
     let filteredCheckedCount = 0;
     let selectedId = null;
-    currentFilteredRows.forEach(tr => {
+    const visibleRows = Array.from(document.querySelectorAll('#main-table tbody tr:not(.is-hidden)')).filter(tr => tr.id !== 'empty-row');
+    visibleRows.forEach(tr => {
         const chk = tr.querySelector('.iips-chk');
         if (chk && chk.checked) {
             filteredCheckedCount++;
@@ -798,8 +721,8 @@ function onChkChange() {
     document.getElementById('bulk-count').textContent = filteredCheckedCount + ' selected';
     
     const chkAll = document.getElementById('chk-all');
-    chkAll.indeterminate = filteredCheckedCount > 0 && filteredCheckedCount < currentFilteredRows.length;
-    chkAll.checked = filteredCheckedCount > 0 && filteredCheckedCount === currentFilteredRows.length && currentFilteredRows.length > 0;
+    chkAll.indeterminate = filteredCheckedCount > 0 && filteredCheckedCount < visibleRows.length;
+    chkAll.checked = filteredCheckedCount > 0 && filteredCheckedCount === visibleRows.length && visibleRows.length > 0;
 
     const viewBtn = document.getElementById('btn-view-details');
     const editBtn = document.getElementById('btn-edit-details');
@@ -815,9 +738,8 @@ function onChkChange() {
 }
 
 function toggleAll(cb) {
-    currentFilteredRows.forEach(tr => {
-        const chk = tr.querySelector('.iips-chk');
-        if (chk) chk.checked = cb.checked;
+    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .iips-chk').forEach(c => {
+        if(c.closest('tr').id !== 'empty-row') c.checked = cb.checked;
     });
     onChkChange();
 }
@@ -855,7 +777,7 @@ function exportFilteredOrAll() {
 
     const btnExport = document.getElementById('btn-export-all');
     if (btnExport.classList.contains('filtered')) {
-        currentFilteredRows.forEach(tr => {
+        document.querySelectorAll('#main-table tbody tr:not(.is-hidden)').forEach(tr => {
             const pid = tr.dataset.pid;
             if (pid) {
                 const input = document.createElement('input');
@@ -942,7 +864,7 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('resize', fixStickyHeaders);
 document.getElementById('search-input').addEventListener('input', applyFilters);
 
-let colFilters = { iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
+let colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
 
 function toggleInverse() {
     const btn = document.getElementById('btn-inverse-filter');
@@ -1102,6 +1024,7 @@ function applyFilters() {
         }
 
         if (ok) {
+            if (colFilters.pm      !== '' && (d.hasPm         || '0') !== colFilters.pm)              ok = false;
             if (colFilters.iips    !== '' && (d.iipsStatus    || '') !== colFilters.iips)             ok = false;
             if (colFilters.billing !== '' && (d.billingStatus || '') !== colFilters.billing)          ok = false;
             if (colFilters['tbd-year'] !== '' && (d.tbdYear || '') !== colFilters['tbd-year'])        ok = false;
@@ -1115,8 +1038,12 @@ function applyFilters() {
             ok = !ok;
         }
 
-        tr.classList.add('is-hidden');
-        if (ok) visRows.push(tr);
+        if (ok) {
+            tr.classList.remove('is-hidden');
+            visRows.push(tr);
+        } else {
+            tr.classList.add('is-hidden');
+        }
     });
 
     let emptyTr = document.getElementById('empty-row');
@@ -1128,9 +1055,6 @@ function applyFilters() {
     
     document.querySelectorAll('.filter-cats label').forEach(lbl => { lbl.classList.toggle('active-cat', lbl.querySelector('input').checked); });
     updateAdvCount();
-
-    currentPage = 1;
-    renderPagination(visRows);
 
     const btnExport = document.getElementById('btn-export-all');
     if (hasFilter && (!isInverse || visRows.length !== document.querySelectorAll('#main-table tbody tr[data-pid]').length)) {
@@ -1218,7 +1142,7 @@ function clearAllFilters() {
     invBtn.style.borderColor = '';
     invBtn.style.display = 'none';
 
-    colFilters = { iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
+    colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
     updateAdvCount();
     applyFilters();
 }

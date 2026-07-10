@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$view_mode) {
     $partner   = strlen(trim($_POST['partner_cost']  ?? '')) > 0 ? floatval($_POST['partner_cost'])  : null;
     $internal  = strlen(trim($_POST['internal_cost'] ?? '')) > 0 ? floatval($_POST['internal_cost']) : null;
     $gross     = ($selling !== null && $partner !== null) ? $selling - $partner : null;
-    $has_pm    = 0; 
+    $has_pm = isset($_POST['has_project_mgmt']) ? 1 : 0;
 
     $accrued = strlen(trim($_POST['accrued'] ?? '')) > 0 ? floatval($_POST['accrued']) : null;
     $remarks_status  = trim($_POST['remarks_status'] ?? '');
@@ -145,7 +145,7 @@ $v = [
     'account_manager'     => $_SERVER['REQUEST_METHOD']==='POST' && !$view_mode ? implode(', ', array_filter(array_map('trim', $_POST['account_manager_multi'] ?? []))) : ($iips_data['account_manager'] ?? ''),
     'account_leader'      => $_SERVER['REQUEST_METHOD']==='POST' && !$view_mode ? implode(', ', array_filter(array_map('trim', $_POST['account_leader_multi']  ?? []))) : ($iips_data['account_leader']  ?? ''),
     'presales_sdm'        => $_SERVER['REQUEST_METHOD']==='POST' && !$view_mode ? implode(', ', array_filter(array_map('trim', $_POST['presales_sdm_multi']    ?? []))) : ($iips_data['presales_sdm']    ?? ''),
-    'project_manager'     => $_SERVER['REQUEST_METHOD']==='POST' && !$view_mode ? implode(', ', array_filter(array_map('trim', $_POST['project_manager_multi'] ?? []))) : ($iips_data['project_manager'] ?? ''),
+    'has_project_mgmt' => ($_SERVER['REQUEST_METHOD'] === 'POST') ? (isset($_POST['has_project_mgmt']) ? 1 : 0) : ($iips_data['has_project_mgmt'] ?? 0),
 ];
 $dAttr = $view_mode ? 'disabled' : '';
 ?>
@@ -188,6 +188,10 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+.check-group { display: flex; align-items: center; gap: 10px; padding-top: 8px; }
+.check-group input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+.check-group label { font-size: 13px; font-weight: 600; color: #333; margin: 0; cursor: pointer; }
 
 .iips-cal-btn { position: absolute; right: 0; top: 0; width: 32px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; z-index: 4; }
 
@@ -257,6 +261,10 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
                     <label>Internal Cost (RM)</label>
                     <input type="number" name="internal_cost" id="ic" step="0.01" min="0" value="<?= htmlspecialchars($v['internal_cost']) ?>" oninput="clearCostErr()" class="<?= isset($errors['cost']) ? 'err' : '' ?>" <?= $dAttr ?>>
                     <?php if (isset($errors['cost'])): ?><div id="err-cost" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['cost'] ?></div><?php endif; ?>
+                </div>
+                <div class="check-group" style="align-self:center; padding-top:20px;">
+                    <input type="checkbox" name="has_project_mgmt" id="has_pm" <?= $v['has_project_mgmt'] ? 'checked' : '' ?> <?= $dAttr ?>>
+                    <label for="has_pm">Project Management Included</label>
                 </div>
             </div>
         </div>
@@ -385,18 +393,6 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
                         <?php endforeach; ?>
                     </div>
                     <?php if(!$view_mode): ?><button type="button" onclick="addName('presales-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button><?php endif; ?>
-                </div>
-                <div class="form-group">
-                    <label>Project Manager</label>
-                    <div id="project-mgr-list">
-                        <?php $pm_names = array_filter(array_map('trim', explode(',', $v['project_manager']))); if(empty($pm_names)) $pm_names = ['']; foreach($pm_names as $i => $n): ?>
-                        <div class="multi-name-row" style="display:flex;gap:8px;margin-bottom:6px;">
-                            <input type="text" name="project_manager_multi[]" value="<?= htmlspecialchars($n) ?>" placeholder="Enter name" style="flex:1;height:36px;padding:0 10px;border:1px solid <?= $view_mode ? '#e9ecef' : '#ced4da' ?>;border-radius:4px;font-size:13px;" <?= $dAttr ?>>
-                            <?php if(!$view_mode): ?><button type="button" onclick="removeName(this)" style="background:#dc3545;color:white;border:none;width:32px;border-radius:4px;cursor:pointer;font-size:16px;<?= $i===0?'visibility:hidden':''; ?>">×</button><?php endif; ?>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php if(!$view_mode): ?><button type="button" onclick="addName('project-mgr-list')" style="background:none;border:1px dashed #94a3b8;color:#64748b;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:2px;">+ Add another</button><?php endif; ?>
                 </div>
             </div>
         </div>
