@@ -55,6 +55,7 @@ CREATE TABLE iips_tracking (
     actual_end_date     DATE NULL DEFAULT NULL,
     iips_status         ENUM('Not Quoted','Quoted','Not Started','In Progress','Completed','Cancelled') NOT NULL DEFAULT 'Not Quoted',
     billing_status      ENUM('Not Forecasted','Forecasted','Pending','Completed') NOT NULL DEFAULT 'Not Forecasted',
+    billing_on          VARCHAR(10) NULL DEFAULT NULL;
     account_manager     VARCHAR(150) NULL DEFAULT NULL,
     account_leader      VARCHAR(150) NULL DEFAULT NULL,
     presales_sdm        VARCHAR(150) NULL DEFAULT NULL,

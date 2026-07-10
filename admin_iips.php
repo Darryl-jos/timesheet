@@ -60,7 +60,7 @@ $result = $conn->query("
         i.has_project_mgmt,
         i.target_mandays, i.target_start_date, i.target_end_date,
         i.target_billing_date,
-        i.iips_status, i.billing_status,
+        i.iips_status, i.billing_status, i.billing_on,
         i.account_manager, i.account_leader, i.presales_sdm, i.project_manager,
         i.partner
     FROM projects p
@@ -83,7 +83,7 @@ $ts_agg = $conn->query("
         GROUP_CONCAT(DISTINCT engineer_name ORDER BY engineer_name SEPARATOR ', ') AS engineers
     FROM timesheets
     GROUP BY project_id
-");
+    ");
 if ($ts_agg) {
     while ($t = $ts_agg->fetch_assoc()) {
         $ts_map[$t['project_id']] = $t;
@@ -120,6 +120,11 @@ function fmtMins($m) {
     if (!$m) return '-';
     $h = floor($m/60); $r = $m%60;
     return $h.'h '.$r.'m';
+}
+function fmtMonthYear($d) {
+    if (!$d) return '-';
+    $dt = DateTime::createFromFormat('Y-m', $d);
+    return $dt ? $dt->format('M Y') : htmlspecialchars($d);
 }
 
 $billing_years = [];
@@ -180,16 +185,13 @@ sort($actual_end_years);
     .iips-date-wrap input[type="text"]:focus { border-color: #007bff; outline: none; }
     .iips-date-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 32px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
     .iips-cal-btn { position: absolute; right: 0; top: 0; width: 32px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; z-index: 4; }
-    .date-wrap input[type="text"] { flex: 1; height: 100%; padding: 0 36px 0 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; text-transform: uppercase; background: #fff; color: #333; }
-    .date-wrap input[type="text"]:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,.1); }
-    .date-wrap .cal-btn { position: absolute; right: 0; top: 0; width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; pointer-events: none; }
-    .date-wrap input[type="date"] { position: absolute; top: 0; right: 0; width: 36px; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
     .date-sep { font-size: 12px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
     .btn-clear-filter { background: #f1f5f9; color: #475569; border: 1px solid #d1d5db; height: 38px; padding: 0 14px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
     .btn-clear-filter:hover { background: #e2e8f0; }
     .btn-adv-toggle { background: none; border: 1px solid #d1d5db; color: #475569; height: 34px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
     .btn-adv-toggle:hover { background: #f0f7ff; border-color: #007bff; color: #007bff; }
     .btn-adv-toggle .arr { font-size: 10px; transition: transform .2s; }
+    #btn-inverse-filter { display: none; }
     .adv-filters { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }
     .adv-filters.open { display: block; }
     .adv-group { margin-bottom: 10px; }
@@ -205,6 +207,10 @@ sort($actual_end_years);
     #bulk-toolbar { display: none; background: #e6f0ff; border: 1px solid #b8daff; border-radius: 6px; padding: 10px 15px; margin-bottom: 12px; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     #bulk-toolbar span { font-size: 13px; font-weight: 600; color: #1e40af; flex: 1; }
     .btn-bulk { border: none; padding: 7px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
+    .btn-view-details { background: #17a2b8; color: white; transition: background 0.2s; }
+    .btn-view-details:hover { background: #138496; }
+    .btn-edit-bulk { background: #ffc107; color: #212529; transition: background 0.2s; }
+    .btn-edit-bulk:hover { background: #e0a800; }
     .btn-export { background: #28a745; color: white; }
     .btn-bulk-del { background: #dc3545; color: white; }
     .btn-desel { background: #e2e8f0; color: #374151; }
@@ -217,7 +223,7 @@ sort($actual_end_years);
     .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    table { width: 100%; border-collapse: collapse; min-width: 1850px; }
+    table { width: 100%; border-collapse: collapse; min-width: 2000px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; text-align: left; font-size: 13px; white-space: nowrap; }
     th { font-weight: bold; color: #495057; background: #f8f9fa; }
     .sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); position: sticky; top: 0; z-index: 22; }
@@ -234,7 +240,7 @@ sort($actual_end_years);
     .s-actual  { background: #004d40; }
     .s-status  { background: #6a1b4d; }
     .s-res     { background: #4a235a; }
-    .s-act     { background: #343a40; width: 90px; }
+    .s-act     { background: #343a40; width: 150px; }
 
     .bg-c-base { background: #f8f9fa; }
     .bg-c-cost { background: #eafaf1; } 
@@ -251,6 +257,15 @@ sort($actual_end_years);
     tbody tr:hover td.bg-c-stat { background: #f8bbd0; }
     tbody tr:hover td.bg-c-res  { background: #e1bee7; }
 
+    .card-hdr .hdr-left { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    #totals-bar { display: flex; gap: 22px; align-items: center; padding-left: 20px; border-left: 1px solid #e5e7eb; }
+    #totals-bar .tot-lbl { font-size: 12px; font-weight: 700; color: #374151; letter-spacing: .5px; padding-right: 18px; border-right: 1px solid #e5e7eb; text-transform: uppercase; }
+    #totals-bar .tot-lbl em { font-style: normal; font-weight: 500; color: #6b7280; text-transform: none; letter-spacing: 0; margin-left: 4px; }
+    #totals-bar .tot-item { display: flex; flex-direction: column; gap: 2px; }
+    #totals-bar .tot-item small { font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; }
+    #totals-bar .tot-item span { font-size: 14px; font-weight: 700; color: #1f2937; white-space: nowrap; }
+    @media (max-width: 768px) { #totals-bar { padding-left: 0; border-left: none; gap: 14px; } #totals-bar .tot-item span { font-size: 13px; } }
+
     .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
     .b-nq   { background:#f1f5f9; color:#475569; }
     .b-q    { background:#dbeafe; color:#1e40af; }
@@ -263,10 +278,14 @@ sort($actual_end_years);
     .b-pend { background:#fef9c3; color:#854d0e; }
     .b-bdc  { background:#166534; color:white; }
     td:last-child { white-space: nowrap; }
-    .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; }
-    .btn-del  { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    
+    .btn-view { background: #17a2b8; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; display: inline-block; }
+    .btn-view:hover { background: #138496; }
+    .btn-edit { background: #ffc107; color: #333; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 4px; display: inline-block; }
+    .btn-del  { background: #dc3545; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
     .btn-edit:hover { background: #e0a800; }
     .btn-del:hover  { background: #c82333; }
+    
     .sort-wrap { display: inline-flex; align-items: center; gap: 4px; position: relative; }
     .sort-btn { background:none; border:none; width:13px; height:13px; cursor:pointer; position:relative; padding:0; }
     .sort-btn::before { content:""; position:absolute; top:1px; left:1px; border-left:4px solid transparent; border-right:4px solid transparent; border-bottom:4px solid #888; }
@@ -328,50 +347,50 @@ sort($actual_end_years);
     <div class="filter-panel">
         <div class="filter-row">
             <span class="filter-label">🔍</span>
-            <input type="text" class="filter-input" id="search-input" placeholder="Search IIPS ID, name, customer, manager, partner..." oninput="applyFilters()">
-            <a href="create_iips.php" class="btn-create-iips">+ Create IIPS</a>
+            <input type="text" class="filter-input" id="search-input" placeholder="Search IIPS ID, name, customer, manager, partner..." oninput="applyFilters()" title="Search by ID, name, customer, etc.">
+            <a href="create_iips.php" class="btn-create-iips" title="Create a new IIPS project">+ Create IIPS</a>
         </div>
         <div class="filter-row">
             <span class="filter-label">🎯 Target</span>
             <div class="iips-date-wrap">
                 <input type="text" id="filter-target-start-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('target-start')" onkeydown="if(event.key==='Enter'){this.blur()}">
-                <div class="iips-cal-btn" onclick="document.getElementById('filter-target-start-hidden').showPicker()">📅</div>
+                       onblur="parseFilerDate('target-start')" onkeydown="if(event.key==='Enter'){this.blur()}" title="Select Target Start Date">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-target-start-hidden').showPicker()" title="Select Target Start Date">📅</div>
                 <input type="date" id="filter-target-start-hidden" onchange="syncFilterDate('target-start')">
             </div>
             <span class="date-sep">→</span>
             <div class="iips-date-wrap">
                 <input type="text" id="filter-target-end-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('target-end')" onkeydown="if(event.key==='Enter'){this.blur()}">
-                <div class="iips-cal-btn" onclick="document.getElementById('filter-target-end-hidden').showPicker()">📅</div>
+                       onblur="parseFilerDate('target-end')" onkeydown="if(event.key==='Enter'){this.blur()}" title="Select Target End Date">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-target-end-hidden').showPicker()" title="Select Target End Date">📅</div>
                 <input type="date" id="filter-target-end-hidden" onchange="syncFilterDate('target-end')">
             </div>
             <span class="filter-label" style="margin-left:12px;">📌 Actual</span>
             <div class="iips-date-wrap">
                 <input type="text" id="filter-actual-start-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('actual-start')" onkeydown="if(event.key==='Enter'){this.blur()}">
-                <div class="iips-cal-btn" onclick="document.getElementById('filter-actual-start-hidden').showPicker()">📅</div>
+                       onblur="parseFilerDate('actual-start')" onkeydown="if(event.key==='Enter'){this.blur()}" title="Select Actual Start Date">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-actual-start-hidden').showPicker()" title="Select Actual Start Date">📅</div>
                 <input type="date" id="filter-actual-start-hidden" onchange="syncFilterDate('actual-start')">
             </div>
             <span class="date-sep">→</span>
             <div class="iips-date-wrap">
                 <input type="text" id="filter-actual-end-display" placeholder="DD MMM YYYY" autocomplete="off"
                        oninput="this.value=this.value.toUpperCase()"
-                       onblur="parseFilerDate('actual-end')" onkeydown="if(event.key==='Enter'){this.blur()}">
-                <div class="iips-cal-btn" onclick="document.getElementById('filter-actual-end-hidden').showPicker()">📅</div>
+                       onblur="parseFilerDate('actual-end')" onkeydown="if(event.key==='Enter'){this.blur()}" title="Select Actual End Date">
+                <div class="iips-cal-btn" onclick="document.getElementById('filter-actual-end-hidden').showPicker()" title="Select Actual End Date">📅</div>
                 <input type="date" id="filter-actual-end-hidden" onchange="syncFilterDate('actual-end')">
             </div>
             <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-                <button type="button" class="btn-adv-toggle" id="btn-inverse-filter" onclick="toggleInverse()">
+                <button type="button" class="btn-adv-toggle" id="btn-inverse-filter" onclick="toggleInverse()" title="Toggle to exclude rows matching the current filters">
                     🔄 Exclude Selected
                 </button>
-                <button type="button" class="btn-adv-toggle" id="adv-toggle-btn" onclick="toggleAdvFilters()">
+                <button type="button" class="btn-adv-toggle" id="adv-toggle-btn" onclick="toggleAdvFilters()" title="Toggle advanced filter options">
                     Advanced <span class="arr" id="adv-arr">▾</span><span class="active-filter-count" id="adv-count" style="display:none">0</span>
                 </button>
-                <button class="btn-clear-filter" onclick="clearAllFilters()">✕ Clear All</button>
+                <button class="btn-clear-filter" onclick="clearAllFilters()" title="Clear all active filters">✕ Clear All</button>
             </div>
         </div>
         <div class="adv-filters" id="adv-filters">
@@ -398,6 +417,19 @@ sort($actual_end_years);
                         <label><input type="checkbox" value="billing_none"    onchange="applyFilters()"> No Status</label>
                         <label><input type="checkbox" value="accrued_got"     onchange="applyFilters()"> Got Accrued</label>
                         <label><input type="checkbox" value="accrued_no"      onchange="applyFilters()"> No Accrued</label>
+                    </div>
+                </div>
+                <div class="adv-group">
+                    <span class="adv-group-label" title="Filter by Billing Month/Year or Year only">Billing On</span>
+                    <div style="position:relative; height:34px; width:100%; display:flex; margin-bottom:8px;">
+                        <input type="text" id="filter-bo-display" class="filter-input" style="flex:1;height:100%;padding:0 32px 0 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;text-transform:uppercase;" autocomplete="off" title="Type Month/Year (1/25) or just Year (2025)">
+                        <div class="iips-cal-btn" onclick="document.getElementById('filter-bo-picker').showPicker()" title="Select Billing Month">📅</div>
+                        <input type="month" id="filter-bo-picker" style="position:absolute;top:0;right:0;width:32px;height:100%;opacity:0;cursor:pointer;z-index:4;" title="Select Billing Month">
+                        <input type="hidden" id="filter-bo-val" value="">
+                    </div>
+                    <div class="filter-cats">
+                        <label><input type="checkbox" value="bo_yes" onchange="applyFilters()"> Has Billing On</label>
+                        <label><input type="checkbox" value="bo_no"  onchange="applyFilters()"> No Billing On</label>
                     </div>
                 </div>
                 <div class="adv-group">
@@ -442,9 +474,11 @@ sort($actual_end_years);
     <div id="bulk-toolbar">
         <span id="bulk-count">0 selected</span>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn-bulk btn-export" onclick="submitBulkExport()">📥 Export Selected</button>
-            <button type="button" class="btn-bulk btn-bulk-del" onclick="submitBulkDelete()">🗑 Delete Selected</button>
-            <button type="button" class="btn-bulk btn-desel" onclick="deselectAll()">✕ Deselect All</button>
+            <button type="button" class="btn-bulk btn-view-details" id="btn-view-details" style="display:none;" title="View details of the selected IIPS">👁️ View Details</button>
+            <button type="button" class="btn-bulk btn-edit-bulk" id="btn-edit-details" style="display:none;" title="Edit the selected IIPS">✏️ Edit Selected</button>
+            <button type="button" class="btn-bulk btn-export" onclick="submitBulkExport()" title="Export the currently checked IIPS to Excel">📥 Export Selected</button>
+            <button type="button" class="btn-bulk btn-bulk-del" onclick="submitBulkDelete()" title="Permanently delete the checked IIPS">🗑 Delete Selected</button>
+            <button type="button" class="btn-bulk btn-desel" onclick="deselectAll()" title="Uncheck all selected rows">✕ Deselect All</button>
         </div>
     </div>
 
@@ -453,8 +487,16 @@ sort($actual_end_years);
         
         <div class="card">
             <div class="card-hdr">
-                <h3>IIPS Database</h3>
-                <button type="button" id="btn-export-all" class="btn-export-all" onclick="exportFilteredOrAll()">📥 Export All</button>
+                <div class="hdr-left">
+                    <h3>IIPS Database</h3>
+                    <div id="totals-bar">
+                        <span class="tot-lbl">Total Rows <em id="tot-rows-lbl">(0 projects)</em></span>
+                        <div class="tot-item"><small>Total Selling Price</small><span id="tot-sr">RM 0.00</span></div>
+                        <div class="tot-item"><small>Total Partner Cost</small><span id="tot-pr">RM 0.00</span></div>
+                        <div class="tot-item"><small>Total Actual GP</small><span id="tot-gp">RM 0.00</span></div>
+                    </div>
+                </div>
+                <button type="button" id="btn-export-all" class="btn-export-all" onclick="exportFilteredOrAll()" title="Export all (or currently filtered) IIPS to Excel">📥 Export All</button>
             </div>
             
             <div class="tbl-outer" id="tbl-outer">
@@ -467,7 +509,7 @@ sort($actual_end_years);
                             <th class="s-costing" colspan="6">IIPS Costing</th>
                             <th class="s-timeline" colspan="3">Target Timeline</th>
                             <th class="s-actual"   colspan="3">Actual Timeline</th>
-                            <th class="s-status"   colspan="5">Status</th>
+                            <th class="s-status"   colspan="6">Status</th>
                             <th class="s-res"      colspan="6">Resources</th>
                             <th class="s-act" rowspan="2">Actions</th>
                         </tr>
@@ -490,6 +532,7 @@ sort($actual_end_years);
                             <th><div class="sort-wrap">IIPS Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-ist')"></button><div id="s-ist" class="sort-menu"><a href="#" onclick="filterCol('iips','');return false;">Default (All)</a><a href="#" onclick="filterCol('iips','Not Quoted');return false;">Not Quoted</a><a href="#" onclick="filterCol('iips','Quoted');return false;">Quoted</a><a href="#" onclick="filterCol('iips','Not Started');return false;">Not Started</a><a href="#" onclick="filterCol('iips','In Progress');return false;">In Progress</a><a href="#" onclick="filterCol('iips','Completed');return false;">Completed</a><a href="#" onclick="filterCol('iips','Cancelled');return false;">Cancelled</a></div></div></th>
                             <th><div class="sort-wrap">Target Billing Date<button type="button" class="sort-btn" onclick="toggleSort(event,'s-tbd')"></button><div id="s-tbd" class="sort-menu"><a href="#" onclick="filterCol('tbd-year','');return false;">All Years</a><?php foreach ($billing_years as $by): ?><a href="#" onclick="filterCol('tbd-year','<?= $by ?>');return false;"><?= $by ?></a><?php endforeach; ?></div></div></th>
                             <th><div class="sort-wrap">Billing Status<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bst')"></button><div id="s-bst" class="sort-menu"><a href="#" onclick="filterCol('billing','');return false;">Default (All)</a><a href="#" onclick="filterCol('billing','Not Forecasted');return false;">Not Forecasted</a><a href="#" onclick="filterCol('billing','Forecasted');return false;">Forecasted</a><a href="#" onclick="filterCol('billing','Pending');return false;">Pending</a><a href="#" onclick="filterCol('billing','Completed');return false;">Completed</a></div></div></th>
+                            <th><div class="sort-wrap">Billing On<button type="button" class="sort-btn" onclick="toggleSort(event,'s-bon')"></button><div id="s-bon" class="sort-menu"><a href="#" onclick="sortT(18,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(18,'alpha',1);return false;">Low → High</a><a href="#" onclick="sortT(18,'alpha',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Accrued (RM)<button type="button" class="sort-btn" onclick="toggleSort(event,'s-acc')"></button><div id="s-acc" class="sort-menu"><a href="#" onclick="sortT(19,'num',0);return false;">Default</a><a href="#" onclick="sortT(19,'num',1);return false;">Low → High</a><a href="#" onclick="sortT(19,'num',2);return false;">High → Low</a></div></div></th>
                             <th><div class="sort-wrap">Remarks<button type="button" class="sort-btn" onclick="toggleSort(event,'s-rem')"></button><div id="s-rem" class="sort-menu"><a href="#" onclick="sortT(20,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(20,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(20,'alpha',2);return false;">Z → A</a></div></div></th>
                             <th><div class="sort-wrap">Account Manager<button type="button" class="sort-btn" onclick="toggleSort(event,'s-am')"></button><div id="s-am" class="sort-menu"><a href="#" onclick="sortT(21,'alpha',0);return false;">Default</a><a href="#" onclick="sortT(21,'alpha',1);return false;">A → Z</a><a href="#" onclick="sortT(21,'alpha',2);return false;">Z → A</a></div></div></th>
@@ -501,7 +544,7 @@ sort($actual_end_years);
                         </tr>
                     </thead>
                     <tbody>
-                    <tr id="empty-row" class="is-hidden"><td colspan="28" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
+                    <tr id="empty-row" class="is-hidden"><td colspan="29" style="text-align:center;padding:40px;color:#9ca3af;">No matching IIPS found.</td></tr>
                     <?php if (!empty($rows)): foreach ($rows as $r):
                         $pid_display = fmtPid($r['project_id']);
                         $sp_raw = $r['selling_price'];
@@ -575,6 +618,7 @@ sort($actual_end_years);
                         data-search="<?= htmlspecialchars($search_str) ?>"
                         data-iips-status="<?= htmlspecialchars($r['iips_status'] ?? '') ?>"
                         data-billing-status="<?= htmlspecialchars($r['billing_status'] ?? '') ?>"
+                        data-billing-on="<?= htmlspecialchars($r['billing_on'] ?? '') ?>"
                         data-iips-none="<?= $iips_none ?>"
                         data-billing-none="<?= $billing_none ?>"
                         data-ts-start="<?= htmlspecialchars($r['ts_start'] ?? '') ?>"
@@ -622,6 +666,7 @@ sort($actual_end_years);
                         <td class="bg-c-stat"><span class="badge <?= $status_badge ?>"><?= htmlspecialchars($r['iips_status'] ?? 'Not Quoted') ?></span></td>
                         <td class="bg-c-stat"><?= $r['target_billing_date'] ? fmtDate($r['target_billing_date']) : '<span class="dash">—</span>' ?></td>
                         <td class="bg-c-stat"><span class="badge <?= $billing_badge ?>"><?= htmlspecialchars($r['billing_status'] ?? 'Not Forecasted') ?></span></td>
+                        <td class="bg-c-stat"><span style="display:none;"><?= $r['billing_on'] ?? '' ?></span><?= fmtMonthYear($r['billing_on']) ?></td>
                         <td class="bg-c-stat"><?= $r['accrued'] !== null ? 'RM '.number_format($r['accrued'],2) : '<span class="dash">—</span>' ?></td>
                         <td class="bg-c-stat"><?= htmlspecialchars($r['remarks_status'] ?? '') ?: '<span class="dash">—</span>' ?></td>
                         <td class="bg-c-res"><?php
@@ -640,7 +685,11 @@ sort($actual_end_years);
                         <td class="bg-c-res"><?php
                             $names = cleanNames($partner_display);
                             if ($names): ?><ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8;"><?php foreach($names as $n): ?><li><?= htmlspecialchars($n) ?></li><?php endforeach; ?></ul><?php else: ?><span class="dash">—</span><?php endif; ?></td>
-                        <td><a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit">Edit</a><a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a></td>
+                        <td>
+                            <a href="create_iips.php?edit=<?= urlencode($r['project_id']) ?>&view=1" class="btn-view" title="View details in read-only mode">View</a>
+                            <a href="admin_iips.php?edit_proj=<?= urlencode($r['project_id']) ?>" class="btn-edit" title="Edit this project">Edit</a>
+                            <a href="admin_iips.php?delete_proj=<?= urlencode($r['project_id']) ?>" class="btn-del" title="Permanently delete this project" onclick="return confirm('Delete project <?= htmlspecialchars(addslashes($r['project_id'])) ?>?\nThis cannot be undone.')">Delete</a>
+                        </td>
                     </tr>
                     <?php endforeach; endif; ?>
                     </tbody>
@@ -735,9 +784,13 @@ function renderPagination(rows) {
 
 function onChkChange() {
     let filteredCheckedCount = 0;
+    let selectedId = null;
     currentFilteredRows.forEach(tr => {
         const chk = tr.querySelector('.iips-chk');
-        if (chk && chk.checked) filteredCheckedCount++;
+        if (chk && chk.checked) {
+            filteredCheckedCount++;
+            selectedId = chk.value;
+        }
     });
 
     const toolbar = document.getElementById('bulk-toolbar');
@@ -747,6 +800,18 @@ function onChkChange() {
     const chkAll = document.getElementById('chk-all');
     chkAll.indeterminate = filteredCheckedCount > 0 && filteredCheckedCount < currentFilteredRows.length;
     chkAll.checked = filteredCheckedCount > 0 && filteredCheckedCount === currentFilteredRows.length && currentFilteredRows.length > 0;
+
+    const viewBtn = document.getElementById('btn-view-details');
+    const editBtn = document.getElementById('btn-edit-details');
+    if (filteredCheckedCount === 1 && selectedId) {
+        viewBtn.style.display = 'inline-flex';
+        viewBtn.onclick = () => window.location.href = 'create_iips.php?edit=' + encodeURIComponent(selectedId) + '&view=1';
+        editBtn.style.display = 'inline-flex';
+        editBtn.onclick = () => window.location.href = 'create_iips.php?edit=' + encodeURIComponent(selectedId);
+    } else {
+        viewBtn.style.display = 'none';
+        editBtn.style.display = 'none';
+    }
 }
 
 function toggleAll(cb) {
@@ -831,6 +896,47 @@ function fixStickyHeaders() {
 
 window.addEventListener('DOMContentLoaded', () => {
     fixStickyHeaders();
+
+    const boDisp = document.getElementById('filter-bo-display');
+    const boVal = document.getElementById('filter-bo-val');
+    const boPicker = document.getElementById('filter-bo-picker');
+
+    if (boDisp && boVal) {
+        boDisp.addEventListener('blur', function() {
+            if (this.value.trim() === '') {
+                boVal.value = '';
+                this.value = '';
+            } else {
+                const parsed = parseBillingOnFilter(this.value);
+                if (parsed) {
+                    boVal.value = parsed.val;
+                    this.value = parsed.disp;
+                } else if (!boVal.value) {
+                    this.value = '';
+                }
+            }
+            applyFilters();
+        });
+        boDisp.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); this.blur(); }
+        });
+    }
+
+    if (boPicker && boDisp && boVal) {
+        boPicker.addEventListener('change', function() {
+            if (this.value) {
+                const parts = this.value.split('-');
+                const mNames = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+                boVal.value = this.value;
+                boDisp.value = mNames[parseInt(parts[1], 10) - 1] + " " + parts[0];
+            } else {
+                boVal.value = '';
+                boDisp.value = '';
+            }
+            applyFilters();
+        });
+    }
+
     applyFilters();
 });
 window.addEventListener('resize', fixStickyHeaders);
@@ -853,16 +959,60 @@ function toggleInverse() {
     applyFilters();
 }
 
+function parseBillingOnFilter(str) {
+    str = str.trim().toUpperCase();
+    if (!str) return null;
+    if (/^\d{4}$/.test(str)) return { val: str, disp: str };
+
+    const mNames = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    let m = null, y = null;
+
+    const numMatch = str.match(/^(\d{1,2})[\/\-\s]+(\d{2,4})$/);
+    if (numMatch) {
+        m = parseInt(numMatch[1], 10);
+        y = numMatch[2];
+    } else {
+        const textMatch = str.match(/^([A-Z]{3,})[\/\-\s]*(\d{2,4})$/);
+        if (textMatch) {
+            const mStr = textMatch[1].substring(0,3);
+            m = mNames.indexOf(mStr) + 1;
+            y = textMatch[2];
+        }
+    }
+
+    if (m && m >= 1 && m <= 12 && y) {
+        if (y.length === 2) y = "20" + y;
+        return { 
+            val: y + "-" + String(m).padStart(2, '0'), 
+            disp: mNames[m-1] + " " + y 
+        };
+    }
+    return null;
+}
+
 function applyFilters() {
     const txt      = document.getElementById('search-input').value.toLowerCase();
     const tgtStart = document.getElementById('filter-target-start-hidden').value;
     const tgtEnd   = document.getElementById('filter-target-end-hidden').value;
     const actStart = document.getElementById('filter-actual-start-hidden').value;
     const actEnd   = document.getElementById('filter-actual-end-hidden').value;
+    const boFilter = document.getElementById('filter-bo-val') ? document.getElementById('filter-bo-val').value : '';
     const checks   = Array.from(document.querySelectorAll('.filter-cats input[type="checkbox"]:checked')).map(c => c.value);
 
-    const hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== ''));
-    const isInverse = document.getElementById('btn-inverse-filter').classList.contains('active-inverse');
+    const hasFilter = (txt !== '' || tgtStart !== '' || tgtEnd !== '' || actStart !== '' || actEnd !== '' || checks.length > 0 || Object.values(colFilters).some(v => v !== '') || boFilter !== '');
+    
+    const invBtn = document.getElementById('btn-inverse-filter');
+    if (!hasFilter) {
+        invBtn.classList.remove('active-inverse');
+        invBtn.style.background = '';
+        invBtn.style.color = '';
+        invBtn.style.borderColor = '';
+        invBtn.style.display = 'none';
+    } else {
+        invBtn.style.display = 'flex';
+    }
+    
+    const isInverse = invBtn.classList.contains('active-inverse');
 
     const groups = {
         iips_status:     ['not_quoted','quoted','not_started','in_progress','completed','cancelled','iips_none'],
@@ -870,7 +1020,8 @@ function applyFilters() {
         timesheet:       ['has_data','no_data'],
         costing:         ['cost_pc_only','cost_ic_only','cost_empty','no_sp','no_pc','no_ic'],
         target_timeline: ['tgt_yes','tgt_partial','tgt_no','tgt_no_md'],
-        actual_timeline: ['act_yes','act_partial','act_no']
+        actual_timeline: ['act_yes','act_partial','act_no'],
+        billing_on:      ['bo_yes', 'bo_no']
     };
 
     const activeGroups = {};
@@ -934,9 +1085,20 @@ function applyFilters() {
                     if (chk === 'act_yes'        && d.actState     === 'act_yes')      groupMatch = true;
                     if (chk === 'act_partial'    && d.actState     === 'act_partial')  groupMatch = true;
                     if (chk === 'act_no'         && d.actState     === 'act_no')       groupMatch = true;
+                    
+                    if (chk === 'bo_yes'         && d.billingOn && d.billingOn.trim() !== '') groupMatch = true;
+                    if (chk === 'bo_no'          && (!d.billingOn || d.billingOn.trim() === '')) groupMatch = true;
                 });
                 if (!groupMatch) ok = false;
             });
+        }
+
+        if (ok && boFilter) {
+            if (boFilter.length === 4) {
+                if (!(d.billingOn || '').startsWith(boFilter)) ok = false;
+            } else {
+                if ((d.billingOn || '') !== boFilter) ok = false;
+            }
         }
 
         if (ok) {
@@ -980,6 +1142,32 @@ function applyFilters() {
     }
 
     onChkChange();
+    updateTotals(visRows);
+}
+
+function updateTotals(visRows) {
+    let sSR = 0, sPR = 0, sGP = 0, nRows = 0;
+    const parseRM = function(el) {
+        if (!el) return 0;
+        const t = el.textContent.replace(/[^0-9.\-]/g, '');
+        const n = parseFloat(t);
+        return isNaN(n) ? 0 : n;
+    };
+    const rows = visRows || document.querySelectorAll('#main-table tbody tr[data-pid]');
+    rows.forEach(function(tr) {
+        nRows++;
+        const c = tr.querySelectorAll('td');
+        sSR += parseRM(c[4]);
+        sPR += parseRM(c[5]);
+        sGP += parseRM(c[8]);
+    });
+    const fmt = function(n) { return 'RM ' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+    const set = function(id, v) { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+    set('tot-sr', sSR);
+    set('tot-pr', sPR);
+    set('tot-gp', sGP);
+    const rLbl = document.getElementById('tot-rows-lbl');
+    if (rLbl) rLbl.textContent = '(' + nRows + ' project' + (nRows === 1 ? '' : 's') + ')';
 }
 
 function toggleAdvFilters() {
@@ -991,10 +1179,15 @@ function toggleAdvFilters() {
 
 function updateAdvCount() {
     const count = document.querySelectorAll('.filter-cats input[type="checkbox"]:checked').length;
+    let boFilterCount = 0;
+    if (document.getElementById('filter-bo-val') && document.getElementById('filter-bo-val').value) {
+        boFilterCount = 1;
+    }
+    const totalCount = count + boFilterCount;
     const badge = document.getElementById('adv-count');
-    badge.textContent = count;
-    badge.style.display = count > 0 ? 'inline-flex' : 'none';
-    if (count > 0 && !document.getElementById('adv-filters').classList.contains('open')) {
+    badge.textContent = totalCount;
+    badge.style.display = totalCount > 0 ? 'inline-flex' : 'none';
+    if (totalCount > 0 && !document.getElementById('adv-filters').classList.contains('open')) {
         document.getElementById('adv-filters').classList.add('open');
         document.getElementById('adv-arr').textContent = '▴';
     }
@@ -1010,6 +1203,11 @@ function clearAllFilters() {
     document.getElementById('filter-actual-start-hidden').value = '';
     document.getElementById('filter-actual-end-display').value = '';
     document.getElementById('filter-actual-end-hidden').value = '';
+    if (document.getElementById('filter-bo-display')) {
+        document.getElementById('filter-bo-display').value = '';
+        document.getElementById('filter-bo-val').value = '';
+        document.getElementById('filter-bo-picker').value = '';
+    }
     document.querySelectorAll('.filter-cats input[type="checkbox"]').forEach(c => c.checked = false);
     document.querySelectorAll('.filter-cats label').forEach(l => l.classList.remove('active-cat'));
     
@@ -1018,6 +1216,7 @@ function clearAllFilters() {
     invBtn.style.background = '';
     invBtn.style.color = '';
     invBtn.style.borderColor = '';
+    invBtn.style.display = 'none';
 
     colFilters = { iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
     updateAdvCount();
