@@ -217,8 +217,8 @@ sort($actual_end_years);
     .btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
     .btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
 
-    .tbl-outer { position: relative; padding: 0 25px 25px 25px; }
-    .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
+    .tbl-outer { position: relative; padding: 0 25px 0 25px; }
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
     .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
     .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
@@ -298,6 +298,16 @@ sort($actual_end_years);
     .show-sort { display:block !important; }
     .auto-val { font-size: 12px; color: #065f46; white-space: nowrap; }
     .dash { color: #9ca3af; }
+    
+    .pagination-container { padding: 12px 25px; display: flex; align-items: center; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; width: 100%; box-sizing: border-box; overflow: hidden; gap: 6px; }
+    .page-btn { min-width: 32px; height: 32px; margin: 0; padding: 0 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; user-select: none; transition: all 0.2s; flex-shrink: 0; }
+    .page-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+    .page-btn.active { background: #007bff; color: white; border-color: #007bff; }
+    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .page-scroll-wrap { display: flex; overflow-x: auto; flex: 1; scroll-behavior: smooth; align-items: center; gap: 6px; padding-bottom: 6px; margin-bottom: -6px; }
+    .page-scroll-wrap::-webkit-scrollbar { height: 6px; }
+    .page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 
     @media (max-width: 600px) {
         body { margin: 10px; }
@@ -317,7 +327,8 @@ sort($actual_end_years);
         .adv-filters > div { grid-template-columns: 1fr !important; }
         .card { padding: 0; }
         .card-hdr { padding: 12px; }
-        .tbl-outer { padding: 12px; }
+        .tbl-outer { padding: 12px 12px 0 12px; }
+        .pagination-container { padding: 12px; }
     }
 </style>
 </head>
@@ -685,16 +696,96 @@ sort($actual_end_years);
                 </table>
                 </div>
             </div>
+            <div id="pagination-container" class="pagination-container" style="display:none;"></div>
         </div>
     </form>
 </div>
 
 <script>
+let currentPage = 1;
+const rowsPerPage = 10;
+let paginationMode = 'standard';
+let currentFilteredRows = [];
+
+function goToPage(p) {
+    currentPage = p;
+    renderPagination(currentFilteredRows);
+    onChkChange();
+}
+
+function togglePaginationMode() {
+    paginationMode = paginationMode === 'standard' ? 'all' : 'standard';
+    renderPagination(currentFilteredRows);
+}
+
+function renderPagination(rows) {
+    currentFilteredRows = rows;
+    const totalPages = Math.ceil(rows.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    let visibleCount = 0;
+    rows.forEach((r, idx) => {
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        if (idx >= start && idx < end) {
+            r.classList.remove('is-hidden');
+            visibleCount++;
+        } else {
+            r.classList.add('is-hidden');
+        }
+    });
+
+    const tbody = document.querySelector('#main-table tbody');
+
+    const pCont = document.getElementById('pagination-container');
+    if (rows.length === 0) {
+        pCont.innerHTML = '';
+        pCont.style.display = 'none';
+        return;
+    }
+    
+    pCont.style.display = 'flex';
+    let html = '';
+
+    if (paginationMode === 'standard') {
+        html += `<div style="display:flex; gap:6px; flex:1; justify-content:flex-end; align-items:center;">`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(1)" ${currentPage===1?'disabled':''}>&laquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
+
+        if (currentPage > 1) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})">${currentPage-1}</button>`;
+        html += `<button type="button" class="page-btn active">${currentPage}</button>`;
+        if (currentPage < totalPages) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})">${currentPage+1}</button>`;
+
+        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
+        html += `<button type="button" class="page-btn" onclick="goToPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>&raquo;</button>`;
+        if (totalPages > 3) html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `</div>`;
+    } else {
+        html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
+        html += `<div class="page-scroll-wrap">`;
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button type="button" class="page-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
+        }
+        html += `</div>`;
+    }
+    pCont.innerHTML = html;
+
+    if (paginationMode === 'all') {
+        setTimeout(() => {
+            const wrap = document.querySelector('.page-scroll-wrap');
+            const activeBtn = wrap.querySelector('.active');
+            if (activeBtn) {
+                wrap.scrollLeft = activeBtn.offsetLeft - wrap.offsetWidth / 2 + activeBtn.offsetWidth / 2;
+            }
+        }, 10);
+    }
+}
+
 function onChkChange() {
     let filteredCheckedCount = 0;
     let selectedId = null;
-    const visibleRows = Array.from(document.querySelectorAll('#main-table tbody tr:not(.is-hidden)')).filter(tr => tr.id !== 'empty-row');
-    visibleRows.forEach(tr => {
+    currentFilteredRows.forEach(tr => {
         const chk = tr.querySelector('.iips-chk');
         if (chk && chk.checked) {
             filteredCheckedCount++;
@@ -707,8 +798,8 @@ function onChkChange() {
     document.getElementById('bulk-count').textContent = filteredCheckedCount + ' selected';
     
     const chkAll = document.getElementById('chk-all');
-    chkAll.indeterminate = filteredCheckedCount > 0 && filteredCheckedCount < visibleRows.length;
-    chkAll.checked = filteredCheckedCount > 0 && filteredCheckedCount === visibleRows.length && visibleRows.length > 0;
+    chkAll.indeterminate = filteredCheckedCount > 0 && filteredCheckedCount < currentFilteredRows.length;
+    chkAll.checked = filteredCheckedCount > 0 && filteredCheckedCount === currentFilteredRows.length && currentFilteredRows.length > 0;
 
     const viewBtn = document.getElementById('btn-view-details');
     const editBtn = document.getElementById('btn-edit-details');
@@ -724,8 +815,9 @@ function onChkChange() {
 }
 
 function toggleAll(cb) {
-    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .iips-chk').forEach(c => {
-        if(c.closest('tr').id !== 'empty-row') c.checked = cb.checked;
+    currentFilteredRows.forEach(tr => {
+        const chk = tr.querySelector('.iips-chk');
+        if (chk) chk.checked = cb.checked;
     });
     onChkChange();
 }
@@ -763,7 +855,7 @@ function exportFilteredOrAll() {
 
     const btnExport = document.getElementById('btn-export-all');
     if (btnExport.classList.contains('filtered')) {
-        document.querySelectorAll('#main-table tbody tr:not(.is-hidden)').forEach(tr => {
+        currentFilteredRows.forEach(tr => {
             const pid = tr.dataset.pid;
             if (pid) {
                 const input = document.createElement('input');
@@ -1023,12 +1115,8 @@ function applyFilters() {
             ok = !ok;
         }
 
-        if (ok) {
-            tr.classList.remove('is-hidden');
-            visRows.push(tr);
-        } else {
-            tr.classList.add('is-hidden');
-        }
+        tr.classList.add('is-hidden');
+        if (ok) visRows.push(tr);
     });
 
     let emptyTr = document.getElementById('empty-row');
@@ -1040,6 +1128,9 @@ function applyFilters() {
     
     document.querySelectorAll('.filter-cats label').forEach(lbl => { lbl.classList.toggle('active-cat', lbl.querySelector('input').checked); });
     updateAdvCount();
+
+    currentPage = 1;
+    renderPagination(visRows);
 
     const btnExport = document.getElementById('btn-export-all');
     if (hasFilter && (!isInverse || visRows.length !== document.querySelectorAll('#main-table tbody tr[data-pid]').length)) {
