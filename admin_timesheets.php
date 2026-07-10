@@ -207,8 +207,9 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color:
 .btn-export-all { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
 .btn-export-all.filtered { background: #17a2b8; box-shadow: 0 2px 5px rgba(23,162,184,0.3); }
 
-.tbl-outer { position: relative; padding: 0 20px 0 20px; }
-.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Changed to Match Scrollable UI */
+.tbl-outer { position: relative; padding: 0 20px 20px 20px; }
+.tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; -webkit-overflow-scrolling: touch; }
 .tbl-wrap::-webkit-scrollbar { width: 10px; height: 8px; }
 .tbl-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; }
 .tbl-wrap::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
@@ -216,7 +217,7 @@ body { font-family: Arial, sans-serif; margin: 30px; background: #f4f7f6; color:
 table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 th, td { padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
 th { background: #f8fafc; font-weight: 600; color: #475569; }
-tbody tr:hover { background: #f8faff; }
+
 .is-hidden { display: none !important; }
 .dr { line-height: 1.4; }
 .dr .d-start { color: #1d4ed8; font-weight: 600; font-size: 12px; }
@@ -240,24 +241,21 @@ tbody tr:hover { background: #f8faff; }
 .sort-menu a { display:block; padding:6px 10px; font-size:12px; color:#333; text-decoration:none; }
 .sort-menu a:hover { background:#f8fafc; color:#007bff; }
 .show-sort { display:block !important; }
+
+/* Sticky headers and columns */
 .sec-row th { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 5px 8px; color: white; border: 1px solid rgba(255,255,255,0.15); position: sticky; top: 0; z-index: 22; }
 thead tr:last-child th { position: sticky; top: 27px; z-index: 21; background: #f8fafc; box-shadow: 0 2px 0 #dee2e6; }
-thead tr.sec-row th.chk-col { z-index: 26; }
+.chk-col { width: 36px; position: sticky; left: 0; z-index: 23; background: #ffffff; border-right: 1px solid #dee2e6; }
+tbody tr td.chk-col { background: #ffffff; }
+tbody tr:hover { background: #f8faff; }
+tbody tr:hover td.chk-col { background: #f8faff; }
+thead tr:last-child th.chk-col { z-index: 25; background: #f8fafc; }
+thead tr.sec-row th.chk-col { z-index: 26; background: #343a40; }
+
 .s-base     { background: #343a40; }
 .s-timeline { background: #1a237e; }
 .s-actual   { background: #004d40; }
 .s-act      { background: #343a40; }
-.chk-col { width: 36px; position: sticky; left: 0; z-index: 23; background: #343a40; border-right: 1px solid #dee2e6; }
-
-.pagination-container { padding: 12px 20px; display: flex; align-items: center; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; width: 100%; box-sizing: border-box; overflow: hidden; gap: 6px; }
-.page-btn { min-width: 32px; height: 32px; margin: 0; padding: 0 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; user-select: none; transition: all 0.2s; flex-shrink: 0; }
-.page-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
-.page-btn.active { background: #007bff; color: white; border-color: #007bff; }
-.page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.page-scroll-wrap { display: flex; overflow-x: auto; flex: 1; scroll-behavior: smooth; align-items: center; gap: 6px; padding-bottom: 6px; margin-bottom: -6px; }
-.page-scroll-wrap::-webkit-scrollbar { height: 6px; }
-.page-scroll-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-.page-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 
 .gantt-section { margin-top:20px; display:none; background:white; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.07); }
 .gantt-header { padding: 12px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -310,7 +308,6 @@ thead tr.sec-row th.chk-col { z-index: 26; }
     .card { padding: 0; }
     .card-hdr { padding: 12px; }
     .tbl-outer { padding: 12px 12px 0 12px; }
-    .pagination-container { padding: 12px; }
 }
 </style>
 <script>
@@ -432,12 +429,12 @@ if ($proj_list_result) {
                 <h3>Employee Work Hour Compliance Logs</h3>
                 <button type="button" id="btn-export-all" class="btn-export-all" onclick="exportFilteredOrAll()">📥 Export All</button>
             </div>
-            <div class="tbl-outer">
-            <div class="tbl-wrap">
+            <div class="tbl-outer" id="tbl-outer">
+            <div class="tbl-wrap" id="tbl-wrap">
             <table id="main-table">
                 <thead>
                     <tr class="sec-row">
-                        <th class="s-base" rowspan="2" style="width:36px;"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+                        <th class="chk-col s-base" rowspan="2"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
                         <th class="s-base" colspan="2">Engineer & Project</th>
                         <th class="s-base" colspan="2">IIPS Details</th>
                         <th class="s-base" colspan="1">Activity</th>
@@ -470,7 +467,7 @@ if ($proj_list_result) {
                     data-sd="<?= htmlspecialchars($row['start_date']) ?>"
                     data-ed="<?= htmlspecialchars($row['end_date']) ?>"
                     data-mins="<?= $mins ?>">
-                    <td><input type="checkbox" class="ts-chk" name="selected_ts[]" value="<?= $row['id'] ?>" onchange="onChkChange()"></td>
+                    <td class="chk-col"><input type="checkbox" class="ts-chk" name="selected_ts[]" value="<?= $row['id'] ?>" onchange="onChkChange()"></td>
                     <td><strong><?= htmlspecialchars($row['engineer_name']) ?></strong></td>
                     <td><code style="font-size:11px;"><?= preg_match('/^N[\/.\-]?A/i', $row['project_id']) ? '<span style=\'color:#9ca3af;\'>—</span>' : htmlspecialchars($row['project_id']) ?></code></td>
                     <td style="font-size:11px;"><?= htmlspecialchars($row['customer_name']) ?></td>
@@ -486,7 +483,6 @@ if ($proj_list_result) {
             </table>
             </div>
             </div>
-            <div id="pagination-container" class="pagination-container" style="display:none;"></div>
         </div>
     </form>
 
@@ -552,91 +548,10 @@ let showTargetDates  = false;
 let origRows = null;
 let ganttData = {};
 
-let currentPage = 1;
-const rowsPerPage = 10;
-let paginationMode = 'standard';
-let currentFilteredRows = [];
-
 window.ganttScrollMap = {};
 window.ganttScrollIdx = {};
 window.ganttScrollDir = {};
 window.barChartInst = null;
-
-function goToPage(p) {
-    currentPage = p;
-    renderPagination(currentFilteredRows);
-    document.getElementById('chk-all').checked = false;
-    onChkChange();
-}
-
-function togglePaginationMode() {
-    paginationMode = paginationMode === 'standard' ? 'all' : 'standard';
-    renderPagination(currentFilteredRows);
-}
-
-function renderPagination(rows) {
-    currentFilteredRows = rows;
-    const totalPages = Math.ceil(rows.length / rowsPerPage) || 1;
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-
-    let visibleCount = 0;
-    rows.forEach((r, idx) => {
-        const start = (currentPage - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-        if (idx >= start && idx < end) {
-            r.classList.remove('is-hidden');
-            visibleCount++;
-        } else {
-            r.classList.add('is-hidden');
-        }
-    });
-
-    const tbody = document.querySelector('#main-table tbody');
-
-    const pCont = document.getElementById('pagination-container');
-    if (rows.length === 0) {
-        pCont.innerHTML = '';
-        pCont.style.display = 'none';
-        return;
-    }
-    
-    pCont.style.display = 'flex';
-    let html = '';
-
-    if (paginationMode === 'standard') {
-        html += `<div style="display:flex; gap:6px; flex:1; justify-content:flex-end; align-items:center;">`;
-        html += `<button type="button" class="page-btn" onclick="goToPage(1)" ${currentPage===1?'disabled':''}>&laquo;</button>`;
-        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
-
-        if (currentPage > 1) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage-1})">${currentPage-1}</button>`;
-        html += `<button type="button" class="page-btn active">${currentPage}</button>`;
-        if (currentPage < totalPages) html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})">${currentPage+1}</button>`;
-
-        html += `<button type="button" class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
-        html += `<button type="button" class="page-btn" onclick="goToPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>&raquo;</button>`;
-        if (totalPages > 3) html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
-        html += `</div>`;
-    } else {
-        html += `<button type="button" class="page-btn" onclick="togglePaginationMode()">...</button>`;
-        html += `<div class="page-scroll-wrap">`;
-        for (let i = 1; i <= totalPages; i++) {
-            html += `<button type="button" class="page-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
-        }
-        html += `</div>`;
-    }
-    pCont.innerHTML = html;
-
-    if (paginationMode === 'all') {
-        setTimeout(() => {
-            const wrap = document.querySelector('.page-scroll-wrap');
-            const activeBtn = wrap.querySelector('.active');
-            if (activeBtn) {
-                wrap.scrollLeft = activeBtn.offsetLeft - wrap.offsetWidth / 2 + activeBtn.offsetWidth / 2;
-            }
-        }, 10);
-    }
-}
 
 window.cycleGroupScroll = function(groupId, viewMinT, totalRange) {
     let times = window.ganttScrollMap[groupId];
@@ -767,8 +682,13 @@ function doFilter() {
                 && (activeYearFilter === 'all' || rSd.startsWith(activeYearFilter))
                 && (!dateStart        || rSd  >= dateStart)
                 && (!dateEnd          || rSd  <= dateEnd);
-        tr.classList.add('is-hidden');
-        if (ok) visRows.push(tr);
+        
+        if (ok) {
+            tr.classList.remove('is-hidden');
+            visRows.push(tr);
+        } else {
+            tr.classList.add('is-hidden');
+        }
     });
 
     let emptyTr = document.getElementById('empty-row');
@@ -780,9 +700,6 @@ function doFilter() {
 
     updateLiveDashboard(visRows);
     
-    currentPage = 1;
-    renderPagination(visRows);
-
     const hasFilter = (txt !== '' || activeProjFilter !== '' || activeEngFilter !== '' || dateStart !== '' || dateEnd !== '');
     const btnExport = document.getElementById('btn-export-all');
     if (hasFilter) {
@@ -802,6 +719,31 @@ function doFilter() {
         document.getElementById('gantt-section').style.display = 'none';
         document.getElementById('charts-section').style.display = 'none';
     }
+}
+
+function clearAllFilters() {
+    document.getElementById('txt-search').value = '';
+    document.getElementById('date-start').value = '';
+    document.getElementById('date-end').value = '';
+    document.getElementById('date-start-display').value = '';
+    document.getElementById('date-end-display').value = '';
+    
+    activeProjFilter = '';
+    document.getElementById('proj-label').textContent = 'All IIPS';
+    document.querySelectorAll('#proj-list .sel-item').forEach(i => i.classList.remove('active'));
+    document.querySelector('#proj-list .sel-item[data-value=""]').classList.add('active');
+    
+    activeEngFilter = '';
+    document.getElementById('eng-label').textContent = 'All Engineers';
+    document.querySelectorAll('#eng-list .sel-item').forEach(i => i.classList.remove('active'));
+    document.querySelector('#eng-list .sel-item[data-value=""]').classList.add('active');
+
+    activeYearFilter = 'all';
+    document.getElementById('year-label').textContent = 'Year: All';
+    document.querySelectorAll('#year-list .sel-item').forEach(i => i.classList.remove('active'));
+    document.querySelector('#year-list .sel-item[data-value="all"]').classList.add('active');
+
+    doFilter();
 }
 
 function fmtDateJS(ymd) {
@@ -892,17 +834,20 @@ function onChkChange() {
     visibleCheckboxes.forEach(c => { if(c.checked) visibleCheckedCount++; });
     
     document.getElementById('chk-all').indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleCheckboxes.length;
-    document.getElementById('chk-all').checked = visibleCheckedCount > 0 && visibleCheckedCount === visibleCheckboxes.length;
+    document.getElementById('chk-all').checked = visibleCheckedCount > 0 && visibleCheckedCount === visibleCheckboxes.length && visibleCheckboxes.length > 0;
 }
 
 function toggleAll(cb) { 
-    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk').forEach(c => c.checked = cb.checked); 
+    document.querySelectorAll('#main-table tbody tr:not(.is-hidden) .ts-chk').forEach(c => {
+        if(c.closest('tr').id !== 'empty-row') c.checked = cb.checked;
+    }); 
     onChkChange(); 
 }
 
 function deselectAll() { 
     document.querySelectorAll('.ts-chk').forEach(c => c.checked = false); 
     document.getElementById('chk-all').checked = false; 
+    document.getElementById('chk-all').indeterminate = false;
     document.getElementById('bulk-toolbar').style.display = 'none'; 
 }
 
@@ -932,7 +877,7 @@ function exportFilteredOrAll() {
 
     const btnExport = document.getElementById('btn-export-all');
     if (btnExport.classList.contains('filtered')) {
-        currentFilteredRows.forEach(tr => {
+        document.querySelectorAll('#main-table tbody tr:not(.is-hidden)').forEach(tr => {
             const chk = tr.querySelector('.ts-chk');
             if (chk) {
                 const input = document.createElement('input');
