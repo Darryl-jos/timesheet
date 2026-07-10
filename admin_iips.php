@@ -490,7 +490,7 @@ sort($actual_end_years);
                 <div class="hdr-left">
                     <h3>IIPS Database</h3>
                     <div id="totals-bar">
-                        <span class="tot-lbl">Total Rows <em id="tot-rows-lbl">(0 projects)</em></span>
+                        <span class="tot-lbl">Total all in the Database <em id="tot-rows-lbl">(0 projects)</em></span>
                         <div class="tot-item"><small>Total Selling Price</small><span id="tot-sr">RM 0.00</span></div>
                         <div class="tot-item"><small>Total Partner Cost</small><span id="tot-pr">RM 0.00</span></div>
                         <div class="tot-item"><small>Total Actual GP</small><span id="tot-gp">RM 0.00</span></div>
