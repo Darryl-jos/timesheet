@@ -327,6 +327,9 @@ sort($actual_end_years);
         .card-hdr { padding: 12px; }
         .tbl-outer { padding: 12px; }
     }
+
+    #sticky-scrollbar-container { position: fixed; bottom: 0; overflow-x: auto; z-index: 1000; background: rgba(255,255,255,0.95); box-shadow: 0 -2px 5px rgba(0,0,0,0.05); border-radius: 4px 4px 0 0; display: none; }
+    #sticky-scrollbar-content { height: 1px; }
 </style>
 </head>
 <body>
@@ -703,7 +706,52 @@ sort($actual_end_years);
     </form>
 </div>
 
+<div id="sticky-scrollbar-container">
+    <div id="sticky-scrollbar-content"></div>
+</div>
+
 <script>
+const dummyScrlCont = document.getElementById('sticky-scrollbar-container');
+const dummyScrlIn = document.getElementById('sticky-scrollbar-content');
+const realScrlCont = document.getElementById('tbl-wrap');
+let syncL = false;
+let syncR = false;
+
+dummyScrlCont.addEventListener('scroll', function() {
+    if (!syncL) {
+        syncR = true;
+        realScrlCont.scrollLeft = dummyScrlCont.scrollLeft;
+    }
+    syncL = false;
+});
+
+realScrlCont.addEventListener('scroll', function() {
+    if (!syncR) {
+        syncL = true;
+        dummyScrlCont.scrollLeft = realScrlCont.scrollLeft;
+    }
+    syncR = false;
+});
+
+function updateStickyScrl() {
+    if (!realScrlCont || !dummyScrlCont) return;
+    dummyScrlIn.style.width = realScrlCont.scrollWidth + 'px';
+    const r = realScrlCont.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+
+    dummyScrlCont.style.left = r.left + 'px';
+    dummyScrlCont.style.width = r.width + 'px';
+
+    if (r.top < vh && r.bottom > vh) {
+        dummyScrlCont.style.display = 'block';
+        dummyScrlCont.scrollLeft = realScrlCont.scrollLeft;
+    } else {
+        dummyScrlCont.style.display = 'none';
+    }
+}
+
+window.addEventListener('scroll', updateStickyScrl);
+
 function onChkChange() {
     let filteredCheckedCount = 0;
     let selectedId = null;
@@ -818,6 +866,7 @@ function fixStickyHeaders() {
 
 window.addEventListener('DOMContentLoaded', () => {
     fixStickyHeaders();
+    updateStickyScrl();
 
     const boDisp = document.getElementById('filter-bo-display');
     const boVal = document.getElementById('filter-bo-val');
@@ -861,7 +910,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     applyFilters();
 });
-window.addEventListener('resize', fixStickyHeaders);
+
+window.addEventListener('resize', () => {
+    fixStickyHeaders();
+    updateStickyScrl();
+});
+
 document.getElementById('search-input').addEventListener('input', applyFilters);
 
 let colFilters = { pm: '', iips: '', billing: '', 'tbd-year': '', 'tsd-year': '', 'ted-year': '', 'asd-year': '', 'aed-year': '' };
@@ -1067,6 +1121,7 @@ function applyFilters() {
 
     onChkChange();
     updateTotals(visRows);
+    updateStickyScrl();
 }
 
 function updateTotals(visRows) {
@@ -1191,8 +1246,8 @@ function filterCol(type, value) {
 }
 
 let origRows = null;
-function toggleSort(e, id) { e.stopPropagation(); document.querySelectorAll('.sort-menu').forEach(m => { if(m.id!==id) m.classList.remove('show-sort'); }); document.getElementById(id).classList.toggle('show-sort'); }
-window.addEventListener('click', () => document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')));
+function toggleSort(e, id) { e.stopPropagation(); document.querySelectorAll('.sort-menu').forEach(m => { if(m.id!==id) m.classList.remove('show-sort'); }); document.getElementById(id).classList.toggle('show-sort'); updateStickyScrl(); }
+window.addEventListener('click', () => { document.querySelectorAll('.sort-menu').forEach(m => m.classList.remove('show-sort')); updateStickyScrl(); });
 function sortT(col, type, dir) {
     const tbody = document.querySelector('#main-table tbody');
     const rows  = Array.from(tbody.querySelectorAll('tr[data-pid]'));
@@ -1227,4 +1282,4 @@ function sortT(col, type, dir) {
 }
 </script>
 </body>
-</html>
+</html> 
