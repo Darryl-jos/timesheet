@@ -31,7 +31,9 @@ $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$view_mode) {
     $old_pid   = trim($_POST['old_project_id'] ?? '');
-    $p_id      = !empty(trim($_POST['project_id'])) ? trim($_POST['project_id']) : ('NA-'.strtoupper(uniqid()));
+    $input_pid = trim($_POST['project_id'] ?? '');
+    $p_id = empty($input_pid) ? (!empty($old_pid) ? $old_pid : ('NA-'.strtoupper(uniqid()))) : $input_pid;
+    
     $p_name    = trim($_POST['project_name']);
     $c_name    = trim($_POST['customer_name']);
 
@@ -230,7 +232,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
             <div class="section-body three-col">
                 <div class="form-group">
                     <label>IIPS ID</label>
-                    <input type="text" name="project_id" id="project_id" value="<?= htmlspecialchars($v['project_id']) ?>" placeholder="e.g. SO-0000123" class="<?= isset($errors['project_id']) ? 'err' : '' ?>" oninput="clearErr('project_id')" <?= $dAttr ?>>
+                    <input type="text" name="project_id" id="project_id" value="<?= htmlspecialchars(strpos($v['project_id'], 'NA-') === 0 ? '' : $v['project_id']) ?>" placeholder="e.g. SO-0000123" class="<?= isset($errors['project_id']) ? 'err' : '' ?>" oninput="clearErr('project_id')" <?= $dAttr ?>>
                     <?php if (isset($errors['project_id'])): ?><div id="err-project_id" style="color:#dc3545;font-size:11px;margin-top:4px;font-weight:600;"><?= $errors['project_id'] ?></div><?php endif; ?>
                 </div>
                 <div class="form-group">
